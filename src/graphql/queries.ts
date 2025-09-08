@@ -1,0 +1,482 @@
+import { gql } from "@apollo/client";
+
+export const GET_TOP_LEVEL_COLLECTIONS = gql`
+  query GetTopLevelCollections {
+    collections(options: { topLevelOnly: true }) {
+      items {
+        id
+        slug
+        name
+        featuredAsset {
+          id
+          preview
+        }
+      }
+    }
+  }
+`;
+
+export const GET_COLLECTION_PRODUCTS = gql`
+  query GetCollectionProducts(
+    $collectionSlug: String!
+    $groupByProduct: Boolean = true
+    $skip: Int = 0
+    $take: Int = 20
+    $facetValueIds: [ID!]
+  ) {
+    search(
+      input: {
+        collectionSlug: $collectionSlug
+        groupByProduct: $groupByProduct
+        skip: $skip
+        take: $take
+        facetValueIds: $facetValueIds
+      }
+    ) {
+      totalItems
+      items {
+        productName
+        slug
+        facetValueIds
+        productAsset {
+          id
+          preview
+        }
+        priceWithTax {
+          __typename
+          ... on SinglePrice {
+            value
+          }
+          ... on PriceRange {
+            min
+            max
+          }
+        }
+        currencyCode
+      }
+    }
+  }
+`;
+
+export const GET_PRODUCT_DETAILS = gql`
+  query GetProductDetail($slug: String!) {
+    product(slug: $slug) {
+      id
+      name
+      description
+      collections {
+        name
+        id
+        slug
+      }
+      customFields {
+        powerOutput
+        efficiency
+        voltage
+        dimensions
+        weight
+        frameMaterial
+        surfaceMaterial
+        relatedProducts {
+          variants {
+            id
+            name
+            featuredAsset {
+              preview
+            }
+            price
+            product {
+              id
+              name
+              slug
+              enabled
+              assets {
+                preview
+              }
+              featuredAsset {
+                id
+                preview
+              }
+            }
+            price
+          }
+        }
+      }
+      featuredAsset {
+        id
+        preview
+      }
+      assets {
+        id
+        preview
+      }
+      variants {
+        id
+        name
+        sku
+        stockLevel
+        currencyCode
+        price
+        priceWithTax
+        featuredAsset {
+          id
+          preview
+        }
+        assets {
+          id
+          preview
+        }
+      }
+    }
+  }
+`;
+
+/* ------------------- Fragments ------------------- */
+export const ACTIVE_ORDER_FRAGMENT = gql`
+  fragment ActiveOrder on Order {
+    id
+    code
+    state
+    currencyCode
+    totalWithTax
+    subTotalWithTax
+    shippingWithTax
+    lines {
+      id
+      quantity
+      linePriceWithTax
+      productVariant {
+        id
+        name
+        sku
+        product {
+          id
+          featuredAsset {
+            id
+            preview
+          }
+        }
+      }
+    }
+    shippingLines {
+      priceWithTax
+      shippingMethod {
+        id
+        code
+        name
+        description
+      }
+    }
+    customer {
+      id
+      firstName
+      lastName
+      emailAddress
+    }
+  }
+`;
+
+/* ------------------- Active order & orders ------------------- */
+export const GET_ACTIVE_ORDER = gql`
+  query GetActiveOrder {
+    activeOrder {
+      ...ActiveOrder
+    }
+  }
+  ${ACTIVE_ORDER_FRAGMENT}
+`;
+
+export const GET_CUSTOMER_ORDERS = gql`
+  query GetCustomerOrders($options: OrderListOptions) {
+    orders(options: $options) {
+      totalItems
+      items {
+        id
+        code
+        state
+        totalWithTax
+        createdAt
+      }
+    }
+  }
+`;
+
+/* ------------------- Address & Shipping ------------------- */
+export const SET_SHIPPING_ADDRESS = gql`
+  mutation SetOrderShippingAddress($input: CreateAddressInput!) {
+    setOrderShippingAddress(input: $input) {
+      ...ActiveOrder
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+  ${ACTIVE_ORDER_FRAGMENT}
+`;
+
+export const GET_SHIPPING_METHODS = gql`
+  query GetShippingMethods {
+    eligibleShippingMethods {
+      id
+      price
+      description
+      name
+    }
+  }
+`;
+
+export const SET_SHIPPING_METHOD = gql`
+  mutation SetShippingMethod($id: [ID!]!) {
+    setOrderShippingMethod(shippingMethodId: $id) {
+      ...ActiveOrder
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+  ${ACTIVE_ORDER_FRAGMENT}
+`;
+
+/* ------------------- Payments ------------------- */
+export const GET_PAYMENT_METHODS = gql`
+  query GetPaymentMethods {
+    eligiblePaymentMethods {
+      id
+      name
+      code
+      isEligible
+    }
+  }
+`;
+
+export const TRANSITION_TO_STATE = gql`
+  mutation TransitionToState($state: String!) {
+    transitionOrderToState(state: $state) {
+      ...ActiveOrder
+      ... on OrderStateTransitionError {
+        errorCode
+        message
+        transitionError
+        fromState
+        toState
+      }
+    }
+  }
+  ${ACTIVE_ORDER_FRAGMENT}
+`;
+
+/** Custom resolver on your backend */
+export const PAYSTACK_INTENT = gql`
+  mutation CreatePaystackIntent($orderCode: String!) {
+    createPaystackPaymentIntent(orderCode: $orderCode) {
+      authorizationUrl
+      accessCode
+      reference
+      amount
+    }
+  }
+`;
+
+/** Custom resolver to restore cart when payment fails/cancels */
+export const RECREATE_FAILED_ORDER = gql`
+  mutation RecreateFailedOrder($orderCode: String!) {
+    recreateFailedOrder(orderCode: $orderCode) {
+      ...ActiveOrder
+    }
+  }
+  ${ACTIVE_ORDER_FRAGMENT}
+`;
+
+/* ------------CART------------------ */
+export const ADD_TO_CART = gql`
+  mutation AddItemToOrder($productVariantId: ID!, $quantity: Int!) {
+    addItemToOrder(productVariantId: $productVariantId, quantity: $quantity) {
+      ...ActiveOrder
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+      ... on InsufficientStockError {
+        quantityAvailable
+        order {
+          ...ActiveOrder
+        }
+      }
+    }
+  }
+  ${ACTIVE_ORDER_FRAGMENT}
+`;
+
+export const ADJUST_QUANTITY = gql`
+  mutation AdjustOrderLine($orderLineId: ID!, $quantity: Int!) {
+    adjustOrderLine(orderLineId: $orderLineId, quantity: $quantity) {
+      ...ActiveOrder
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+  ${ACTIVE_ORDER_FRAGMENT}
+`;
+
+export const GET_PRODUCTS_FOR_GRID = gql`
+  query GetProductsForGrid($take: Int!, $skip: Int!) {
+    products(options: { take: $take, skip: $skip }) {
+      items {
+        id
+        name
+        slug
+        featuredAsset {
+          preview
+        }
+        variants {
+          id
+          name
+          priceWithTax
+          stockLevel
+          featuredAsset {
+            preview
+          }
+        }
+      }
+      totalItems
+    }
+  }
+`;
+
+export const GET_CURRENT_USER = gql`
+  query GetCurrentUser {
+    me {
+      id
+      identifier
+    }
+    activeCustomer {
+      id
+      emailAddress
+      firstName
+      lastName
+    }
+  }
+`;
+
+export const LOGIN = gql`
+  mutation Login($username: String!, $password: String!, $rememberMe: Boolean) {
+    login(username: $username, password: $password, rememberMe: $rememberMe) {
+      __typename
+      ... on CurrentUser {
+        id
+        identifier
+      }
+      ... on InvalidCredentialsError {
+        errorCode
+        message
+      }
+      ... on NotVerifiedError {
+        errorCode
+        message
+      }
+    }
+  }
+`;
+
+export const LOGOUT = gql`
+  mutation Logout {
+    logout
+  }
+`;
+
+export const REGISTER_CUSTOMER = gql`
+  mutation RegisterCustomer(
+    $emailAddress: String!
+    $password: String!
+    $firstName: String
+    $lastName: String
+  ) {
+    registerCustomerAccount(
+      input: {
+        emailAddress: $emailAddress
+        password: $password
+        firstName: $firstName
+        lastName: $lastName
+      }
+    ) {
+      __typename
+      ... on Success {
+        success
+      }
+      ... on MissingPasswordError {
+        message
+      }
+      ... on NativeAuthStrategyError {
+        message
+      }
+    }
+  }
+`;
+
+export const GET_ALL_FACETS = gql`
+  query GetFacets {
+    facets {
+      items {
+        values {
+          id
+          name
+          facetId
+          facet {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const GET_CATEGORIES_QUERY = gql`
+  query GetTopLevelCollections {
+    collections(options: { topLevelOnly: true }) {
+      items {
+        id
+        slug
+        name
+        featuredAsset {
+          id
+          preview
+        }
+      }
+    }
+  }
+`;
+
+/* ------------------- 🔍 Search Products ------------------- */
+export const SEARCH_PRODUCTS = gql`
+  query SearchProducts($input: SearchInput!) {
+    search(input: $input) {
+      totalItems
+      items {
+        productName
+        slug
+        productVariantId
+        description
+        productAsset {
+          id
+          preview
+        }
+        productVariantName
+        inStock
+        priceWithTax {
+          ... on SinglePrice {
+            value
+          }
+          ... on PriceRange {
+            min
+            max
+          }
+        }
+      }
+    }
+  }
+`;

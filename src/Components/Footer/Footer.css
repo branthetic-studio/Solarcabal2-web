@@ -1,0 +1,176 @@
+.footer {
+  background-color: #fff;
+  padding: 60px 20px;
+  border-top: 1px solid #ddd;
+  font-family: inter;
+  color: #333;
+}
+
+.footer-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: auto;
+  gap: 40px;
+}
+
+.footer-about,
+.footer-links,
+.footer-social {
+  flex: 1 1 300px;
+  min-width: 250px;
+}
+
+.footer-logo {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 12px;
+}
+
+.footer-about h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.footer-about p {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.6;
+}
+
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.footer-links a {
+  color: #333;
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  text-decoration: underline;
+}
+
+.footer-social {
+  text-align: center;
+}
+
+.social-icons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.social-icons svg {
+  font-size: 18px;
+  padding: 8px;
+  background: #f2f2f2;
+  border-radius: 50%;
+  color: #111;
+}
+
+.footer-social p {
+  font-size: 12px;
+  color: #666;
+  margin: 8px 0;
+}
+
+.legal-links {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  font-size: 12px;
+}
+
+.legal-links a {
+  text-decoration: underline;
+  color: #111;
+}
+
+/* =========================
+   Footer: Mobile styles
+   ========================= */
+
+/* Tablets & down */
+@media (max-width: 768px) {
+  .footer {
+    padding: 36px 16px;
+  }
+
+  .footer-container {
+    gap: 24px;
+    justify-content: center;
+  }
+
+  .footer-about,
+  .footer-links,
+  .footer-social {
+    flex: 1 1 100%;
+    min-width: 0;
+    text-align: center; /* center all columns on mobile */
+  }
+
+  .footer-logo {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .footer-about h3 {
+    font-size: 15px;
+  }
+
+  .footer-about p {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .footer-links {
+    align-items: center; /* center links column */
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .social-icons {
+    gap: 10px;
+  }
+
+  .social-icons svg {
+    font-size: 16px;
+    padding: 7px;
+  }
+
+  .footer-social p {
+    font-size: 12px;
+  }
+
+  .legal-links {
+    flex-wrap: wrap; /* allow wrapping on small widths */
+    gap: 12px;
+  }
+}
+
+/* Phones */
+@media (max-width: 480px) {
+  .footer {
+    padding: 28px 12px;
+  }
+
+  .footer-about p {
+    font-size: 12px;
+  }
+
+  .footer-links {
+    font-size: 12px;
+    gap: 6px;
+  }
+
+  .legal-links {
+    gap: 10px;
+  }
+}

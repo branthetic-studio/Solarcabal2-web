@@ -1,0 +1,29 @@
+.package-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 35px;
+  padding: 50px;
+  border-radius: 18px;
+  background-image: url(/images/roofpanel.png);
+  background-blend-mode: overlay;
+  background-color: #333;
+  color: #fff;
+  background-repeat: no-repeat;
+  background-size: contain;
+  height: 300px;
+}
+
+.package-detail-title {
+  flex: 1;
+}
+
+.package-detail-features {
+  flex: .8;
+  background-color: #b5b5b54a;
+  /* backdrop-filter: blur(100px); */
+  /* -webkit-backdrop-filter: blur(10px); */
+  height: 100%;
+  padding: 40px;
+  border-radius: 18px;
+}

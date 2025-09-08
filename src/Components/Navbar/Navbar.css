@@ -1,0 +1,195 @@
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  color: white;
+  font-family: inter;
+  width: full;
+  max-width: 1240px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.logo {
+  width: 41px;
+  height: 40px;
+}
+
+.navbar ul {
+  display: flex;
+  gap: 40px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  color: #525252;
+}
+
+.navbar ul li {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.navbar ul li a {
+  text-decoration: none;
+  color: #525252;
+}
+
+.navbar .navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.navbar .navbar-actions button {
+  background: none;
+  border: none;
+  color: black;
+}
+
+.active-link {
+  font-weight: bold;
+  color: #ff0000;
+}
+
+/* --- Mobile (≤768px): stack + scrollable links --- */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 12px 16px;
+    gap: 8px;
+    flex-wrap: wrap; /* allow items to move to new lines */
+  }
+
+  .logo {
+    width: 34px;
+    height: 34px;
+    order: 1; /* 1) logo */
+  }
+
+  /* The first <div> inside .navbar is the links wrapper */
+  .navbar > div:nth-of-type(1) {
+    order: 3; /* 3) links row goes last on mobile */
+    flex-basis: 100%;
+    overflow-x: auto; /* horizontal scroll if too many links */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .navbar ul {
+    gap: 16px;
+    white-space: nowrap; /* keep links on one line for scrolling */
+    padding-bottom: 4px; /* breathing room for the hidden scrollbar */
+    margin-top: 6px;
+    /* Hide scrollbar visuals (keeps scroll) */
+    scrollbar-width: none; /* Firefox */
+  }
+  .navbar ul::-webkit-scrollbar {
+    display: none;
+  }
+
+  .navbar ul li {
+    font-size: 13px;
+  }
+
+  .navbar .navbar-actions {
+    order: 2; /* 2) actions (icons) in the middle row */
+    gap: 12px;
+  }
+  .navbar .navbar-actions button {
+    padding: 6px; /* bigger touch targets */
+  }
+}
+
+/* --- Extra-small (≤360px): tighten spacing just a bit --- */
+@media (max-width: 360px) {
+  .navbar ul {
+    gap: 12px;
+  }
+  .navbar .navbar-actions {
+    gap: 10px;
+  }
+}
+
+/* ---------- hamburger & mobile drawer ---------- */
+
+/* hidden by default on desktop */
+.nav-toggle {
+  display: none;
+  background: none;
+  border: 0;
+  color: black;
+  cursor: pointer;
+}
+
+/* show hamburger and hide desktop links on tablets & phones */
+@media (max-width: 1024px) {
+  .links {
+    display: none;
+  } /* hide center links on small screens */
+  .nav-toggle {
+    display: inline-flex;
+  } /* show hamburger */
+}
+
+/* overlay */
+.mobile-menu {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 1000;
+}
+
+/* slide-in panel */
+.mobile-sheet {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(84vw, 340px);
+  height: 100%;
+  background: #fff;
+  padding: 20px;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mobile-sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mobile-close {
+  background: none;
+  border: 0;
+  color: black;
+  cursor: pointer;
+}
+
+/* links in the drawer */
+.mobile-links {
+  list-style: none;
+  padding: 12px 0 0;
+  margin: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.mobile-links a {
+  color: #1a1a1a;
+  text-decoration: none;
+  font-size: 16px;
+}
+
+/* open state */
+.mobile-menu.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mobile-menu.open .mobile-sheet {
+  transform: translateX(0);
+}
