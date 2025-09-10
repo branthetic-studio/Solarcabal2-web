@@ -480,3 +480,67 @@ export const SEARCH_PRODUCTS = gql`
     }
   }
 `;
+
+/** Ask server to send a reset email */
+export const REQUEST_PASSWORD_RESET = gql`
+  mutation RequestPasswordReset($emailAddress: String!) {
+    requestPasswordReset(emailAddress: $emailAddress) {
+      ... on Success {
+        success
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+`;
+
+/** Complete the reset with the token from email */
+export const RESET_PASSWORD = gql`
+  mutation ResetPassword($token: String!, $password: String!) {
+    resetPassword(token: $token, password: $password) {
+      # Backends differ; keep it flexible:
+      ... on Success {
+        success
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+      # Some Vendure setups return LoginResult-like unions; you can expand here if needed
+    }
+  }
+`;
+
+export const VERIFY_EMAIL_ADDRESS_MUTATION = gql`
+  mutation VerifyEmailAddress($token: String!) {
+    verifyEmailAddress(token: $token) {
+      __typename
+      ... on Success {
+        success
+        message
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+`;
+
+/** Delete the current user’s account */
+export const DELETE_MY_ACCOUNT = gql`
+  mutation DeleteMyAccount {
+    deleteMyAccount {
+      ... on Success {
+        success
+        message
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+`;
