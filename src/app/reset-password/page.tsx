@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useMutation } from "@apollo/client/react";
 import { RESET_PASSWORD } from "@/graphql/queries";
 import Navbar from "@/Components/Navbar/Navbar";
 import Footer from "@/Components/Footer/Footer";
+import { Suspense } from "react";
 
 /* ---------- Manual types (no codegen) ---------- */
 type ResetPasswordPayload =
@@ -26,10 +27,12 @@ type ResetPasswordVars = {
 };
 /* ----------------------------------------------- */
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const token = useMemo(() => searchParams?.get("token") || "", [searchParams]);
+
+  // ✅ Correctly infer token from searchParams
+  const token = searchParams.get("token") ?? "";
 
   const [form, setForm] = useState({ password: "", confirm: "" });
 
@@ -57,8 +60,7 @@ export default function ResetPasswordPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
-    if (passwordMismatch) return;
+    if (!token || passwordMismatch) return;
     await reset({ variables: { token, password: form.password } });
   };
 
@@ -156,5 +158,13 @@ export default function ResetPasswordPage() {
 
       <Footer />
     </main>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<p>Loading reset form...</p>}>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

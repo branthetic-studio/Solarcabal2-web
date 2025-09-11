@@ -6,6 +6,7 @@ import { useMutation } from "@apollo/client/react";
 import { gql } from "@apollo/client";
 import Navbar from "@/Components/Navbar/Navbar";
 import Footer from "@/Components/Footer/Footer";
+import { Suspense } from "react";
 
 /* ---------- GraphQL Mutations ---------- */
 const VERIFY_CUSTOMER_ACCOUNT = gql`
@@ -83,12 +84,12 @@ type LoginResult = {
 
 type RefreshResult = {
   refreshCustomerVerification:
-    | { __typename: "Success"; success: boolean }
-    | ErrorResult;
+  | { __typename: "Success"; success: boolean }
+  | ErrorResult;
 };
 
-/* ---------- Component ---------- */
-export default function VerifyEmailAddressPage() {
+/* ---------- Inner Component that uses useSearchParams ---------- */
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams?.get("token") || "";
@@ -321,26 +322,35 @@ export default function VerifyEmailAddressPage() {
   };
 
   return (
+    <div className="mx-auto max-w-2xl px-4 py-12">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-semibold text-neutral-900">
+          Verify Email Address
+        </h1>
+
+        {renderContent()}
+      </div>
+
+      {/* Dev hint */}
+      <p className="mt-4 text-xs text-neutral-500">
+        Local test:{" "}
+        <code>
+          http://localhost:3000/verify-email-address?token=YOUR_TOKEN
+        </code>
+      </p>
+    </div>
+  );
+}
+
+/* ---------- Main Page Component ---------- */
+export default function VerifyEmailAddressPage() {
+  return (
     <main className="min-h-screen bg-neutral-50">
       <Navbar />
 
-      <div className="mx-auto max-w-2xl px-4 py-12">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-semibold text-neutral-900">
-            Verify Email Address
-          </h1>
-
-          {renderContent()}
-        </div>
-
-        {/* Dev hint */}
-        <p className="mt-4 text-xs text-neutral-500">
-          Local test:{" "}
-          <code>
-            http://localhost:3000/verify-email-address?token=YOUR_TOKEN
-          </code>
-        </p>
-      </div>
+      <Suspense fallback={<div className="mx-auto max-w-2xl px-4 py-12"><p className="text-center">Loading verification...</p></div>}>
+        <VerifyEmailContent />
+      </Suspense>
 
       <Footer />
     </main>
