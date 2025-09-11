@@ -53,7 +53,10 @@ export default function ForgotPasswordPage() {
 
   return (
     <main className="min-h-screen bg-neutral-50">
-      <Navbar />
+      {/* Faded Navbar */}
+      <div className="opacity-40">
+        <Navbar />
+      </div>
 
       <div className="mx-auto max-w-md px-4 py-12">
         <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
@@ -61,7 +64,7 @@ export default function ForgotPasswordPage() {
             Forgot Password
           </h1>
           <p className="mt-2 text-sm text-neutral-600">
-            Enter the email associated with your account. We’ll send you a reset
+            Enter the email associated with your account. We'll send you a reset
             link.
           </p>
 
@@ -103,7 +106,10 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
 
-      <Footer />
+      {/* Faded Footer */}
+      <div className="opacity-40">
+        <Footer />
+      </div>
     </main>
   );
 }
