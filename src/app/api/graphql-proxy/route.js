@@ -3,7 +3,7 @@ export async function POST(request) {
     const body = await request.json();
 
     const response = await fetch(
-      "https://staging-backend.solarcabal.com/shop-api",
+      process.env.env.local,
       {
         method: "POST",
         headers: {
