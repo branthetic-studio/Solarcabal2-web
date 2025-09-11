@@ -5,10 +5,11 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useApolloClient } from "@apollo/client/react";
 import { gql, TypedDocumentNode } from "@apollo/client";
 import { useMutation } from "@apollo/client/react";
+import Link from "next/link";
 import { X, Eye, EyeOff } from "lucide-react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { useUser } from "@/context/UserContext"; 
-import { GET_ACTIVE_ORDER, GET_CURRENT_USER } from "@/graphql/queries"; 
+import { useUser } from "@/context/UserContext";
+import { GET_ACTIVE_ORDER, GET_CURRENT_USER } from "@/graphql/queries";
 import { MdEmail } from "react-icons/md";
 import { FaGoogle } from "react-icons/fa";
 
@@ -16,8 +17,8 @@ import { FaGoogle } from "react-icons/fa";
 const REGISTER_MUTATION: TypedDocumentNode<
   {
     registerCustomerAccount:
-    | { __typename: "Success"; success: boolean }
-    | { __typename: "ErrorResult"; errorCode: string; message: string };
+      | { __typename: "Success"; success: boolean }
+      | { __typename: "ErrorResult"; errorCode: string; message: string };
   },
   {
     input: {
@@ -141,19 +142,21 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
           <div className="flex mb-6 border-b">
             <button
               onClick={() => setActiveTab("login")}
-              className={`flex-1 py-2 text-center ${activeTab === "login"
+              className={`flex-1 py-2 text-center ${
+                activeTab === "login"
                   ? "border-b-1 border-[#3C3C3C] font-semibold"
                   : "text-gray-500"
-                }`}
+              }`}
             >
               Log in
             </button>
             <button
               onClick={() => setActiveTab("register")}
-              className={`flex-1 py-2 text-center ${activeTab === "register"
+              className={`flex-1 py-2 text-center ${
+                activeTab === "register"
                   ? "border-b-1 border-black font-light"
                   : "text-gray-500"
-                }`}
+              }`}
             >
               Create Account
             </button>
@@ -183,17 +186,29 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                   className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none"
                   required
                 />
-                <label className="flex items-center text-sm">
-                  <input
-                    type="checkbox"
-                    checked={registerForm.agree}
-                    onChange={(e) =>
-                      setRegisterForm({ ...registerForm, agree: e.target.checked })
-                    }
-                    className="mr-2"
-                  />
-                  Keep me logged in
-                </label>
+                <div className="flex items-center justify-between text-sm">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={registerForm.agree}
+                      onChange={(e) =>
+                        setRegisterForm({
+                          ...registerForm,
+                          agree: e.target.checked,
+                        })
+                      }
+                      className="mr-2"
+                    />
+                    Keep me logged in
+                  </label>
+
+                  <a
+                    href="/forgot-password"
+                    className="text-red-600 hover:underline font-medium"
+                  >
+                    Forgot password?
+                  </a>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowLoginPassword(!showLoginPassword)}
@@ -206,6 +221,7 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                   )}
                 </button>
               </div>
+
               <button
                 type="submit"
                 disabled={loginSubmitting || userLoading}
@@ -329,7 +345,6 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                 >
                   <FaGoogle /> Google
                 </button>
-
               </div>
 
               {/* Switch link */}
