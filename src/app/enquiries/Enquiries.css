@@ -133,3 +133,170 @@
   border-radius: 30px;
   cursor: pointer;
 }
+
+/* ====================================================== */
+/* ENQUIRIES: RESPONSIVE ENHANCEMENTS (NO UI CHANGES)     */
+/* ====================================================== */
+
+/* ---------- Wide tablets & down (≤ 1200px) ---------- */
+@media (max-width: 1200px) {
+  .enquiries-container {
+    padding: 20px 6%;
+  }
+
+  .contact-form {
+    max-width: 560px;
+  }
+
+  .enquiries-banner {
+    height: 420px;
+    background-position: center;
+    background-size: cover;
+  }
+  .enquiries-banner h2 {
+    font-size: 44px;
+  }
+}
+
+/* ---------- Large tablets & small laptops (≤ 1024px) ---------- */
+@media (max-width: 1024px) {
+  .enquiries-container {
+    gap: 20px;
+  }
+
+  /* Keep two-column feel but give more breathing room */
+  .enquiries-header {
+    margin-right: 24px;
+  }
+
+  .contact-form {
+    padding: 20px;
+    max-width: 520px;
+  }
+
+  .enquiries-banner h2 {
+    font-size: 40px;
+  }
+  .enquiries-banner p {
+    font-size: 15px;
+  }
+}
+
+/* ---------- Tablets (≤ 768px) ---------- */
+@media (max-width: 768px) {
+  /* Stack content over form without touching JSX */
+  .enquiries-container {
+    flex-direction: column;
+    padding: 18px 5%;
+  }
+
+  .enquiries-content,
+  .enquiries-form {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .enquiries-header {
+    margin-right: 0;
+  }
+
+  .contact-form {
+    max-width: 100%;
+    border-radius: 16px;
+  }
+
+  /* Name fields stack vertically */
+  .name-fields {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Tighten typographic scale a bit */
+  .enquiries-banner {
+    height: 360px;
+  }
+  .enquiries-banner h2 {
+    font-size: 34px;
+  }
+  .enquiries-banner p {
+    font-size: 14px;
+  }
+
+  .contact-info {
+    margin: 28px 0;
+  }
+}
+
+/* ---------- Large phones (≤ 600px) ---------- */
+@media (max-width: 600px) {
+  .enquiries-container {
+    padding: 16px 16px;
+  }
+
+  .contact-form {
+    padding: 16px;
+  }
+
+  .input-group input,
+  .input-group textarea {
+    padding: 14px;
+    border-radius: 22px;
+    font-size: 14px;
+  }
+
+  .submit-btn {
+    padding: 12px 16px;
+    border-radius: 22px;
+    font-size: 14px;
+  }
+
+  .enquiries-banner {
+    height: 320px;
+    background-position: 50% 40%;
+  }
+  .enquiries-banner h2 {
+    font-size: 28px;
+  }
+}
+
+/* ---------- Small phones (≤ 480px) ---------- */
+@media (max-width: 480px) {
+  .enquiries-banner {
+    height: 280px;
+    padding: 0 8px;
+  }
+
+  .enquiries-header h3 {
+    font-size: 24px;
+  }
+
+  .reach-us {
+    gap: 12px;
+  }
+
+  .contact-info h6 {
+    font-size: 16px;
+  }
+  .contact-info p {
+    font-size: 14px;
+  }
+
+  .input-group label {
+    font-size: 13px;
+  }
+
+  /* Prevent edge-to-edge crowding */
+  .contact-form {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.03) inset;
+  }
+}
+
+/* ---------- Ultra-small (≤ 360px) ---------- */
+@media (max-width: 360px) {
+  .enquiries-banner h2 {
+    font-size: 24px;
+  }
+  .enquiries-banner p {
+    font-size: 13px;
+  }
+}

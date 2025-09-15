@@ -1,6 +1,6 @@
 .faq-banner {
   height: 350px;
-  background-image: url('../../Assets/enqimg.png');
+  background-image: url("../../Assets/enqimg.png");
   background-color: #333333;
   background-blend-mode: overlay;
   color: #ffffff;
@@ -63,9 +63,155 @@
   margin: 10px 0;
 }
 
-.accordian-flex{
+.accordian-flex {
   width: 80vw;
   display: flex;
   justify-content: space-between;
   font-weight: 500;
+}
+
+/* ============================================= */
+/* FAQ: RESPONSIVE ENHANCEMENTS (NO UI CHANGES)  */
+/* ============================================= */
+
+/* ---------- Wide tablets & down (≤ 1200px) ---------- */
+@media (max-width: 1200px) {
+  .faq-banner {
+    height: 320px;
+    background-position: center;
+    background-size: cover;
+  }
+  .faq-banner h2 {
+    font-size: 36px;
+  }
+  .faq-banner p {
+    font-size: 15px;
+  }
+
+  .faqAccordion {
+    padding: 20px 8%;
+  }
+}
+
+/* ---------- Tablets & small laptops (≤ 1024px) ---------- */
+@media (max-width: 1024px) {
+  .faq-banner {
+    height: 300px;
+  }
+  .faq-banner h2 {
+    font-size: 32px;
+  }
+
+  .faqAccordion {
+    padding: 18px 6%;
+  }
+
+  /* Keep header row tidy without altering JSX */
+  .accordion-header button {
+    padding: 10px 0;
+  }
+
+  /* The row that holds title + +/x toggle */
+  .accordian-flex {
+    width: 100%; /* override fixed 80vw */
+    gap: 12px;
+  }
+
+  .accordion-content {
+    font-size: 15px;
+  }
+}
+
+/* ---------- Tablets (≤ 768px) ---------- */
+@media (max-width: 768px) {
+  .faq-banner {
+    height: 260px;
+    padding: 0 12px;
+  }
+  .faq-banner h2 {
+    font-size: 28px;
+  }
+  .faq-banner p {
+    font-size: 14px;
+  }
+
+  .faqAccordion {
+    padding: 16px 5%;
+  }
+
+  .faqAccordion h3 {
+    font-size: 22px;
+  }
+
+  .accordion-header {
+    font-size: 17px;
+  }
+
+  .accordian-flex {
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .rule {
+    margin-block: 16px;
+  }
+}
+
+/* ---------- Large phones (≤ 600px) ---------- */
+@media (max-width: 600px) {
+  .faq-banner {
+    height: 230px;
+  }
+  .faqAccordion {
+    padding: 14px 16px;
+  }
+
+  .accordion-header {
+    font-size: 16px;
+  }
+  .accordion-content {
+    font-size: 14.5px;
+  }
+
+  /* Make the tap target comfortable on mobile */
+  .accordion-header button {
+    padding: 12px 0;
+  }
+}
+
+/* ---------- Small phones (≤ 480px) ---------- */
+@media (max-width: 480px) {
+  .faq-banner {
+    height: 200px;
+  }
+  .faq-banner h2 {
+    font-size: 24px;
+  }
+  .faq-banner p {
+    font-size: 13px;
+  }
+
+  .faqAccordion h3 {
+    font-size: 20px;
+  }
+
+  .accordion-header {
+    font-size: 15.5px;
+  }
+  .accordion-content {
+    font-size: 14px;
+  }
+}
+
+/* ---------- Ultra-small (≤ 360px) ---------- */
+@media (max-width: 360px) {
+  .faq-banner h2 {
+    font-size: 22px;
+  }
+  .accordion-header {
+    font-size: 15px;
+  }
+  .accordion-content {
+    font-size: 13.5px;
+  }
 }

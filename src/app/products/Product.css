@@ -275,3 +275,134 @@
   transform: none;
   box-shadow: none;
 }
+
+/* ----------------------------- */
+/* RESPONSIVE ENHANCEMENTS ONLY  */
+/* (No structural/UI changes)    */
+/* ----------------------------- */
+
+/* ========== Large tablets & down (≤ 1024px) ========== */
+@media (max-width: 1024px) {
+  .products-page {
+    /* stack sidebar above content without changing the components */
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  /* Sidebar in this app is rendered with Tailwind `w-64`.
+     We override width/resets here without touching JSX. */
+  .products-page aside.w-64 {
+    width: 100% !important; /* full width on top */
+    border-right: none !important;
+    border-bottom: 1px solid #e5e7eb; /* subtle divider like original */
+  }
+
+  .main {
+    padding: 0.75rem;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 32px;
+  }
+
+  .product-card img {
+    height: 200px;
+    width: 90%;
+  }
+
+  .qty-control button {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* ========== Tablets & large phones (≤ 768px) ========== */
+@media (max-width: 768px) {
+  .main {
+    padding: 0.75rem;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+
+  .product-card {
+    padding: 0.75rem;
+    border-radius: 10px;
+  }
+
+  .product-header {
+    padding: 8px;
+  }
+
+  .product-card img {
+    height: 180px;
+  }
+
+  .product-card .title {
+    font-size: 0.95rem;
+  }
+  .product-card .desc {
+    font-size: 0.8rem;
+  }
+  .product-card .price {
+    font-size: 18px;
+    margin-top: 14px;
+  }
+
+  /* Price slider touch targets a bit smaller on mobile-ish screens */
+  .price-slider input[type="range"]::-webkit-slider-thumb {
+    height: 14px;
+    width: 14px;
+    margin-top: -4px;
+  }
+}
+
+/* ========== Small phones (≤ 480px) ========== */
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: 1fr; /* single column */
+    gap: 20px;
+  }
+
+  .product-card img {
+    height: 160px;
+    width: 100%;
+  }
+
+  .qty-control {
+    gap: 0.4rem;
+  }
+  .qty-control button {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+  }
+
+  .add-to-cart-btn {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  /* Make the dual-range rail easier to see on small screens */
+  .price-slider {
+    height: 32px;
+  }
+}
+
+/* ========== Ultra-small devices (≤ 360px) ========== */
+@media (max-width: 360px) {
+  .product-card img {
+    height: 140px;
+  }
+  .product-card .price {
+    font-size: 16px;
+  }
+}

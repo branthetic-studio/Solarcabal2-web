@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
+import Navbar from "@/Components/Navbar/Navbar";
+import Footer from "@/Components/Footer/Footer";
 
 // If you already have a query in queries.ts, you can delete this and import yours.
 // This returns products in a collection/category by slug.
@@ -191,155 +193,159 @@ export default function InstallationListingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50">
-      {/* Hero banner */}
-      <section className="mx-auto max-w-6xl px-4 pt-6">
-        <div className="relative overflow-hidden rounded-2xl bg-[url('/assets/installation-hero.jpg')] bg-cover bg-center">
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative p-6 md:p-10">
-            <div className="inline-flex items-center rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-neutral-700 backdrop-blur">
-              {items.length} Products
-            </div>
+    <>
+      <Navbar />
+      <main className="min-h-screen bg-neutral-50">
+        {/* Hero banner */}
+        <section className="mx-auto max-w-6xl px-4 pt-6">
+          <div className="relative overflow-hidden rounded-2xl bg-[url('/assets/installation-hero.jpg')] bg-cover bg-center">
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="relative p-6 md:p-10">
+              <div className="inline-flex items-center rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-neutral-700 backdrop-blur">
+                {items.length} Products
+              </div>
 
-            <h1 className="mt-4 text-2xl md:text-3xl font-semibold text-white">
-              {packageTitle}
-            </h1>
+              <h1 className="mt-4 text-2xl md:text-3xl font-semibold text-white">
+                {packageTitle}
+              </h1>
 
-            <div className="mt-2 flex items-center gap-3">
-              <span className="rounded-lg bg-red-600 px-3 py-1 text-white text-sm font-semibold">
-                {estimatedTotalNGN}
-              </span>
-              <span className="text-white/90 text-sm">
-                Appliances: AC, Washing Machine, Fan, TV, Sats
-              </span>
+              <div className="mt-2 flex items-center gap-3">
+                <span className="rounded-lg bg-red-600 px-3 py-1 text-white text-sm font-semibold">
+                  {estimatedTotalNGN}
+                </span>
+                <span className="text-white/90 text-sm">
+                  Appliances: AC, Washing Machine, Fan, TV, Sats
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Content */}
-      <section className="mx-auto max-w-6xl px-4 py-6">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
-          {/* Left: products list */}
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 md:p-6 shadow-sm">
-            {items.length === 0 ? (
-              <div className="py-12 text-center text-sm text-neutral-500">
-                No products found in this package yet.
+        {/* Content */}
+        <section className="mx-auto max-w-6xl px-4 py-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+            {/* Left: products list */}
+            <div className="rounded-2xl border border-neutral-200 bg-white p-4 md:p-6 shadow-sm">
+              {items.length === 0 ? (
+                <div className="py-12 text-center text-sm text-neutral-500">
+                  No products found in this package yet.
+                </div>
+              ) : (
+                <div>{items.map(renderRow)}</div>
+              )}
+            </div>
+
+            {/* Right: summary / selector */}
+            <aside className="lg:sticky lg:top-6">
+              <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+                <p className="text-sm font-semibold text-neutral-800">
+                  Package Summary
+                </p>
+
+                <div className="mt-3 space-y-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-600">Selected package</span>
+                    <span className="font-medium text-neutral-900">
+                      {packageTitle}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-600">Items</span>
+                    <span className="font-medium text-neutral-900">
+                      {items.length}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-600">Est. total</span>
+                    <span className="font-semibold text-neutral-900">
+                      {estimatedTotalNGN}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-5">
+                  <label className="mb-2 block text-xs font-medium text-neutral-700">
+                    Installation Location
+                  </label>
+                  <select className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm">
+                    <option>Lagos</option>
+                    <option>Abuja</option>
+                    <option>Port Harcourt</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+
+                <button
+                  className="mt-5 w-full rounded-full bg-red-600 py-3 text-sm font-semibold text-white hover:opacity-95"
+                  onClick={() => router.push("/checkout")}
+                >
+                  Proceed to Checkout
+                </button>
+
+                <div className="mt-6 space-y-2 text-xs text-neutral-600">
+                  <div className="flex items-center gap-2">
+                    <span>•</span> Certified installers
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>•</span> Safety inspection
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>•</span> System testing
+                  </div>
+                </div>
               </div>
-            ) : (
-              <div>{items.map(renderRow)}</div>
-            )}
+            </aside>
           </div>
+        </section>
 
-          {/* Right: summary / selector */}
-          <aside className="lg:sticky lg:top-6">
-            <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-              <p className="text-sm font-semibold text-neutral-800">
-                Package Summary
-              </p>
-
-              <div className="mt-3 space-y-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-neutral-600">Selected package</span>
-                  <span className="font-medium text-neutral-900">
-                    {packageTitle}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-neutral-600">Items</span>
-                  <span className="font-medium text-neutral-900">
-                    {items.length}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-neutral-600">Est. total</span>
-                  <span className="font-semibold text-neutral-900">
-                    {estimatedTotalNGN}
-                  </span>
-                </div>
+        {/* What's included */}
+        <section className="mx-auto max-w-6xl px-4 pb-10">
+          <p className="text-sm font-semibold text-neutral-800 mb-3">
+            What’s included
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: "Solar Panels" },
+              { label: "Mounting Hardware" },
+              { label: "System Testing" },
+              { label: "Safety Inspection" },
+            ].map((f) => (
+              <div
+                key={f.label}
+                className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700"
+              >
+                {f.label}
               </div>
+            ))}
+          </div>
+        </section>
 
-              <div className="mt-5">
-                <label className="mb-2 block text-xs font-medium text-neutral-700">
-                  Installation Location
-                </label>
-                <select className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm">
-                  <option>Lagos</option>
-                  <option>Abuja</option>
-                  <option>Port Harcourt</option>
-                  <option>Other</option>
-                </select>
-              </div>
-
+        {/* CTA */}
+        <section className="bg-neutral-900">
+          <div className="mx-auto max-w-6xl px-4 py-10 md:py-14 text-center">
+            <h2 className="text-white text-xl md:text-2xl font-semibold">
+              Ready to Go Solar?
+            </h2>
+            <div className="mt-4 flex items-center justify-center gap-3">
               <button
-                className="mt-5 w-full rounded-full bg-red-600 py-3 text-sm font-semibold text-white hover:opacity-95"
+                className="rounded-full bg-red-600 px-6 py-3 text-sm font-semibold text-white hover:opacity-95"
                 onClick={() => router.push("/checkout")}
               >
                 Proceed to Checkout
               </button>
-
-              <div className="mt-6 space-y-2 text-xs text-neutral-600">
-                <div className="flex items-center gap-2">
-                  <span>•</span> Certified installers
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>•</span> Safety inspection
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>•</span> System testing
-                </div>
-              </div>
+              <button
+                className="rounded-full border border-neutral-700 px-6 py-3 text-sm font-semibold text-white/90 hover:bg-neutral-800"
+                onClick={() => router.push("/contact")}
+              >
+                Contact Installer
+              </button>
             </div>
-          </aside>
-        </div>
-      </section>
-
-      {/* What's included */}
-      <section className="mx-auto max-w-6xl px-4 pb-10">
-        <p className="text-sm font-semibold text-neutral-800 mb-3">
-          What’s included
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: "Solar Panels" },
-            { label: "Mounting Hardware" },
-            { label: "System Testing" },
-            { label: "Safety Inspection" },
-          ].map((f) => (
-            <div
-              key={f.label}
-              className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700"
-            >
-              {f.label}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="bg-neutral-900">
-        <div className="mx-auto max-w-6xl px-4 py-10 md:py-14 text-center">
-          <h2 className="text-white text-xl md:text-2xl font-semibold">
-            Ready to Go Solar?
-          </h2>
-          <div className="mt-4 flex items-center justify-center gap-3">
-            <button
-              className="rounded-full bg-red-600 px-6 py-3 text-sm font-semibold text-white hover:opacity-95"
-              onClick={() => router.push("/checkout")}
-            >
-              Proceed to Checkout
-            </button>
-            <button
-              className="rounded-full border border-neutral-700 px-6 py-3 text-sm font-semibold text-white/90 hover:bg-neutral-800"
-              onClick={() => router.push("/contact")}
-            >
-              Contact Installer
-            </button>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Footer space handled by your global layout/footer */}
-    </main>
+        {/* Footer space handled by your global layout/footer */}
+      </main>
+      <Footer />
+    </>
   );
 }

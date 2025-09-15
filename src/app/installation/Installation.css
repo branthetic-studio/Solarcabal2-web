@@ -361,3 +361,253 @@
   text-align: left;
   padding: 10px;
 }
+
+/* ============================================= */
+/* RESPONSIVE ENHANCEMENTS (NO UI/STRUCTURE CHANGES) */
+/* ============================================= */
+
+/* ---------- Wide tablets & down (≤ 1200px) ---------- */
+@media (max-width: 1200px) {
+  .installation-banner img {
+    height: 520px;
+  }
+  .installation-banner-content {
+    padding: 40px 72px;
+    width: min(90vw, 1100px);
+  }
+  .installation-banner-content h1 {
+    max-width: 70%;
+  }
+  .installation-banner-content p {
+    max-width: 70%;
+  }
+
+  .items {
+    gap: 20px;
+  }
+  .item-card {
+    width: 300px;
+  }
+}
+
+/* ---------- Large tablets & small laptops (≤ 1024px) ---------- */
+@media (max-width: 1024px) {
+  /* Keep banner composition, scale typography & padding */
+  .installation-banner img {
+    height: 460px;
+    padding: 0 10px;
+  }
+  .installation-banner-container {
+    left: 4%;
+    padding: 22px;
+  }
+  .installation-banner-content {
+    padding: 32px 56px;
+  }
+  .installation-banner-content h1 {
+    font-size: 48px;
+    max-width: 80%;
+  }
+  .installation-banner-content p {
+    max-width: 80%;
+  }
+
+  /* Included items: allow wrapping without changing markup */
+  .included-items {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .included-items .item {
+    flex: 1 1 calc(50% - 16px);
+    margin-right: 0; /* kill fixed gutter that caused overflow */
+  }
+
+  /* Package layout: stack sidebar above content */
+  .package-container {
+    flex-direction: column;
+  }
+  .package-sidebar {
+    width: 100%;
+    flex-direction: row;
+    gap: 16px;
+    overflow-x: auto; /* preserve buttons without reflow */
+    padding-bottom: 6px;
+  }
+  .package-main {
+    padding: 24px 28px;
+    gap: 32px;
+  }
+
+  /* Cards row: keep three-ish with wrap */
+  .items {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .item-card {
+    width: clamp(260px, 45%, 320px);
+  }
+}
+
+/* ---------- Tablets (≤ 768px) ---------- */
+@media (max-width: 768px) {
+  /* Banner: reduce skew box padding while preserving look */
+  .installation-banner img {
+    height: 400px;
+  }
+  .installation-banner-container {
+    top: 8%;
+    left: 3%;
+    padding: 18px;
+    border-radius: 16px;
+  }
+  .installation-banner-content {
+    padding: 24px 28px;
+    width: 90vw;
+  }
+  .installation-banner-content h1 {
+    font-size: 36px;
+    max-width: 92%;
+  }
+  .installation-banner-content p {
+    max-width: 92%;
+    margin: 16px 0;
+  }
+  .installation-banner-content button {
+    padding: 10px 18px;
+    font-size: 13px;
+  }
+
+  .certified,
+  .installation-info,
+  .installation-section {
+    padding: 28px 15px;
+  }
+
+  .installation-steps {
+    padding-left: 22px;
+  }
+  .installation-step {
+    max-width: 100%;
+  }
+  .step-indicator {
+    top: 18px;
+  }
+
+  .ready h3 {
+    font-size: 28px;
+    text-align: center;
+  }
+  .consult-btn,
+  .request-btn {
+    font-size: 16px;
+    padding: 12px 22px;
+  }
+
+  /* Package header spacing */
+  .package-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}
+
+/* ---------- Large phones (≤ 600px) ---------- */
+@media (max-width: 600px) {
+  .installation-banner img {
+    height: 340px;
+    border-radius: 12px;
+    padding: 0 8px;
+    object-fit: cover;
+  }
+  .installation-banner-container {
+    top: auto;
+    bottom: 6%;
+    left: 50%;
+    transform: translateX(-50%) skewY(-3.5deg); /* keep your skew vibe */
+    width: calc(100% - 24px);
+    padding: 14px;
+  }
+  .installation-banner-content {
+    width: 100%;
+    padding: 18px;
+  }
+  .installation-banner-content h1 {
+    font-size: 28px;
+    max-width: 100%;
+  }
+  .installation-banner-content p {
+    font-size: 14px;
+    max-width: 100%;
+  }
+
+  /* Included items: 2-up */
+  .included-items .item {
+    flex: 1 1 calc(50% - 12px);
+    font-size: 18px;
+    padding: 16px;
+  }
+
+  /* Cards: 1–2 per row depending on space */
+  .items {
+    gap: 16px;
+  }
+  .item-card {
+    width: 100%;
+    max-width: 360px;
+  }
+  .item-card img {
+    height: 180px;
+  }
+
+  .package-main {
+    padding: 18px;
+    border-radius: 12px;
+  }
+  .package-card p {
+    font-size: 15px;
+  }
+}
+
+/* ---------- Small phones (≤ 480px) ---------- */
+@media (max-width: 480px) {
+  .installation-title {
+    font-size: 24px;
+  }
+  .installation-subtitle {
+    font-size: 16px;
+    margin-bottom: 28px;
+  }
+  .installation-steps {
+    border-left-width: 1px;
+  }
+
+  .included-items .item {
+    flex: 1 1 100%;
+  }
+
+  .ready {
+    gap: 18px;
+    padding: 42px 10px;
+  }
+  .consult-btn,
+  .request-btn {
+    width: 100%;
+    border-radius: 24px;
+  }
+
+  .price {
+    border-radius: 14px;
+  }
+}
+
+/* ---------- Ultra-small (≤ 360px) ---------- */
+@media (max-width: 360px) {
+  .installation-banner img {
+    height: 300px;
+  }
+  .installation-banner-content h1 {
+    font-size: 24px;
+  }
+  .installation-banner-content p {
+    font-size: 13px;
+  }
+}
