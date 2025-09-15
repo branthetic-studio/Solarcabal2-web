@@ -3,7 +3,7 @@ export async function POST(request) {
     const body = await request.json();
 
     const response = await fetch(
-      process.env.env.local,
+      process.env.NEXT_PUBLIC_API_URL,
       {
         method: "POST",
         headers: {
