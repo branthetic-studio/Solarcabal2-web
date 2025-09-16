@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useMutation } from "@apollo/client/react";
 import { gql } from "@apollo/client";
 import Navbar from "@/Components/Navbar/Navbar";
 import Footer from "@/Components/Footer/Footer";
-import { Suspense } from "react";
 
 /* ---------- GraphQL Mutations ---------- */
 const VERIFY_CUSTOMER_ACCOUNT = gql`
@@ -84,12 +83,12 @@ type LoginResult = {
 
 type RefreshResult = {
   refreshCustomerVerification:
-  | { __typename: "Success"; success: boolean }
-  | ErrorResult;
+    | { __typename: "Success"; success: boolean }
+    | ErrorResult;
 };
 
-/* ---------- Inner Component that uses useSearchParams ---------- */
-function VerifyEmailContent() {
+/* ---------- Verification Component (uses useSearchParams) ---------- */
+function VerifyEmailForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams?.get("token") || "";
@@ -334,10 +333,24 @@ function VerifyEmailContent() {
       {/* Dev hint */}
       <p className="mt-4 text-xs text-neutral-500">
         Local test:{" "}
-        <code>
-          http://localhost:3000/verify-email-address?token=YOUR_TOKEN
-        </code>
+        <code>http://localhost:3000/verify-email-address?token=YOUR_TOKEN</code>
       </p>
+    </div>
+  );
+}
+
+/* ---------- Loading Component ---------- */
+function VerifyEmailLoading() {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-12">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-semibold text-neutral-900">
+          Verify Email Address
+        </h1>
+        <div className="mt-3">
+          <div className="h-4 bg-neutral-200 rounded animate-pulse"></div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -348,8 +361,8 @@ export default function VerifyEmailAddressPage() {
     <main className="min-h-screen bg-neutral-50">
       <Navbar />
 
-      <Suspense fallback={<div className="mx-auto max-w-2xl px-4 py-12"><p className="text-center">Loading verification...</p></div>}>
-        <VerifyEmailContent />
+      <Suspense fallback={<VerifyEmailLoading />}>
+        <VerifyEmailForm />
       </Suspense>
 
       <Footer />
