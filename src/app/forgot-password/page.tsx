@@ -7,14 +7,20 @@ import { RESET_PASSWORD } from "@/graphql/queries";
 import Navbar from "@/Components/Navbar/Navbar";
 import Footer from "@/Components/Footer/Footer";
 
-/* ---------- Manual types (no codegen) ---------- */
-type ResetPasswordPayload =
-  | { __typename: "Success"; success: boolean; message?: string | null }
-  | {
-      __typename: "ErrorResult";
-      errorCode?: string | null;
-      message?: string | null;
-    };
+/* ---------- Updated types to match actual API response ---------- */
+type CurrentUser = {
+  __typename: "CurrentUser";
+  id: string;
+  identifier: string;
+};
+
+type ErrorResult = {
+  __typename: "ErrorResult";
+  errorCode?: string | null;
+  message?: string | null;
+};
+
+type ResetPasswordPayload = CurrentUser | ErrorResult;
 
 type ResetPasswordResult = {
   resetPassword: ResetPasswordPayload;
@@ -40,13 +46,10 @@ function ResetPasswordForm() {
   >(RESET_PASSWORD);
 
   const payload = data?.resetPassword;
-  const isSuccess = payload?.__typename === "Success";
-  const successMsg =
-    isSuccess && payload?.message
-      ? payload.message
-      : isSuccess
-      ? "Password updated successfully."
-      : null;
+  const isSuccess = payload?.__typename === "CurrentUser";
+  const successMsg = isSuccess
+    ? `Password updated successfully for ${payload.identifier}.`
+    : null;
 
   const errMsg =
     error?.message ||
@@ -119,7 +122,7 @@ function ResetPasswordForm() {
           </form>
         )}
 
-        {errMsg && <p className="mt-3 text-sm text-red-600">❌ {errMsg}</p>}
+        {errMsg && <p className="mt-3 text-sm text-red-600">⚠ {errMsg}</p>}
         {isSuccess && (
           <>
             <p className="mt-3 text-sm text-green-700">✅ {successMsg}</p>
