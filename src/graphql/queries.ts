@@ -500,15 +500,14 @@ export const REQUEST_PASSWORD_RESET = gql`
 export const RESET_PASSWORD = gql`
   mutation ResetPassword($token: String!, $password: String!) {
     resetPassword(token: $token, password: $password) {
-      # Backends differ; keep it flexible:
-      ... on Success {
-        success
+      ... on CurrentUser {
+        id
+        identifier
       }
       ... on ErrorResult {
         errorCode
         message
       }
-      # Some Vendure setups return LoginResult-like unions; you can expand here if needed
     }
   }
 `;
