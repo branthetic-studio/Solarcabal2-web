@@ -74,7 +74,6 @@ const ProductGrid: React.FC<Props> = ({
   condition,
   priceRange,
 }) => {
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({});
 
   // ✅ Build facetValueIds for multiple brands
@@ -132,18 +131,13 @@ const ProductGrid: React.FC<Props> = ({
     }));
   }, [data]);
 
-  const inc = (id: string) =>
-    setQuantities((q) => ({ ...q, [id]: (q[id] || 1) + 1 }));
-  const dec = (id: string) =>
-    setQuantities((q) => ({ ...q, [id]: Math.max(1, (q[id] || 1) - 1) }));
-
-  const addToCart = async (id: string, quantity: number) => {
+  const addToCart = async (id: string) => {
     setAddingToCart((prev) => ({ ...prev, [id]: true }));
 
     try {
       // Your add-to-cart logic here
       await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
-      console.log(`Added ${quantity} of product ${id} to cart`);
+      console.log(`Added product ${id} to cart`);
     } catch (error) {
       console.error("Failed to add to cart:", error);
     } finally {
@@ -152,7 +146,8 @@ const ProductGrid: React.FC<Props> = ({
   };
 
   if (loading) return <div className="product-grid">Loading products…</div>;
-  if (error) return <div className="product-grid">Failed to load products.</div>;
+  if (error)
+    return <div className="product-grid">Failed to load products.</div>;
 
   return (
     <div className="product-grid">
@@ -163,7 +158,6 @@ const ProductGrid: React.FC<Props> = ({
           <h2>{brand && brand.length > 0 ? brand.join(", ") : "All Brands"}</h2>
           <div className="grid">
             {items.map((item, index) => {
-              const qty = quantities[item.id] || 1;
               const isAddingToCart = addingToCart[item.id] || false;
               return (
                 <div className="product-card" key={item.id ?? index}>
@@ -175,25 +169,18 @@ const ProductGrid: React.FC<Props> = ({
                       />
                     </Link>
                     <div className="actions">
-                      <div className="qty-control">
-                        <button onClick={() => dec(item.id)}>-</button>
-                        <span>{qty}</span>
-                        <button onClick={() => inc(item.id)}>+</button>
-                      </div>
                       <button
-                        onClick={() => addToCart(item.id, qty)}
+                        onClick={() => addToCart(item.id)}
                         disabled={isAddingToCart}
                         className="add-to-cart-btn"
                       >
-                        {isAddingToCart ? "Adding..." : `Add ${qty} to Cart`}
+                        {isAddingToCart ? "Adding..." : "Add to Cart"}
                       </button>
                     </div>
                   </div>
                   <div className="product-details">
                     <Link href={`/products/${item.slug}`} className="block">
-                      <p className="desc">
-                        ⚙ {item.brand ?? "Unknown Brand"}
-                      </p>
+                      <p className="desc">⚙ {item.brand ?? "Unknown Brand"}</p>
                       <p className="title">{item.name}</p>
                       {item.priceText && (
                         <p className="price">{item.priceText}</p>
