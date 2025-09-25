@@ -37,6 +37,8 @@ export const GET_COLLECTION_PRODUCTS = gql`
       items {
         productName
         slug
+        productVariantId
+        productVariantName
         facetValueIds
         productAsset {
           id
