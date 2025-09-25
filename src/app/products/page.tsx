@@ -2,14 +2,14 @@
 import React, { useState } from "react";
 import Navbar from "../../Components/Navbar/Navbar";
 import Footer from "../../Components/Footer/Footer";
-// import Refer from "../../Components/Refer/Refer";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import ProductGrid from "./components/ProductGrid";
 import "./Product.css";
 
 const Page = () => {
-  const [selectedCategorySlug, setSelectedCategorySlug] = useState<string>("panels");
+  const [selectedCategorySlug, setSelectedCategorySlug] =
+    useState<string>("panels");
   const [selectedBrand, setSelectedBrand] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<string>("relevance");
 
@@ -19,10 +19,18 @@ const Page = () => {
 
   // Temporary mock values for required props
   const categoriesFromApi = [
-  { slug: "panels", name: "Solar Panels", brands: ["Jinko", "JA", "Longi"] },
-  { slug: "inverters", name: "Inverters", brands: ["Huawei", "SMA", "Fronius"] },
-  { slug: "batteries", name: "Batteries", brands: ["LG Chem", "BYD", "Pylontech"] },
-];
+    { slug: "panels", name: "Solar Panels", brands: ["Jinko", "JA", "Longi"] },
+    {
+      slug: "inverters",
+      name: "Inverters",
+      brands: ["Huawei", "SMA", "Fronius"],
+    },
+    {
+      slug: "batteries",
+      name: "Batteries",
+      brands: ["LG Chem", "BYD", "Pylontech"],
+    },
+  ];
 
   const minPrice = 0;
   const maxPrice = 10000;
