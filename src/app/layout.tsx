@@ -5,6 +5,8 @@ import ApolloWrapper from "./providers";
 import CartProvider from "@/context/CartContext";
 import UserProvider from "@/context/UserContext";
 import FacetsProvider from "@/context/useFacet";
+import { Toaster } from "sonner";
+import LocalCartProvider from "@/context/LocalCartContext";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -26,10 +28,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased`}>
+        <Toaster position="top-right" expand={true} richColors closeButton />
         <ApolloWrapper>
           <UserProvider>
             <FacetsProvider>
-              <CartProvider>{children}</CartProvider>
+              <LocalCartProvider>
+                <CartProvider>{children}</CartProvider>
+              </LocalCartProvider>
             </FacetsProvider>
           </UserProvider>
         </ApolloWrapper>
