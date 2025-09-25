@@ -1,243 +1,466 @@
 "use client";
 
 import React from "react";
-import Navbar from "../../Components/Navbar/Navbar";
-import Footer from "../../Components/Footer/Footer";
 import Image from "next/image";
-import { useCart } from "@/context/CartContext";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BsCartXFill } from "react-icons/bs";
+import { Trash2, PencilLine } from "lucide-react";
+import { useCart } from "@/context/CartContext";
+import { useLocalCart } from "@/context/LocalCartContext";
+import { useUser } from "@/context/UserContext";
+import Footer from "@/Components/Footer/Footer";
+import Navbar from "@/Components/Navbar/Navbar";
+import { toast } from "sonner";
 
-const NGN = new Intl.NumberFormat("en-NG", {
-  style: "currency",
-  currency: "NGN",
-  maximumFractionDigits: 0,
-});
+/** NGN with no decimals (adjust if you need decimals) */
+const money = (amount: number, currency = "NGN") =>
+  new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(Math.max(0, amount || 0));
 
-const page = () => {
-  const { cart, handleAdjustQuantity } = useCart();
+export default function CartPage() {
   const router = useRouter();
 
-  if (!cart?.activeOrder) {
+  // Contexts
+  const { cart, handleAdjustQuantity } = useCart();
+  const {
+    items: localItems,
+    updateQuantity,
+    removeItem,
+    clearCart,
+  } = useLocalCart();
+  const u = useUser() as any;
+  const isLoggedIn = !!(u?.me || u?.user || u?.activeCustomer || u?.customer);
+
+  // Server-cart derived
+  const order = cart?.activeOrder;
+  const lines = (isLoggedIn ? order?.lines : []) ?? [];
+
+  const serverSubtotal = order?.subTotalWithTax ?? 0;
+  const serverShipping = (order?.shippingLines ?? []).reduce(
+    (s: number, x: any) => s + (x?.priceWithTax ?? 0),
+    0
+  );
+  const serverTax = (order?.taxSummary ?? []).reduce(
+    (s: number, x: any) => s + (x?.tax ?? 0),
+    0
+  );
+  const serverTotal =
+    order?.totalWithTax ?? serverSubtotal + serverShipping + serverTax;
+  const serverCurrency = order?.currencyCode ?? "NGN";
+
+  // Local-cart derived
+  const localSubtotal = localItems.reduce(
+    (s, it) => s + (it.priceWithTax ?? 0) * (it.quantity ?? 1),
+    0
+  );
+  const localCurrency = localItems[0]?.currencyCode ?? "NGN";
+
+  // Empty states
+  if (!isLoggedIn && localItems.length === 0) {
     return (
-      <main className="min-h-screen bg-neutral-50">
-        <Navbar />
-        <div className="m-auto max-w-6xl px-4 py-16 h-100 text-center text-neutral-600 flex items-center justify-center flex-col gap-4">
-          Your cart is empty
-          <BsCartXFill size={86} color="grey" />
+      <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+        <h1 className="text-xl sm:text-2xl font-semibold">Shopping Cart</h1>
+        <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-neutral-200 bg-white p-10 text-center">
+          <div className="text-5xl mb-3">🛒</div>
+          <p className="text-neutral-600">Your cart is empty.</p>
+          <Link
+            href="/"
+            className="mt-6 inline-flex items-center justify-center rounded-full bg-red-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-red-700"
+          >
+            Continue shopping
+          </Link>
         </div>
-        <Footer />
       </main>
     );
   }
 
-  const order = cart.activeOrder;
-  const subtotal = order.subTotalWithTax;
-  const deliveryFee =
-    order.shippingLines?.reduce(
-      (sum, s) => sum + (s?.priceWithTax ?? 0),
-      0
-    ) ?? 0;
-  const tax =
-    order.taxSummary?.reduce((sum, t) => sum + (t.taxTotal ?? 0), 0) ?? 0;
-  const total = order.totalWithTax;
+  if (isLoggedIn && lines.length === 0) {
+    return (
+      <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+        <h1 className="text-xl sm:text-2xl font-semibold">Shopping Cart</h1>
+        <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-neutral-200 bg-white p-10 text-center">
+          <div className="text-5xl mb-3">🛒</div>
+          <p className="text-neutral-600">Your cart is empty.</p>
+          <Link
+            href="/"
+            className="mt-6 inline-flex items-center justify-center rounded-full bg-red-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-red-700"
+          >
+            Continue shopping
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 lg:py-0">
       <Navbar />
+      {/* Title row */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl sm:text-2xl font-semibold">Shopping Cart</h1>
+        {/* Optional sort UI placeholder */}
+      </div>
 
-      <div className="mx-auto max-w-6xl px-4 pb-16 pt-6">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_380px]">
-          {/* LEFT: items */}
-          <div className="space-y-4">
-            {order.lines.map((line) => {
-              const product = line.productVariant.product;
-              const img = line.featuredAsset?.preview;
-
-              return (
-                <div
-                  key={line.id}
-                  className="group rounded-xl border border-neutral-200 bg-white p-4 shadow-sm"
-                >
-                  <div className="flex items-center gap-4">
-                    {/* image */}
-                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
-                      {img ? (
-                        <Image
-                          src={img}
-                          alt={product.slug}
-                          fill
-                          className="object-contain"
-                        />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
-                          No Image
-                        </span>
-                      )}
-                    </div>
-
-                    {/* details */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-neutral-800">
-                            {line.productVariant.name}
-                          </p>
-                          <p className="mt-2 text-[13px] font-semibold text-neutral-900">
-                            {NGN.format(line.unitPriceWithTax)}{" "}
-                            <span className="text-[10px] font-normal text-neutral-500">
-                              / pcs
+      {/* Grid: Items + Summary */}
+      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-3">
+        {/* Items */}
+        <section className="lg:col-span-2">
+          <ul className="space-y-4">
+            {isLoggedIn
+              ? lines.map((line: any) => {
+                  const asset =
+                    line?.featuredAsset?.preview ??
+                    line?.productVariant?.product?.featuredAsset?.preview ??
+                    line?.productVariant?.product?.assets?.[0]?.preview ??
+                    null;
+                  const brand =
+                    line?.productVariant?.product?.facetValues?.find?.(
+                      (fv: any) => /brand/i.test(fv?.facet?.name ?? "")
+                    )?.name;
+                  return (
+                    <li
+                      key={line.id}
+                      className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5"
+                    >
+                      <div className="flex items-start gap-4">
+                        {/* Image */}
+                        <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
+                          {asset ? (
+                            <Image
+                              src={asset}
+                              alt={
+                                line.productVariant?.featuredAsset.preview ??
+                                "Product image"
+                              }
+                              width={80}
+                              height={80}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
+                              No Image
                             </span>
-                          </p>
+                          )}
                         </div>
 
-                        {/* qty + remove */}
-                        <div className="flex items-center gap-3">
+                        {/* Middle */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
+                                {line.productVariant?.product?.name ??
+                                  line.productVariant?.name}
+                              </p>
+                              <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
+                                {brand ?? line.productVariant?.name ?? "—"}
+                              </p>
+                              <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
+                                {money(
+                                  line.unitPriceWithTax ?? 0,
+                                  serverCurrency
+                                )}{" "}
+                                <span className="text-[11px] font-normal text-neutral-500">
+                                  / pcs
+                                </span>
+                              </p>
+                            </div>
+
+                            {/* Right: price + Remove */}
+                            <div className="text-right">
+                              <button
+                                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
+                                onClick={() => handleAdjustQuantity(line.id, 0)}
+                                aria-label="Remove"
+                              >
+                                Remove <Trash2 className="h-4 w-4" />
+                              </button>
+                              <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
+                                <span className="mr-1">Total</span>
+                                <span className="font-semibold text-neutral-900">
+                                  {money(
+                                    line.linePriceWithTax ?? 0,
+                                    serverCurrency
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Qty control */}
+                          <div className="mt-3 sm:mt-4 flex items-center gap-3">
+                            <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
+                              <button
+                                onClick={() =>
+                                  handleAdjustQuantity(
+                                    line.id,
+                                    Math.max(0, (line.quantity ?? 1) - 1)
+                                  )
+                                }
+                                className="h-8 w-8 flex items-center justify-center"
+                                aria-label="Decrease"
+                              >
+                                −
+                              </button>
+                              <span className="w-8 text-center text-[13px] font-medium">
+                                {line.quantity}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  handleAdjustQuantity(
+                                    line.id,
+                                    (line.quantity ?? 1) + 1
+                                  )
+                                }
+                                className="h-8 w-8 flex items-center justify-center"
+                                aria-label="Increase"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })
+              : localItems.map((line) => (
+                  <li
+                    key={line.id}
+                    className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5"
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* Image */}
+                      <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
+                        {line.image ? (
+                          <Image
+                            src={line.image}
+                            alt={line.name}
+                            width={80}
+                            height={80}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
+                            No Image
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Middle */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
+                              {line.name}
+                            </p>
+                            <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
+                              {line.brand ?? "—"}
+                            </p>
+                            <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
+                              {money(line.priceWithTax ?? 0, localCurrency)}{" "}
+                              <span className="text-[11px] font-normal text-neutral-500">
+                                / pcs
+                              </span>
+                            </p>
+                          </div>
+
+                          {/* Right: price + Remove */}
+                          <div className="text-right">
+                            <button
+                              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
+                              onClick={() => removeItem(line.id)}
+                              aria-label="Remove"
+                            >
+                              Remove <Trash2 className="h-4 w-4" />
+                            </button>
+                            <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
+                              <span className="mr-1">Total</span>
+                              <span className="font-semibold text-neutral-900">
+                                {money(
+                                  (line.priceWithTax ?? 0) *
+                                    (line.quantity ?? 1),
+                                  localCurrency
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Qty control */}
+                        <div className="mt-3 sm:mt-4 flex items-center gap-3">
                           <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
                             <button
-                              aria-label="decrease quantity"
                               onClick={() =>
-                                handleAdjustQuantity(line.id, line.quantity - 1)
+                                updateQuantity(
+                                  line.id,
+                                  Math.max(0, (line.quantity ?? 1) - 1)
+                                )
                               }
-                              className="h-8 w-8 text-neutral-600 hover:bg-neutral-50"
+                              className="h-8 w-8 flex items-center justify-center"
+                              aria-label="Decrease"
                             >
-                              <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 20 20"
-                                className="mx-auto"
-                              >
-                                <path
-                                  d="M5 10h10"
-                                  stroke="currentColor"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                />
-                              </svg>
+                              −
                             </button>
-                            <span className="px-3 text-sm tabular-nums">
+                            <span className="w-8 text-center text-[13px] font-medium">
                               {line.quantity}
                             </span>
                             <button
-                              aria-label="increase quantity"
                               onClick={() =>
-                                handleAdjustQuantity(line.id, line.quantity + 1)
+                                updateQuantity(
+                                  line.id,
+                                  (line.quantity ?? 1) + 1
+                                )
                               }
-                              className="h-8 w-8 text-neutral-600 hover:bg-neutral-50"
+                              className="h-8 w-8 flex items-center justify-center"
+                              aria-label="Increase"
                             >
-                              <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 20 20"
-                                className="mx-auto"
-                              >
-                                <path
-                                  d="M10 5v10M5 10h10"
-                                  stroke="currentColor"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                />
-                              </svg>
+                              +
                             </button>
                           </div>
-
-                          <button
-                            aria-label="remove"
-                            onClick={() => handleAdjustQuantity(line.id, 0)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-red-500 hover:bg-red-50"
-                          >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.6"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M3 6h18M8 6v12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                              <path d="M10 11v6M14 11v6" />
-                            </svg>
-                          </button>
                         </div>
                       </div>
-
-                      {/* line total */}
-                      <div className="mt-3 flex items-center justify-end">
-                        <span className="text-xs text-neutral-500 mr-1">
-                          Total
-                        </span>
-                        <span className="text-sm font-semibold text-neutral-900">
-                          {NGN.format(line.linePriceWithTax)}
-                        </span>
-                      </div>
                     </div>
-                  </div>
+                  </li>
+                ))}
+          </ul>
+
+          {/* Continue shopping */}
+          <div className="mt-6">
+            <Link
+              href="/products"
+              className="inline-flex items-center justify-center rounded-full border border-neutral-200 px-5 py-2 text-sm font-medium hover:bg-neutral-50"
+            >
+              ← Continue shopping
+            </Link>
+          </div>
+        </section>
+
+        {/* Summary */}
+        <aside className="lg:sticky lg:top-6 h-max rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+          <h2 className="text-base sm:text-lg font-semibold">Order Summary</h2>
+
+          {/* Totals */}
+          {isLoggedIn ? (
+            <dl className="mt-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-neutral-600">Sub total products</dt>
+                <dd className="font-semibold">
+                  {money(serverSubtotal, serverCurrency)}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-neutral-600">Delivery fee</dt>
+                <dd className="font-semibold">
+                  {money(serverShipping, serverCurrency)}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-neutral-600">Tax</dt>
+                <dd className="font-semibold">
+                  {money(serverTax, serverCurrency)}
+                </dd>
+              </div>
+
+              <div className="mt-3 border-t border-neutral-200 pt-3 text-base">
+                <div className="flex justify-between">
+                  <dt className="font-semibold">Total</dt>
+                  <dd className="font-semibold">
+                    {money(serverTotal, serverCurrency)}
+                  </dd>
                 </div>
-              );
-            })}
+              </div>
+            </dl>
+          ) : (
+            <dl className="mt-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-neutral-600">Sub total products</dt>
+                <dd className="font-semibold">
+                  {money(localSubtotal, localCurrency)}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-neutral-600">Delivery fee</dt>
+                <dd className="font-semibold">{money(0, localCurrency)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-neutral-600">Tax</dt>
+                <dd className="font-semibold">{money(0, localCurrency)}</dd>
+              </div>
+
+              <div className="mt-3 border-t border-neutral-200 pt-3 text-base">
+                <div className="flex justify-between">
+                  <dt className="font-semibold">Total</dt>
+                  <dd className="font-semibold">
+                    {money(localSubtotal, localCurrency)}
+                  </dd>
+                </div>
+              </div>
+            </dl>
+          )}
+
+          {/* Customer details (placeholder – match your screenshot) */}
+          <div className="mt-6 rounded-xl border border-neutral-200 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold">Customer Details</p>
+              <button
+                onClick={() => router.push("/account")}
+                className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+              >
+                Change <PencilLine className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="mt-3 text-xs text-neutral-700">
+              {/* Replace with real user values if available */}
+              <p className="font-medium">—</p>
+              <p className="mt-1 text-neutral-500">—</p>
+              <p className="mt-1 text-neutral-500">—</p>
+            </div>
           </div>
 
-          {/* RIGHT: summary */}
-          <aside className="lg:sticky lg:top-6">
-            <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-              <div className="mt-2">
-                <p className="mb-3 text-sm font-semibold text-neutral-800">
-                  Summary
-                </p>
-                <div className="space-y-2 text-[12px]">
-                  <Row label="Sub total products" value={NGN.format(subtotal)} />
-                  <Row label="Delivery fee" value={NGN.format(deliveryFee)} />
-                  <Row label="Tax" value={NGN.format(tax)} />
-                </div>
-
-                <div className="mt-4 border-t border-neutral-200 pt-4">
-                  <Row label="Total" value={NGN.format(total)} bold big />
-                </div>
-
-                <button
-                  className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-red-500 to-red-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:opacity-95"
-                  onClick={() => router.push("/checkout")} 
-                >
-                  Checkout
-                </button>
-              </div>
+          {/* Delivery details (placeholder – match your screenshot) */}
+          <div className="mt-4 rounded-xl border border-neutral-200 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold">Delivery Details</p>
+              <button
+                // onClick={() => router.push("/checkout")}
+                className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+              >
+                Change <PencilLine className="h-3.5 w-3.5" />
+              </button>
             </div>
-          </aside>
-        </div>
+            <div className="mt-3 text-xs text-neutral-700">
+              <p>Door Delivery</p>
+              <p className="mt-1 text-neutral-500">Delivery between —</p>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <button
+            onClick={() => {
+              if (!isLoggedIn) {
+                toast.info("Please log in to checkout", {
+                  action: {
+                    label: "Log in",
+                    onClick: () => router.push("/login"), // or your auth route
+                  },
+                  duration: 4000,
+                });
+                router.push("/"); // send them to homepage as you requested
+                return;
+              }
+              router.push("/checkout");
+            }}
+            className="mt-6 w-full rounded-full bg-red-600 py-3 text-sm font-semibold text-white hover:bg-red-700"
+          >
+            Checkout
+          </button>
+        </aside>
       </div>
 
       <Footer />
     </main>
   );
-};
-
-function Row({
-  label,
-  value,
-  bold,
-  big,
-}: {
-  label: string;
-  value: string;
-  bold?: boolean;
-  big?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className={`text-neutral-500 ${big ? "text-sm" : ""}`}>
-        {label}
-      </span>
-      <span
-        className={`tabular-nums ${
-          bold ? "font-semibold text-neutral-900" : "text-neutral-800"
-        } ${big ? "text-base" : ""}`}
-      >
-        {value}
-      </span>
-    </div>
-  );
 }
-
-export default page;
