@@ -14,11 +14,34 @@ import {
   X,
 } from "lucide-react";
 import SearchUI from "../SearchUI";
+import { useCart } from "@/context/CartContext";
+import { useLocalCart } from "@/context/LocalCartContext";
+import { useUser } from "@/context/UserContext";
 
 const Navbar = () => {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+
+  // Import cart contexts to get item count
+  const { cart } = useCart();
+  const { items: localItems } = useLocalCart();
+  const u = useUser() as any;
+  const isLoggedIn = !!(u?.me || u?.user || u?.activeCustomer || u?.customer);
+
+  // Calculate cart count (number of unique items, not total quantity)
+  const getCartCount = () => {
+    if (isLoggedIn) {
+      // For logged-in users, use server cart - count number of line items
+      const lines = cart?.activeOrder?.lines ?? [];
+      return lines.length;
+    } else {
+      // For guest users, use local cart - count number of items
+      return localItems.length;
+    }
+  };
+
+  const cartCount = getCartCount();
 
   useEffect(() => {
     setOpen(false);
@@ -107,9 +130,31 @@ const Navbar = () => {
             }
           />
 
-          <button aria-label="Cart">
+          <button aria-label="Cart" style={{ position: "relative" }}>
             <Link href="/cart">
               <ShoppingCart width={24} height={24} />
+              {cartCount > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "-8px",
+                    right: "-8px",
+                    backgroundColor: "#dc2626",
+                    color: "white",
+                    borderRadius: "50%",
+                    width: "20px",
+                    height: "20px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    minWidth: "20px",
+                  }}
+                >
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
             </Link>
           </button>
         </div>
