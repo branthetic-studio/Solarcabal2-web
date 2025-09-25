@@ -1,12 +1,20 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@apollo/client/react";
-import { GET_COLLECTION_PRODUCTS } from "@/graphql/queries";
+import { useQuery, useLazyQuery } from "@apollo/client/react";
+import { toast } from "sonner";
+import { useCart } from "@/context/CartContext";
+import { useLocalCart } from "@/context/LocalCartContext";
+import { useUser } from "@/context/UserContext";
+import {
+  GET_COLLECTION_PRODUCTS,
+  GET_PRODUCT_DETAILS,
+} from "@/graphql/queries";
+import { useRouter } from "next/navigation";
 
 type Props = {
   categorySlug: string;
-  brand: string[] | null; // ✅ multiple brands supported
+  brand: string[] | null;
   sort: string;
   condition: string;
   priceRange: [number, number];
@@ -32,7 +40,7 @@ type SearchItem = {
   productAsset?: { id: string; preview: string } | null;
   priceWithTax: PriceWithTax;
   currencyCode: string;
-  brand?: string | null; // ✅ optional brand field
+  brand?: string | null;
 };
 
 type GetCollectionProductsData = {
@@ -52,7 +60,20 @@ type GetCollectionProductsVars = {
   filter?: any;
 };
 
-// If you have facet IDs for brands, map them here
+// Product details type for fetching variant ID
+type ProductDetailsForVariant = {
+  product: {
+    featuredAsset?: { preview: string } | null;
+    assets?: Array<{ preview: string }>;
+    variants: Array<{
+      id: string;
+      name: string;
+      priceWithTax: number;
+      currencyCode: string;
+    }>;
+  } | null;
+};
+
 const brandFacetIdMap: Record<string, string> = {
   // Example:
   // Jinko: "fv_123",
@@ -64,7 +85,7 @@ function formatPrice(p: PriceWithTax, currency: string): string {
   if (p.__typename === "SinglePrice") {
     return `${currency} ${p.value.toLocaleString()}`;
   }
-  return `${currency} ${p.min.toLocaleString()} – ${p.max.toLocaleString()}`;
+  return `${currency} ${p.min.toLocaleString()} — ${p.max.toLocaleString()}`;
 }
 
 const ProductGrid: React.FC<Props> = ({
@@ -75,8 +96,19 @@ const ProductGrid: React.FC<Props> = ({
   priceRange,
 }) => {
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({});
+  const { addToCartMutation } = useCart();
+  const { addItem: addLocalItem } = useLocalCart();
+  const { me, customer } = useUser();
+  const router = useRouter();
 
-  // ✅ Build facetValueIds for multiple brands
+  // ✅ Lazy query to fetch product details (including variant IDs) by slug
+  const [getProductDetails] = useLazyQuery<ProductDetailsForVariant>(
+    GET_PRODUCT_DETAILS,
+    {
+      fetchPolicy: "cache-first", // Cache variant IDs to avoid repeated fetches
+    }
+  );
+
   const facetValueIds = useMemo(() => {
     if (!brand || brand.length === 0) return undefined;
     const ids = brand
@@ -85,7 +117,6 @@ const ProductGrid: React.FC<Props> = ({
     return ids.length > 0 ? ids : undefined;
   }, [brand]);
 
-  // ✅ Sort mapping
   const sortMap: Record<string, Record<string, "ASC" | "DESC"> | undefined> = {
     relevance: undefined,
     priceAsc: { price: "ASC" },
@@ -94,7 +125,6 @@ const ProductGrid: React.FC<Props> = ({
     nameDesc: { name: "DESC" },
   };
 
-  // ✅ Build filters
   const filters: any = {
     price: { between: { start: priceRange[0], end: priceRange[1] } },
   };
@@ -131,17 +161,57 @@ const ProductGrid: React.FC<Props> = ({
     }));
   }, [data]);
 
-  const addToCart = async (id: string) => {
-    setAddingToCart((prev) => ({ ...prev, [id]: true }));
-
+  const addToCart = async (item: ProductCardItem) => {
+    setAddingToCart((prev) => ({ ...prev, [item.id]: true }));
     try {
-      // Your add-to-cart logic here
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
-      console.log(`Added product ${id} to cart`);
-    } catch (error) {
-      console.error("Failed to add to cart:", error);
+      // 1) Get variant (needed for both server + local)
+      const { data: productData } = await getProductDetails({
+        variables: { slug: item.slug },
+      });
+      const firstVariant = productData?.product?.variants?.[0];
+      if (!firstVariant?.id)
+        throw new Error("No variant found for this product");
+
+      // image fallbacks from product
+      const image =
+        item.image ??
+        productData?.product?.featuredAsset?.preview ??
+        productData?.product?.assets?.[0]?.preview ??
+        undefined;
+
+      // 🔧 Use the variant currencyCode; don't read product.currencyCode
+      const currencyCode = firstVariant.currencyCode ?? "NGN";
+
+      // 2) ALWAYS add locally so guests see cart immediately
+      addLocalItem({
+        id: firstVariant.id, // productVariantId
+        name: item.name,
+        slug: item.slug,
+        image,
+        priceWithTax: firstVariant.priceWithTax, // NOTE: if API returns minor units, divide at render
+        currencyCode,
+        brand: item.brand ?? undefined,
+        quantity: 1,
+      });
+
+      // 3) Try server add in parallel; ok if it fails for guests
+      const serverAdd = addToCartMutation({
+        variables: { productVariantId: firstVariant.id, quantity: 1 },
+      }).catch(() => null);
+
+      // Don’t block the toast on server result
+      toast.success("Added to cart", {
+        action: {
+          label: "View Cart",
+          onClick: () => router.push("/cart"),
+        },
+      });
+
+      await serverAdd; // optional: wait quietly so refetches settle if logged in
+    } catch (err: any) {
+      toast.error(err?.message || "Could not add to cart");
     } finally {
-      setAddingToCart((prev) => ({ ...prev, [id]: false }));
+      setAddingToCart((prev) => ({ ...prev, [item.id]: false }));
     }
   };
 
@@ -170,7 +240,7 @@ const ProductGrid: React.FC<Props> = ({
                     </Link>
                     <div className="actions">
                       <button
-                        onClick={() => addToCart(item.id)}
+                        onClick={() => addToCart(item)}
                         disabled={isAddingToCart}
                         className="add-to-cart-btn"
                       >
