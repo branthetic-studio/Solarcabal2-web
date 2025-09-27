@@ -96,6 +96,11 @@ const ProductGrid: React.FC<Props> = ({
   priceRange,
 }) => {
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({});
+  // New state for quantity counters - tracks which products have counters showing and their quantities
+  const [quantityCounters, setQuantityCounters] = useState<
+    Record<string, number>
+  >({});
+
   const { addToCartMutation } = useCart();
   const { addItem: addLocalItem } = useLocalCart();
   const { me, customer } = useUser();
@@ -161,7 +166,39 @@ const ProductGrid: React.FC<Props> = ({
     }));
   }, [data]);
 
+  // Show quantity counter when "Add to Cart" is first clicked
+  const showQuantityCounter = (item: ProductCardItem) => {
+    setQuantityCounters((prev) => ({
+      ...prev,
+      [item.id]: 1, // Start with quantity 1
+    }));
+  };
+
+  // Update quantity in counter
+  const updateQuantity = (itemId: string, change: number) => {
+    setQuantityCounters((prev) => {
+      const currentQty = prev[itemId] || 1;
+      const newQty = Math.max(1, currentQty + change); // Minimum quantity is 1
+      return {
+        ...prev,
+        [itemId]: newQty,
+      };
+    });
+  };
+
+  // Cancel quantity selection (hide counter)
+  const cancelQuantitySelection = (itemId: string) => {
+    setQuantityCounters((prev) => {
+      const newCounters = { ...prev };
+      delete newCounters[itemId];
+      return newCounters;
+    });
+  };
+
+  // Add to cart with selected quantity
   const addToCart = async (item: ProductCardItem) => {
+    const quantity = quantityCounters[item.id] || 1;
+
     setAddingToCart((prev) => ({ ...prev, [item.id]: true }));
     try {
       // 1) Get variant (needed for both server + local)
@@ -191,20 +228,30 @@ const ProductGrid: React.FC<Props> = ({
         priceWithTax: firstVariant.priceWithTax, // NOTE: if API returns minor units, divide at render
         currencyCode,
         brand: item.brand ?? undefined,
-        quantity: 1,
+        quantity: quantity, // Use selected quantity
       });
 
       // 3) Try server add in parallel; ok if it fails for guests
       const serverAdd = addToCartMutation({
-        variables: { productVariantId: firstVariant.id, quantity: 1 },
+        variables: { productVariantId: firstVariant.id, quantity: quantity },
       }).catch(() => null);
 
-      // Don’t block the toast on server result
-      toast.success("Added to cart", {
-        action: {
-          label: "View Cart",
-          onClick: () => router.push("/cart"),
-        },
+      // Don't block the toast on server result
+      toast.success(
+        `Added ${quantity} item${quantity > 1 ? "s" : ""} to cart`,
+        {
+          action: {
+            label: "View Cart",
+            onClick: () => router.push("/cart"),
+          },
+        }
+      );
+
+      // Hide the quantity counter after successful add
+      setQuantityCounters((prev) => {
+        const newCounters = { ...prev };
+        delete newCounters[item.id];
+        return newCounters;
       });
 
       await serverAdd; // optional: wait quietly so refetches settle if logged in
@@ -229,6 +276,9 @@ const ProductGrid: React.FC<Props> = ({
           <div className="grid">
             {items.map((item, index) => {
               const isAddingToCart = addingToCart[item.id] || false;
+              const showingCounter = item.id in quantityCounters;
+              const currentQuantity = quantityCounters[item.id] || 1;
+
               return (
                 <div className="product-card" key={item.id ?? index}>
                   <div className="product-header">
@@ -239,13 +289,55 @@ const ProductGrid: React.FC<Props> = ({
                       />
                     </Link>
                     <div className="actions">
-                      <button
-                        onClick={() => addToCart(item)}
-                        disabled={isAddingToCart}
-                        className="add-to-cart-btn"
-                      >
-                        {isAddingToCart ? "Adding..." : "Add to Cart"}
-                      </button>
+                      {!showingCounter ? (
+                        // Initial "Add to Cart" button
+                        <button
+                          onClick={() => showQuantityCounter(item)}
+                          disabled={isAddingToCart}
+                          className="add-to-cart-btn"
+                        >
+                          Add to Cart
+                        </button>
+                      ) : (
+                        // Quantity counter interface
+                        <div className="quantity-selector">
+                          <div className="quantity-controls">
+                            <button
+                              onClick={() => updateQuantity(item.id, -1)}
+                              disabled={currentQuantity <= 1}
+                              className="quantity-btn minus"
+                            >
+                              -
+                            </button>
+                            <span className="quantity-display">
+                              {currentQuantity}
+                            </span>
+                            <button
+                              onClick={() => updateQuantity(item.id, 1)}
+                              className="quantity-btn plus"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <div className="quantity-actions">
+                            <button
+                              onClick={() => addToCart(item)}
+                              disabled={isAddingToCart}
+                              className="confirm-add-btn"
+                            >
+                              {isAddingToCart
+                                ? "Adding..."
+                                : `Add ${currentQuantity}`}
+                            </button>
+                            <button
+                              onClick={() => cancelQuantitySelection(item.id)}
+                              className="cancel-btn"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="product-details">
