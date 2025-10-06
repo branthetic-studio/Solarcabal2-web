@@ -3,16 +3,8 @@ import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import "./Navbar.css";
-import Logo from "../../Assets/solacabal.png";
 import AuthModal from "../AuthModal";
-import {
-  Search as SearchIcon,
-  User as UserIcon,
-  ShoppingCart,
-  Menu,
-  X,
-} from "lucide-react";
+import { Search, User, ShoppingCart, Menu, X } from "lucide-react";
 import SearchUI from "../SearchUI";
 import { useCart } from "@/context/CartContext";
 import { useLocalCart } from "@/context/LocalCartContext";
@@ -23,20 +15,16 @@ const Navbar = () => {
   const [open, setOpen] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  // Import cart contexts to get item count
   const { cart } = useCart();
   const { items: localItems } = useLocalCart();
   const u = useUser() as any;
   const isLoggedIn = !!(u?.me || u?.user || u?.activeCustomer || u?.customer);
 
-  // Calculate cart count (number of unique items, not total quantity)
   const getCartCount = () => {
     if (isLoggedIn) {
-      // For logged-in users, use server cart - count number of line items
       const lines = cart?.activeOrder?.lines ?? [];
       return lines.length;
     } else {
-      // For guest users, use local cart - count number of items
       return localItems.length;
     }
   };
@@ -49,20 +37,41 @@ const Navbar = () => {
 
   return (
     <>
-      <div className="navbar">
-        <Image src={Logo} alt="Company Logo" className="logo" />
+      <nav className="w-full flex items-center justify-center py-6 px-4 bg-[#FAFAFA]">
+        <div className="max-w-6xl w-full flex items-center justify-between gap- bg-white px-3 py-3.5">
+          {/* Logo */}
+          <Link href="/" className="flex-shrink-0">
+            <Image
+              src="/solarcabal.png"
+              alt="Company Logo"
+              className="object-cover"
+              width={32}
+              height={32}
+            />
+          </Link>
 
-        <div className="links">
-          <ul>
+          {/* Desktop Navigation Links */}
+          <ul className="hidden lg:flex items-center gap-8 flex-1 justify-center">
             <li>
-              <Link href="/" className={pathname === "/" ? "active-link" : ""}>
+              <Link
+                href="/"
+                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                  pathname === "/"
+                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    : "text-gray-700"
+                }`}
+              >
                 Home
               </Link>
             </li>
             <li>
               <Link
                 href="/products"
-                className={pathname === "/products" ? "active-link" : ""}
+                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                  pathname === "/products"
+                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    : "text-gray-700"
+                }`}
               >
                 Products
               </Link>
@@ -70,7 +79,11 @@ const Navbar = () => {
             <li>
               <Link
                 href="/installation"
-                className={pathname === "/installation" ? "active-link" : ""}
+                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                  pathname === "/installation"
+                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    : "text-gray-700"
+                }`}
               >
                 Installation
               </Link>
@@ -78,7 +91,11 @@ const Navbar = () => {
             <li>
               <Link
                 href="/enquiries"
-                className={pathname === "/enquiries" ? "active-link" : ""}
+                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                  pathname === "/enquiries"
+                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    : "text-gray-700"
+                }`}
               >
                 Enquiries
               </Link>
@@ -86,7 +103,11 @@ const Navbar = () => {
             <li>
               <Link
                 href="/referral"
-                className={pathname === "/referral" ? "active-link" : ""}
+                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                  pathname === "/referral"
+                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    : "text-gray-700"
+                }`}
               >
                 Referral Program
               </Link>
@@ -94,101 +115,123 @@ const Navbar = () => {
             <li>
               <Link
                 href="/faq"
-                className={pathname === "/faq" ? "active-link" : ""}
+                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                  pathname === "/faq"
+                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    : "text-gray-700"
+                }`}
               >
                 FAQ
               </Link>
             </li>
           </ul>
-        </div>
 
-        <div className="navbar-actions">
+          {/* Desktop Action Buttons */}
+          <div className="hidden lg:flex items-center gap-0.5">
+            <button
+              aria-label="Search"
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              onClick={() => setShowSearch(true)}
+            >
+              <Search className="w-5 h-5 text-gray-700" />
+            </button>
+            <AuthModal
+              trigger={
+                <button
+                  aria-label="Account"
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <User className="w-5 h-5 text-gray-700" />
+                </button>
+              }
+            />
+            <Link
+              href="/cart"
+              aria-label="Cart"
+              className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <ShoppingCart className="w-5 h-5 text-gray-700" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
+            </Link>
+          </div>
+
+          {/* Mobile Menu Button */}
           <button
-            className="nav-toggle"
+            className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
             aria-label="Open menu"
             aria-controls="mobile-menu"
             aria-expanded={open}
             onClick={() => setOpen(true)}
           >
-            <Menu width={24} height={24} />
-          </button>
-
-          {/* ✅ Search Button */}
-          <button
-            aria-label="Search"
-            className="cursor-pointer"
-            onClick={() => setShowSearch(true)}
-          >
-            <SearchIcon width={24} height={24} />
-          </button>
-
-          <AuthModal
-            trigger={
-              <button aria-label="Account" className="cursor-pointer">
-                <UserIcon width={24} height={24} />
-              </button>
-            }
-          />
-
-          <button aria-label="Cart" style={{ position: "relative" }}>
-            <Link href="/cart">
-              <ShoppingCart width={24} height={24} />
-              {cartCount > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "-8px",
-                    right: "-8px",
-                    backgroundColor: "#dc2626",
-                    color: "white",
-                    borderRadius: "50%",
-                    width: "20px",
-                    height: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    minWidth: "20px",
-                  }}
-                >
-                  {cartCount > 99 ? "99+" : cartCount}
-                </span>
-              )}
-            </Link>
+            <Menu className="w-6 h-6 text-gray-700" />
           </button>
         </div>
-      </div>
+      </nav>
+
+      {/* Mobile Drawer Overlay */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
 
       {/* Mobile Drawer */}
       <div
         id="mobile-menu"
-        className={`mobile-menu${open ? " open" : ""}`}
+        className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
         role="dialog"
         aria-modal="true"
       >
-        <div className="mobile-sheet">
-          <div className="mobile-sheet-head">
-            <Image src={Logo} alt="Company Logo" className="logo" />
+        <div className="flex flex-col h-full">
+          {/* Mobile Header */}
+          <div className="flex items-center justify-between p-6 border-b">
+            <Image
+              src="/solarcabal.png"
+              alt="Company Logo"
+              className="object-contain"
+              width={40}
+              height={40}
+            />
             <button
-              className="mobile-close"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label="Close menu"
               onClick={() => setOpen(false)}
             >
-              <X width={24} height={24} />
+              <X className="w-6 h-6 text-gray-700" />
             </button>
           </div>
 
-          <ul className="mobile-links" onClick={() => setOpen(false)}>
+          {/* Mobile Links */}
+          <ul className="flex flex-col p-6 space-y-1">
             <li>
-              <Link href="/" className={pathname === "/" ? "active-link" : ""}>
+              <Link
+                href="/"
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === "/"
+                    ? "bg-orange-50 text-orange-600"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+                onClick={() => setOpen(false)}
+              >
                 Home
               </Link>
             </li>
             <li>
               <Link
                 href="/products"
-                className={pathname === "/products" ? "active-link" : ""}
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === "/products"
+                    ? "bg-orange-50 text-orange-600"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+                onClick={() => setOpen(false)}
               >
                 Products
               </Link>
@@ -196,7 +239,12 @@ const Navbar = () => {
             <li>
               <Link
                 href="/installation"
-                className={pathname === "/installation" ? "active-link" : ""}
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === "/installation"
+                    ? "bg-orange-50 text-orange-600"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+                onClick={() => setOpen(false)}
               >
                 Installation
               </Link>
@@ -204,7 +252,12 @@ const Navbar = () => {
             <li>
               <Link
                 href="/enquiries"
-                className={pathname === "/enquiries" ? "active-link" : ""}
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === "/enquiries"
+                    ? "bg-orange-50 text-orange-600"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+                onClick={() => setOpen(false)}
               >
                 Enquiries
               </Link>
@@ -212,7 +265,12 @@ const Navbar = () => {
             <li>
               <Link
                 href="/referral"
-                className={pathname === "/referral" ? "active-link" : ""}
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === "/referral"
+                    ? "bg-orange-50 text-orange-600"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+                onClick={() => setOpen(false)}
               >
                 Referral Program
               </Link>
@@ -220,16 +278,58 @@ const Navbar = () => {
             <li>
               <Link
                 href="/faq"
-                className={pathname === "/faq" ? "active-link" : ""}
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === "/faq"
+                    ? "bg-orange-50 text-orange-600"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+                onClick={() => setOpen(false)}
               >
                 FAQ
               </Link>
             </li>
           </ul>
+
+          {/* Mobile Actions */}
+          <div className="mt-auto p-6 border-t">
+            <div className="flex items-center justify-around">
+              <button
+                aria-label="Search"
+                className="p-3 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={() => {
+                  setShowSearch(true);
+                  setOpen(false);
+                }}
+              >
+                <Search className="w-6 h-6 text-gray-700" />
+              </button>
+
+              <button
+                aria-label="Account"
+                className="p-3 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <User className="w-6 h-6 text-gray-700" />
+              </button>
+
+              <Link
+                href="/cart"
+                aria-label="Cart"
+                className="relative p-3 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                <ShoppingCart className="w-6 h-6 text-gray-700" />
+                {cartCount > 0 && (
+                  <span className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">
+                    {cartCount > 99 ? "99+" : cartCount}
+                  </span>
+                )}
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ✅ Search Overlay */}
+      {/* Search Overlay */}
       {showSearch && <SearchUI onClose={() => setShowSearch(false)} />}
     </>
   );
