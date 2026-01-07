@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Navbar from "../../Components/Navbar/Navbar";
 import Footer from "../../Components/Footer/Footer";
-import Refer from "../../Components/Refer/Refer";
+import Refer from "../../Components/Suscribe/Suscribe";
 import "./Enquiries.css";
 import Image from "next/image";
 // (Removed GraphQL imports)

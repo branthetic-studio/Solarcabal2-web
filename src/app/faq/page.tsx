@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import './Faq.css';
 import Navbar from '../../Components/Navbar/Navbar';
 import Footer from '../../Components/Footer/Footer';
-import Refer from '../../Components/Refer/Refer';
+import Refer from '../../Components/Suscribe/Suscribe';
 
 
 type AccordionItemProps = {

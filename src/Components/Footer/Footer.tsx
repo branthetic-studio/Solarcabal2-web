@@ -10,118 +10,109 @@ import {
 
 const Footer = () => {
   return (
-    <footer className="relative bg-[#1c1c1c]/95 overflow-hidden text-white py-20 px-6 md:px-16 z-0">
-      {/* Background gradient decorations */}
-      <div className="absolute -top-20 -right-20 pointer-events-none opacity-30 z-10">
-        <Image
-          src="/footershadow1.png"
-          alt="Footer shadow"
-          width={537}
-          height={542}
-          className="object-cover"
-          priority
-        />
-      </div>
-      <div className="absolute -bottom-20 -left-20 pointer-events-none opacity-30 z-10">
-        <Image
-          src="/footershadow2.png"
-          alt="Footer shadow"
-          width={537}
-          height={542}
-          className="object-cover"
-          priority
-        />
-      </div>
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center relative z-20">
-        {/* Left: Logo + About */}
-        <div className="max-w-xs">
-          <Image
-            src="/solarcabal.png"
-            alt="SolarCabal Logo"
-            width={60}
-            height={60}
-          />
-          <p className="mt-4 text-gray-300 text-sm leading-relaxed">
-            SolarCabal is dedicated to providing high-quality solar energy
-            solutions to homeowners and businesses, helping them reduce their
-            carbon footprint and save on energy costs.
-          </p>
+    <footer className="relative bg-[#1c1c1c]/55 overflow-hidden text-white py-20 px-6 md:px-16 z-0">
+
+      {/* Noise Texture */}
+      <div className="absolute inset-0 bg-[url('/noise bg.jpg')] opacity-20 mix-blend-overlay pointer-events-none"></div>
+
+
+      <div className="max-w-7xl mx-auto relative z-20">
+        {/* Grid Section */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+
+          {/* Column 1 */}
+          <div>
+            <h3 className="font-semibold text-lg mb-4">Need Help?</h3>
+            <ul className="space-y-2 text-sm text-gray-300">
+              <li><a href="#" className="hover:text-red-500">FAQs</a></li>
+              <li><a href="#" className="hover:text-red-500">Shipping & Returns</a></li>
+              <li><a href="#" className="hover:text-red-500">Products</a></li>
+              <li><a href="#" className="hover:text-red-500">Contact Us</a></li>
+            </ul>
+          </div>
+
+          {/* Column 2 */}
+          <div>
+            <h3 className="font-semibold text-lg mb-4">Customer service</h3>
+            <p className="text-sm text-gray-300 mb-3">Return and refund policy</p>
+            <ul className="space-y-2 text-sm text-gray-300">
+              <li className="flex items-center gap-2">
+                <span>📧</span> Support@solarcabal.com
+              </li>
+              <li className="flex items-center gap-2">
+                <span>📞</span> 07074890730, 07074782575
+              </li>
+            </ul>
+          </div>
+
+          {/* Column 3 */}
+          <div>
+            <h3 className="font-semibold text-lg mb-4">Useful Links</h3>
+            <ul className="space-y-2 text-sm text-gray-300">
+              <li><a href="#" className="hover:text-red-500">Shipping & Returns</a></li>
+              <li><a href="#" className="hover:text-red-500">Products</a></li>
+              <li><a href="#" className="hover:text-red-500">Warranty Information</a></li>
+              <li><a href="#" className="hover:text-red-500">Track Your Order</a></li>
+              <li><a href="#" className="hover:text-red-500">Gallery</a></li>
+            </ul>
+          </div>
+
+          {/* Column 4 */}
+          <div>
+            <h3 className="font-semibold text-lg mb-4">Earn Money with Solarcabal</h3>
+            <ul className="space-y-2 text-sm text-gray-300 mb-4">
+              <li><a href="#" className="hover:text-red-500">Referral</a></li>
+              <li><a href="#" className="hover:text-red-500">Sell on Solarcabal</a></li>
+            </ul>
+
+            <h4 className="font-semibold text-sm mb-3">We accept</h4>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Image src="/payments/verve.png" alt="Verve" width={40} height={20} />
+              <Image src="/payments/visa.png" alt="Visa" width={40} height={20} />
+              <Image src="/payments/mastercard.png" alt="Mastercard" width={40} height={20} />
+              <Image src="/payments/applepay.png" alt="Apple Pay" width={40} height={20} />
+              <Image src="/payments/paypal.png" alt="PayPal" width={40} height={20} />
+            </div>
+          </div>
+
         </div>
 
-        <div className="flex flex-col items-start justify-center gap-8 pt-6">
-          {/* Top: Navigation */}
-          <div className="flex flex-row gap-3 text-xs font-medium md:items-start items-center">
-            <a href="#" className="hover:text-red-500 transition">
-              FAQs
+        {/* Divider */}
+        <div className="border-t border-gray-700 my-6"></div>
+
+        {/* Bottom Section */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-5">
+
+          {/* Copyright */}
+          <p className="text-gray-400 text-xs">
+            Copyright © 2025 SolarCabal. All rights reserved
+          </p>
+
+          {/* Legal Links */}
+          <div className="flex gap-4 text-xs">
+            <a href="#" className="hover:text-red-500">Privacy Policy</a>
+            <a href="#" className="hover:text-red-500">Terms of Use</a>
+          </div>
+
+          {/* Social Icons */}
+          <div className="flex gap-3">
+            <a className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition">
+              <FaFacebookF size={16} />
             </a>
-            <a href="#" className="hover:text-red-500 transition">
-              Shipping & Returns
+            <a className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition">
+              <FaTwitter size={16} />
             </a>
-            <a href="#" className="hover:text-red-500 transition">
-              Products
+            <a className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition">
+              <FaInstagram size={16} />
             </a>
-            <a href="#" className="hover:text-red-500 transition">
-              Warranty Information
+            <a className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition">
+              <FaLinkedinIn size={16} />
             </a>
-            <a href="#" className="hover:text-red-500 transition">
-              Track Your Order
-            </a>
-            <a href="#" className="hover:text-red-500 transition">
-              Contact Us
+            <a className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition">
+              <FaYoutube size={16} />
             </a>
           </div>
 
-          {/* Bottom: Social + Legal */}
-          <div className="flex flex-col items-center md:items-start gap-5">
-            {/* Social Icons */}
-            <div className="flex gap-3 items-start justify-start">
-              <a
-                href="#"
-                className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition"
-              >
-                <FaFacebookF size={18} />
-              </a>
-              <a
-                href="#"
-                className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition"
-              >
-                <FaTwitter size={18} />
-              </a>
-              <a
-                href="#"
-                className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition"
-              >
-                <FaInstagram size={18} />
-              </a>
-              <a
-                href="#"
-                className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition"
-              >
-                <FaLinkedinIn size={18} />
-              </a>
-              <a
-                href="#"
-                className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition"
-              >
-                <FaYoutube size={18} />
-              </a>
-            </div>
-
-            {/* Copyright + Legal */}
-            <div className="flex gap-3 items-center justify-center">
-              <p className="text-gray-400 text-xs text-center md:text-right">
-                Copyright © 2025 SolarCabal. All rights reserved
-              </p>
-              <div className="flex gap-4 text-xs">
-                <a href="#" className="hover:underline">
-                  Privacy Policy
-                </a>
-                <a href="#" className="hover:underline">
-                  Terms of Use
-                </a>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </footer>

@@ -23,6 +23,8 @@ const Rate = () => {
             margin: "5px 0",
             opacity: index < rating ? 1 : 0.2,
           }}
+
+          className="bg-[#ffffff]"
         />
       ))}
     </div>
@@ -50,10 +52,10 @@ const formatPrice = (priceWithTax: any): string => {
 
 const Products = () => {
   return (
-    <div className="products-container">
+    <div className="products-container bg-[#ffffff] my-6">
       <div className="products-header">
         <h3>Popular Products</h3>
-        <button>More Products </button>
+        <button className="text-lg text-[#FF0000]">More Products </button>
       </div>
       <div className="product-grid">
         <div className="product">

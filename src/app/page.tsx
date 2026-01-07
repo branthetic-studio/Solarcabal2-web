@@ -3,7 +3,7 @@ import React from "react";
 import Navbar from "../Components/Navbar/Navbar";
 import Banner from "./components/banner";
 import Footer from "../Components/Footer/Footer";
-import Refer from "../Components/Refer/Refer";
+import Suscribe from "../Components/Suscribe/Suscribe";
 import Testimonial from "./components/testimonial";
 import Services from "./components/services";
 import ChooseUs from "./components/chooseUs";
@@ -14,7 +14,7 @@ import "./home.css";
 
 export default function Home() {
   return (
-    <div className="w-full bg-[#FAFAFA]">
+    <div className="w-full bg-[#FAFAFA] px-4">
       <Navbar />
       <Banner />
       <Services />
@@ -23,7 +23,7 @@ export default function Home() {
       <ChooseUs />
       <Reward />
       <Testimonial />
-      <Refer />
+      <Suscribe />
       <Footer />
     </div>
   );

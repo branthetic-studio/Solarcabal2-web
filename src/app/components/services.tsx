@@ -25,7 +25,7 @@ const services = () => {
               <h4 className="text-base md:text-lg font-semibold text-[#281D1B]">
                 Products
               </h4>
-              <p className="text-[#281d1b] text-xs md:text-lg mt-2 md:mt-2.5 leading-relaxed">
+              <p className="text-[#281d1b] text-md md:text-md mt-2 md:mt-2.5 leading-relaxed">
                 Revolutionise your energy use with our cutting-edge solar
                 solutions.
               </p>
@@ -46,7 +46,7 @@ const services = () => {
               <h4 className="text-base md:text-lg font-semibold text-[#281D1B]">
                 Installation
               </h4>
-              <p className="text-[#281d1b] text-xs md:text-lg mt-2 md:mt-2.5 leading-relaxed">
+              <p className="text-[#281d1b] text-md md:text-md mt-2 md:mt-2.5 leading-relaxed">
                 Enjoy exceptional solar installations that illuminate your
                 space.
               </p>
@@ -67,7 +67,7 @@ const services = () => {
               <h4 className="text-base md:text-lg font-semibold text-[#281D1B]">
                 Referral & Rewards
               </h4>
-              <p className="text-[#281d1b] text-xs md:text-lg mt-2 md:mt-2.5 leading-relaxed">
+              <p className="text-[#281d1b] text-md md:text-md mt-2 md:mt-2.5 leading-relaxed">
                 Share your referral code, and earn rewards.
               </p>
               <button className="w-full md:w-auto bg-[#FF0000] hover:bg-red-700 text-white  text-sm md:text-base px-6 md:px-8 py-2.5 md:py-2.5 rounded-full mt-3.5 md:mt-4 transition-colors">
@@ -87,7 +87,7 @@ const services = () => {
               <h4 className="text-base md:text-lg font-semibold text-[#281D1B]">
                 Enquiries
               </h4>
-              <p className="text-[#281d1b] text-xs md:text-lg mt-2 md:mt-2.5 leading-relaxed">
+              <p className="text-[#281d1b] text-md md:text-md mt-2 md:mt-2.5 leading-relaxed">
                 Inquire about our solar solutions and get expert assistance today!
               </p>
               <button className="w-full md:w-auto bg-[#FF0000] hover:bg-red-700 text-white text-sm md:text-base px-6 md:px-8 py-2.5 md:py-2.5 rounded-full mt-3.5 md:mt-4 transition-colors">
