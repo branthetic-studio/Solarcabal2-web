@@ -87,10 +87,10 @@ const Banner = () => {
           />
 
           {/* Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/10 to-transparent" />
 
           {/* Content */}
-          <div className="relative h-full flex flex-col justify-center px-8 md:px-16 max-w-3xl">
+          <div className="relative h-full flex flex-col justify-center px-8 md:px-16 md:pl-30 max-w-3xl">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 leading-tight">
               Your One-Stop
               <br />
@@ -104,7 +104,7 @@ const Banner = () => {
 
             <Link
               href="/products"
-              className="inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-semibold px-8 py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit"
+              className="inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit"
             >
               Shop Now
             </Link>
