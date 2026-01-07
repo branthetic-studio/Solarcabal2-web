@@ -38,15 +38,15 @@ const Navbar = () => {
   return (
     <>
       <nav className="w-full flex items-center justify-center py-6 bg-[#FAFAFA]">
-        <div className="w-full flex items-center justify-between gap- bg-white px-3 mx-12 py-3.5">
+        <div className="w-full flex items-center justify-between gap- bg-white px-5 mx-12 py-3.5">
           {/* Logo */}
           <Link href="/" className="flex-shrink-0">
             <Image
               src="/solarcabal.png"
               alt="Company Logo"
               className="object-cover"
-              width={32}
-              height={32}
+              width={50}
+              height={50}
             />
           </Link>
 
@@ -55,9 +55,9 @@ const Navbar = () => {
             <li>
               <Link
                 href="/"
-                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/"
-                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
                     : "text-gray-700"
                 }`}
               >
@@ -67,9 +67,9 @@ const Navbar = () => {
             <li>
               <Link
                 href="/products"
-                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/products"
-                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
                     : "text-gray-700"
                 }`}
               >
@@ -79,9 +79,9 @@ const Navbar = () => {
             <li>
               <Link
                 href="/installation"
-                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/installation"
-                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
                     : "text-gray-700"
                 }`}
               >
@@ -91,9 +91,9 @@ const Navbar = () => {
             <li>
               <Link
                 href="/enquiries"
-                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/enquiries"
-                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
                     : "text-gray-700"
                 }`}
               >
@@ -103,9 +103,9 @@ const Navbar = () => {
             <li>
               <Link
                 href="/referral"
-                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/referral"
-                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
                     : "text-gray-700"
                 }`}
               >
@@ -115,9 +115,9 @@ const Navbar = () => {
             <li>
               <Link
                 href="/faq"
-                className={`text-sm font-medium transition-colors hover:text-orange-600 ${
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/faq"
-                    ? "text-orange-600 border-b-2 border-orange-600 pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
                     : "text-gray-700"
                 }`}
               >
@@ -141,7 +141,7 @@ const Navbar = () => {
                   aria-label="Account"
                   className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                 >
-                  <User className="w-5 h-5 text-gray-700" />
+                  <Image src="/profile.png" alt="User" width={24} height={24} />
                 </button>
               }
             />
@@ -150,7 +150,7 @@ const Navbar = () => {
               aria-label="Cart"
               className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
             >
-              <ShoppingCart className="w-5 h-5 text-gray-700" />
+              <Image src="/shop cart.png" alt="Cart" width={20} height={20} />
               {cartCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">
                   {cartCount > 99 ? "99+" : cartCount}
@@ -215,7 +215,7 @@ const Navbar = () => {
                 href="/"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   pathname === "/"
-                    ? "bg-orange-50 text-orange-600"
+                    ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
                 onClick={() => setOpen(false)}
@@ -228,7 +228,7 @@ const Navbar = () => {
                 href="/products"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   pathname === "/products"
-                    ? "bg-orange-50 text-orange-600"
+                    ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
                 onClick={() => setOpen(false)}
@@ -241,7 +241,7 @@ const Navbar = () => {
                 href="/installation"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   pathname === "/installation"
-                    ? "bg-orange-50 text-orange-600"
+                    ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
                 onClick={() => setOpen(false)}
@@ -254,7 +254,7 @@ const Navbar = () => {
                 href="/enquiries"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   pathname === "/enquiries"
-                    ? "bg-orange-50 text-orange-600"
+                    ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
                 onClick={() => setOpen(false)}
@@ -267,7 +267,7 @@ const Navbar = () => {
                 href="/referral"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   pathname === "/referral"
-                    ? "bg-orange-50 text-orange-600"
+                    ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
                 onClick={() => setOpen(false)}
@@ -280,7 +280,7 @@ const Navbar = () => {
                 href="/faq"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   pathname === "/faq"
-                    ? "bg-orange-50 text-orange-600"
+                    ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
                 onClick={() => setOpen(false)}
@@ -308,7 +308,7 @@ const Navbar = () => {
                 aria-label="Account"
                 className="p-3 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <User className="w-6 h-6 text-gray-700" />
+                <Image src="/profile.png" alt="User" width={24} height={24} />
               </button>
 
               <Link
@@ -317,7 +317,7 @@ const Navbar = () => {
                 className="relative p-3 hover:bg-gray-100 rounded-lg transition-colors"
                 onClick={() => setOpen(false)}
               >
-                <ShoppingCart className="w-6 h-6 text-gray-700" />
+                <Image src="/shop cart.png" alt="Cart" width={20} height={20} />
                 {cartCount > 0 && (
                   <span className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">
                     {cartCount > 99 ? "99+" : cartCount}
