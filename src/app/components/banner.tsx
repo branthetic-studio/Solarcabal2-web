@@ -53,7 +53,7 @@ const categories = [
 const Banner = () => {
   return (
     <div className="w-full bg-[#FAFAFA]">
-      <div className="w-full flex gap-6 px-4 py-8 max-w-6xl mx-auto items-stretch">
+      <div className="w-full flex gap-6 py-8 px-12 mx-auto items-stretch">
         {/* Sidebar Categories */}
         <aside className="hidden lg:flex w-72 flex-shrink-0">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 w-full">

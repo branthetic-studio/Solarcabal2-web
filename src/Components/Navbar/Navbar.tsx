@@ -37,8 +37,8 @@ const Navbar = () => {
 
   return (
     <>
-      <nav className="w-full flex items-center justify-center py-6 px-4 bg-[#FAFAFA]">
-        <div className="max-w-6xl w-full flex items-center justify-between gap- bg-white px-3 py-3.5">
+      <nav className="w-full flex items-center justify-center py-6 bg-[#FAFAFA]">
+        <div className="w-full flex items-center justify-between gap- bg-white px-3 mx-12 py-3.5">
           {/* Logo */}
           <Link href="/" className="flex-shrink-0">
             <Image
