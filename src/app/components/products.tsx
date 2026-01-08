@@ -1,12 +1,13 @@
 "use client";
 import React from "react";
 import Image from "next/image";
-// import { FaArrowRight } from 'react-icons/fa';
+import { FaArrowRight } from 'react-icons/fa';
 import profimg1 from "../../Assets/image.png";
 import profimg2 from "../../Assets/imagebattery.png";
 import profimg3 from "../../Assets/solas.png";
 import profimg4 from "../../Assets/img.png";
 import Rating from "../../Assets/Star Icon.png";
+import Link from "next/link";
 
 const Rate = () => {
   const rating = 4;
@@ -55,7 +56,9 @@ const Products = () => {
     <div className="products-container bg-[#ffffff] my-6">
       <div className="products-header">
         <h3>Popular Products</h3>
-        <button className="text-lg text-[#FF0000]">More Products </button>
+        <Link className="text-lg flex gap-2 items-center cursor-pointer" href="/products" passHref>
+          <span className="text-[#FF0000] font-medium">More Products </span><FaArrowRight className="text-[#ff0000] font-medium" />
+        </Link>
       </div>
       <div className="product-grid">
         <div className="product">
