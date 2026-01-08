@@ -37,10 +37,10 @@ const Footer = () => {
             <p className="text-sm text-gray-300 mb-3">Return and refund policy</p>
             <ul className="space-y-2 text-sm text-gray-300">
               <li className="flex items-center gap-2">
-                <span>📧</span> Support@solarcabal.com
+                <span> <Image src="/message.png" alt="Verve" width={15} height={15} /></span> Support@solarcabal.com
               </li>
               <li className="flex items-center gap-2">
-                <span>📞</span> 07074890730, 07074782575
+                <span> <Image src="/whatsapp.png" alt="Verve" width={15} height={15} /></span> 07074890730, 07074782575
               </li>
             </ul>
           </div>
@@ -66,12 +66,16 @@ const Footer = () => {
             </ul>
 
             <h4 className="font-semibold text-sm mb-3">We accept</h4>
-            <div className="flex items-center gap-3 flex-wrap">
-              <Image src="/payments/verve.png" alt="Verve" width={40} height={20} />
-              <Image src="/payments/visa.png" alt="Visa" width={40} height={20} />
-              <Image src="/payments/mastercard.png" alt="Mastercard" width={40} height={20} />
-              <Image src="/payments/applepay.png" alt="Apple Pay" width={40} height={20} />
-              <Image src="/payments/paypal.png" alt="PayPal" width={40} height={20} />
+            <div className="flex items-center gap-1 flex-wrap">
+              <Image src="/verve.png" alt="Verve" width={30} height={20} />
+              <Image src="/visa.png" alt="Visa" width={30} height={20} />
+              <Image src="/mastercard.png" alt="Mastercard" width={30} height={20} />
+              <Image src="/express.png" alt="PayPal" width={30} height={20} />
+              <Image src="/apple pay.png" alt="Apple Pay" width={30} height={20} />
+              
+              <Image src="/flutterwave.png" alt="PayPal" width={30} height={20} />
+              <Image src="/paystack.png" alt="PayPal" width={30} height={20} />
+              <Image src="/google pay.png" alt="PayPal" width={30} height={20} />
             </div>
           </div>
 
