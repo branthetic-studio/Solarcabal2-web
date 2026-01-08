@@ -15,7 +15,7 @@ const Suscribe = () => {
     <div className="bg-[#1C1C1C] py-16 px-20 text-center grid grid-cols-3">
       <Image src="/full logo.png" alt="Logo" width={200} height={200} />
       <div className="pr-16">
-        <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 text-left">
+        <h3 className="text-lg md:text-lg font-bold text-white mb-4 text-left">
           Subscribe to our Newsletter
         </h3>
 
