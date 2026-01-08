@@ -61,7 +61,15 @@ const Products = () => {
         </Link>
       </div>
       <div className="product-grid">
-        <div className="product">
+        <div className="product relative">
+          <div className="absolute top-2 left-2 flex w-full pr-6 justify-between items-center">
+            <span className="bg-[#ff0000] text-white text-sm px-3 py-2 rounded-xl">
+              Best Seller
+            </span>
+            <div className="bg-[#ffffff] shadow-lg shadow-black/30 rounded-4xl p-1 cursor-pointer">
+              <Image src="/fav icon.png" alt="add to favourites" className="" width={25} height={25} />
+            </div>
+          </div>
           <div className="product-img">
             <Image src={profimg2} alt="" />
           </div>
@@ -74,7 +82,15 @@ const Products = () => {
           </div>
         </div>
 
-        <div className="product">
+        <div className="product relative">
+          <div className="absolute top-2 left-2 flex w-full pr-6 justify-between items-center">
+            <span className="bg-[#000000] text-white text-sm px-3 py-2 rounded-xl">
+              New
+            </span>
+            <div className="bg-[#ffffff] shadow-lg shadow-black/30 rounded-4xl p-1 cursor-pointer">
+              <Image src="/fav icon.png" alt="add to favourites" className="" width={25} height={25} />
+            </div>
+          </div>
           <div className="product-img">
             <Image src={profimg1} alt="" />
           </div>
@@ -87,7 +103,13 @@ const Products = () => {
           </div>
         </div>
 
-        <div className="product">
+        <div className="product relative">
+          <div className=" flex w-full pr-6 justify-between items-center">
+
+            <div className="absolute top-2 right-2 bg-[#ffffff] shadow-lg shadow-black/30 rounded-4xl p-1 cursor-pointer">
+              <Image src="/fav icon.png" alt="add to favourites" className="" width={25} height={25} />
+            </div>
+          </div>
           <div className="product-img">
             <Image src={profimg4} alt="" />
           </div>
@@ -100,7 +122,13 @@ const Products = () => {
           </div>
         </div>
 
-        <div className="product">
+        <div className="product relative">
+          <div className="flex w-full pr-6 justify-between items-center">
+           
+            <div className="absolute top-2 right-2 bg-[#ffffff] shadow-lg shadow-black/30 rounded-4xl p-1 cursor-pointer">
+              <Image src="/fav icon.png" alt="add to favourites" className="" width={25} height={25} />
+            </div>
+          </div>
           <div className="product-img">
             <Image src={profimg3} alt="" />
           </div>
