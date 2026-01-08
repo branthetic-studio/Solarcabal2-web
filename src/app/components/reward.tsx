@@ -14,28 +14,28 @@ const Reward = () => {
   };
 
   return (
-    <div className="relative bg-[#FF0000] py-10 md:py-16 pt-20 md:pt-30 px-4 overflow-hidden -mx-4">
+    <div className="relative bg-linear-to-r from-[#f94848] via-[#ff0000] to-[#f94848] py-10 md:py-16 pt-20 md:pt-30 px-4 overflow-hidden -mx-4">
       {/* Background gradient decorations */}
       <div
-        className="absolute bottom-0 left-0 w-64 h-64 md:w-96 md:h-96 pointer-events-none opacity-30"
+        className="absolute bottom-0 left-0 w-64 h-64 md:w-96 md:h-96 pointer-events-none opacity-100"
         style={{
           background:
-            "radial-gradient(circle, rgba(82, 82, 82, 0.4) 0%, rgba(82, 82, 82, 0.2) 30%, transparent 70%)",
+            "radial-gradient(circle, rgba(250, 82, 82, 0.951) 0%, rgba(243, 27, 27, 0.814) 30%, transparent 70%)",
           transform: "translate(-30%, 30%)",
           filter: "blur(60px)",
         }}
       />
       <div
-        className="absolute top-0 right-0 w-64 h-64 md:w-96 md:h-96 pointer-events-none opacity-30"
+        className="absolute top-0 right-0 w-64 h-64 md:w-96 md:h-96 pointer-events-none opacity-100 z-100"
         style={{
           background:
-            "radial-gradient(circle, rgba(82, 82, 82, 0.4) 0%, rgba(82, 82, 82, 0.2) 30%, transparent 70%)",
+            "radial-gradient(circle, rgba(250, 82, 82, 0.951) 0%, rgba(243, 27, 27, 0.814) 30%, transparent 70%)",
           transform: "translate(30%, -30%)",
           filter: "blur(60px)",
         }}
       />
 
-       <div className="absolute inset-0 bg-[url('/noise.png')] opacity-30"></div>
+       <div className="absolute inset-0 bg-[url('/texture.png')] opacity-80"></div>
 
       <div className="relative max-w-3xl mx-auto flex flex-col items-center text-center gap-6 md:gap-8">
         {/* Gift Icon */}
@@ -59,7 +59,7 @@ const Reward = () => {
         </p>
 
         {/* Referral Code Box */}
-        <div className="w-full max-w-md bg-[#2a2a2a] rounded-xl flex items-center justify-between px-5 py-4 mt-2">
+        <div className="w-full max-w-md bg-[#f43a3a] rounded-xl flex items-center justify-between px-5 py-4 mt-2">
           <span className="text-white text-base md:text-lg font-medium">
             {referralCode}
           </span>

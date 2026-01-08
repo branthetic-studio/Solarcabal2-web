@@ -10,15 +10,15 @@ import {
 
 const Footer = () => {
   return (
-    <footer className="relative bg-[#1c1c1c]/55 overflow-hidden text-white py-20 px-6 md:px-16 z-0">
+    <footer className="relative bg-linear-to-r from-[#1c1c1c]/95 to-[#3d3d3d]/95 overflow-hidden text-white py-16 pb-0 px-6 md:px-16 z-0">
 
       {/* Noise Texture */}
-      <div className="absolute inset-0 bg-[url('/noise bg.jpg')] opacity-20 mix-blend-overlay pointer-events-none"></div>
+      <div className=" w-full absolute inset-0 bg-[url('/texture.png')] opacity-80 mix-blend-multiply pointer-events-none"></div>
 
 
       <div className="max-w-7xl mx-auto relative z-20">
         {/* Grid Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+        <div className="grid grid-cols-1 pb-20 sm:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
 
           {/* Column 1 */}
           <div>
@@ -81,7 +81,7 @@ const Footer = () => {
         <div className="border-t border-gray-700 my-6"></div>
 
         {/* Bottom Section */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-5">
+        <div className="flex md:flex-row justify-around items-center px-80 pb-8 pt-2">
 
           {/* Copyright */}
           <p className="text-gray-400 text-xs">
@@ -89,29 +89,9 @@ const Footer = () => {
           </p>
 
           {/* Legal Links */}
-          <div className="flex gap-4 text-xs">
-            <a href="#" className="hover:text-red-500">Privacy Policy</a>
-            <a href="#" className="hover:text-red-500">Terms of Use</a>
-          </div>
 
-          {/* Social Icons */}
-          <div className="flex gap-3">
-            <a className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition">
-              <FaFacebookF size={16} />
-            </a>
-            <a className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition">
-              <FaTwitter size={16} />
-            </a>
-            <a className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition">
-              <FaInstagram size={16} />
-            </a>
-            <a className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition">
-              <FaLinkedinIn size={16} />
-            </a>
-            <a className="bg-white text-black rounded-full p-2 hover:bg-red-500 hover:text-white transition">
-              <FaYoutube size={16} />
-            </a>
-          </div>
+          <a href="#" className="text-xs underline hover:text-red-500">Privacy Policy</a>
+          <a href="#" className="text-xs underline hover:text-red-500">Terms of Use</a>
 
         </div>
       </div>
