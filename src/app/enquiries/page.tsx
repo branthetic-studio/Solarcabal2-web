@@ -10,6 +10,7 @@ import Image from "next/image";
 // import { useMutation } from "@apollo/client/react";
 // import { gql } from "@apollo/client";
 // import { Mail, Phone, MapPin, Handshake, Package } from "lucide-react";
+import Suscribe from "@/Components/Suscribe/Suscribe";
 
 const Page = () => {
   const [form, setForm] = useState({
@@ -227,6 +228,7 @@ const Page = () => {
       </div>
 
       <Refer />
+      {/* <Suscribe /> */}
       <Footer />
     </div>
   );

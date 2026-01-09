@@ -10,6 +10,7 @@ import systemImage from "../../Assets/Vector (2).png";
 import safetyImage from "../../Assets/Vector (3).png";
 import BannerImg from "../../../public/hero.png";
 import Image from "next/image";
+import Suscribe from "@/Components/Suscribe/Suscribe";
 
 const steps = [
   {
@@ -98,11 +99,7 @@ const page = () => {
           </div>
         </div>
       </div>
-      <div className="ready">
-        <h3>Ready to Go Solar?</h3>
-        <button className="consult-btn">Book a Free Consultation</button>
-        <button className="request-btn">Request Installation</button>
-      </div>
+      <Suscribe />
       <Footer />
     </div>
   );

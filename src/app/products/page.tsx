@@ -5,6 +5,7 @@ import Footer from "../../Components/Footer/Footer";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import ProductGrid from "./components/ProductGrid";
+import Suscribe from "@/Components/Suscribe/Suscribe";
 import "./Product.css";
 
 const Page = () => {
@@ -78,6 +79,7 @@ const Page = () => {
         </div>
       </div>
       {/* <Refer /> */}
+      <Suscribe />
       <Footer />
     </div>
   );
