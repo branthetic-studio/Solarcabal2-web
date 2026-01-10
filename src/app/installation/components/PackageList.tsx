@@ -91,18 +91,18 @@ const PackageList: React.FC = () => {
   return (
     <div className="package-container flex">
       {/* Sidebar Categories */}
-      <div className="package-sidebar w-1/4 p-4 ">
+      <div className="package-sidebar w-1/4 ">
         {categories.map((cat: any) => (
           <button
             key={cat.id}
             className={`
-            relative py-10 px-7
+            relative py-10
             bg-[url('/btnpanel.png')] bg-no-repeat bg-cover bg-center
-            text-left font-semibold text-sm block w-full rounded-[6px]
+            text-left font-semibold text-xl block px-8 rounded-[6px]
             transition-[opacity,transform] hover:opacity-90 active:scale-[0.99]
             ${
               selectedSlug === cat.slug
-                ? "ring-2 ring-red-500"
+                ? ""
                 : "ring-1 ring-gray-200"
             }
           `}
@@ -113,8 +113,8 @@ const PackageList: React.FC = () => {
               absolute inset-0 rounded-[6px]
               ${
                 selectedSlug === cat.slug
-                  ? "bg-gradient-to-b from-red-900/60 to-red-500/60"
-                  : ""
+                  ? "bg-linear-to-b from-red-900/60 to-red-500/80"
+                  : "bg-linear-to-t from-black/100 to-black-500/80"
               }
             `}
             />

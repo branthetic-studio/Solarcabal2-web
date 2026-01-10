@@ -17,19 +17,15 @@
   position: absolute;
   top: 10%;
   left: 5%;
-  transform: skewY(-3.5deg);
-  background-color: #33333365;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  background-blend-mode: color-burn;
+  
+  
   padding: 30px;
-  border-radius: 20px;
+  
 }
 
 .installation-banner-content {
   width: 85vw;
   color: #ffffff;
-  transform: skewY(3.5deg);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -47,15 +43,16 @@
 .installation-banner-content p {
   margin: 25px 0px;
   max-width: 60%;
+  font-size: 18px;
 }
 
 .installation-banner-content button {
   background-color: #ff0000;
   border: none;
   color: #ffffff;
-  padding: 10px 20px;
-  border-radius: 20px;
-  font-size: 14px;
+  padding: 15px 50px;
+  border-radius: 24px;
+  font-size: 18px;
   font-weight: 500;
 }
 
@@ -93,11 +90,17 @@
 }
 
 .installation-info {
-  padding: 40px 15px;
+  padding: 40px 35px;
+}
+
+.installation-info h3{
+  font-size: 32px;
+  font-weight: 600;
 }
 
 .included-items {
   display: flex;
+  margin: 40px 0px;
 }
 .included-items .item {
   flex: 1;
@@ -105,7 +108,7 @@
   color: #281d1b;
   font-family: Inter;
   font-weight: 600;
-  font-size: 20px;
+  font-size: 24px;
   padding: 20px;
   border-radius: 10px;
   margin-right: 20px;
@@ -141,14 +144,15 @@
 }
 
 .request-btn {
-  background-color: #ffffff;
-  color: #0f0f0f;
+  background-color: #ff0000;
+  color: #ffffff;
   font-family: Inter;
   font-size: 16px;
   font-weight: 500;
   border-radius: 30px;
   padding: 15px 30px;
   border: none;
+  justify-items: center;
 }
 
 .installation-section {
@@ -156,13 +160,13 @@
 }
 
 .installation-title {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: bold;
   margin-bottom: 5px;
 }
 
 .installation-subtitle {
-  font-size: 18px;
+  font-size: 20px;
   color: #888;
   margin-bottom: 40px;
 }
@@ -196,13 +200,13 @@
 }
 
 .step-content h3 {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 500;
   margin-bottom: 8px;
 }
 
 .step-content p {
-  font-size: 14px;
+  font-size: 16px;
   color: #555;
   line-height: 1.6;
 }
@@ -238,6 +242,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  font-size: 22px;
+  font-weight: 600;
 }
 
 .price {
@@ -245,6 +251,8 @@
   color: white;
   padding: 4px 10px;
   border-radius: 4px;
+  font-size: 16px;
+  font-weight: 300;
 }
 
 .view-all {
@@ -499,9 +507,12 @@
   }
   .consult-btn,
   .request-btn {
+
     font-size: 16px;
     padding: 12px 22px;
   }
+
+  
 
   /* Package header spacing */
   .package-header {

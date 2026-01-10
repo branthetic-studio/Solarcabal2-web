@@ -73,8 +73,8 @@ const page = () => {
             </div>
           ))}
         </div>
-        <div>
-          <button className="request-btn">Request Installation</button>
+        <div className="flex w-full justify-center align-middle my-16">
+          <button className="request-btn">Book a Free Consultation</button>
         </div>
       </section>
 
