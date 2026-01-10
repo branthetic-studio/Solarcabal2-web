@@ -57,7 +57,7 @@ const Navbar = () => {
                 href="/"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2 font-bold"
                     : "text-gray-700"
                 }`}
               >
@@ -69,7 +69,7 @@ const Navbar = () => {
                 href="/products"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/products"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
                     : "text-gray-700"
                 }`}
               >
@@ -81,7 +81,7 @@ const Navbar = () => {
                 href="/installation"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/installation"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
                     : "text-gray-700"
                 }`}
               >
@@ -93,7 +93,7 @@ const Navbar = () => {
                 href="/enquiries"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/enquiries"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
                     : "text-gray-700"
                 }`}
               >
@@ -105,7 +105,7 @@ const Navbar = () => {
                 href="/referral"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/referral"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
                     : "text-gray-700"
                 }`}
               >
@@ -117,7 +117,7 @@ const Navbar = () => {
                 href="/faq"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
                   pathname === "/faq"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-1"
+                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
                     : "text-gray-700"
                 }`}
               >

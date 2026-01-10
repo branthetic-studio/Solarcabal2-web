@@ -10,7 +10,8 @@ import Image from "next/image";
 // import { useMutation } from "@apollo/client/react";
 // import { gql } from "@apollo/client";
 // import { Mail, Phone, MapPin, Handshake, Package } from "lucide-react";
-import Suscribe from "@/Components/Suscribe/Suscribe";
+import { PhoneInput } from "react-international-phone";
+import "react-international-phone/style.css";
 
 const Page = () => {
   const [form, setForm] = useState({
@@ -56,7 +57,7 @@ const Page = () => {
   };
 
   return (
-    <div>
+    <div className="pb-12">
       <Navbar />
       <div className="enquiries-banner">
         <h2>Reach Us Anytime</h2>
@@ -81,19 +82,19 @@ const Page = () => {
             <h3>Other Ways to Reach Us</h3>
             <div className="reach-us">
               <div className="contact-info-details flex gap-4 align-center">
-                <div className="rounded-md bg-gray-100 p-3">
-                  <Image src="/email.png" alt="" width={30} height={30} />
+                <div className="rounded-full bg-gray-100 p-3 flex items-center justify-center">
+                  <Image src="/email.png" alt="" width={25} height={25} />
                 </div>
 
                 <div>
-                  <h6>Email</h6>
+                  <h6 >Email</h6>
                   <p>support@solarcabal.com</p>
                 </div>
               </div>
 
               <div className="flex gap-4 align-center">
-                <div className="rounded-md bg-gray-100 p-3">
-                  <Image src="/rename.png" alt="" width={30} height={30} />
+                <div className="rounded-full bg-gray-100 p-3 flex items-center justify-center">
+                  <Image src="/rename.png" alt="" width={25} height={25} />
                 </div>
 
                 <div>
@@ -103,8 +104,8 @@ const Page = () => {
               </div>
 
               <div className="flex gap-4 align-center">
-                <div className="rounded-md bg-gray-100 p-3">
-                  <Image src="/location.png" alt="" width={30} height={30} />
+                <div className="rounded-full bg-gray-100 p-3 flex items-center justify-center">
+                  <Image src="/location.png" alt="" width={25} height={25} />
                 </div>
 
                 <div>
@@ -119,8 +120,8 @@ const Page = () => {
             <h3>Partnerships & Bulk Inquiries</h3>
             <div className="reach-us">
               <div className="flex gap-4 align-center">
-                <div className="rounded-md bg-gray-100 p-3">
-                  <Image src="/partner.png" alt="" width={30} height={30} />
+                <div className="rounded-full bg-gray-100 p-3 flex items-center justify-center">
+                  <Image src="/partner.png" alt="" width={25} height={25} />
                 </div>
 
                 <div>
@@ -130,8 +131,8 @@ const Page = () => {
               </div>
 
               <div className="flex gap-4 align-center">
-                <div className="rounded-md bg-gray-100 p-3">
-                  <Image src="/box.png" alt="" width={30} height={30} />
+                <div className="rounded-full bg-gray-100 p-3 flex items-center justify-center">
+                  <Image src="/box.png" alt="" width={25} height={25} />
                 </div>
 
                 <div>
@@ -186,12 +187,32 @@ const Page = () => {
 
             <div className="input-group">
               <label>Phone Number</label>
-              <input
-                type="tel"
-                placeholder="+1 2345 678 4321"
+              <PhoneInput
+                defaultCountry="ng"
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(phone) => setForm({ ...form, phone })}
+                className="w-full flex items-center"
+                inputClassName="w-full h-[50px] border border-gray-300 rounded-2xl pl-14 text-[16px] bg-[#fafafa]"
+                inputStyle={{
+                  height: "50px",
+                  fontSize: "16px",
+                  borderRadius: "24px",
+                  // borderLeft: "0px"
+                  borderBottomLeftRadius: "0px",
+                  borderTopLeftRadius: "0px",
+                }}
+                countrySelectorStyleProps={{
+                  buttonStyle: {
+                    height: "50px",
+                    width: "55px",
+                    borderRadius: "24px",
+                    borderTopRightRadius: "0px",
+                    borderBottomRightRadius: "0px",
+                    background: "#fafafa",
+                  },
+                }}
               />
+
             </div>
 
             <div className="input-group">

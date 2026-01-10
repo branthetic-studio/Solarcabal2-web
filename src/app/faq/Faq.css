@@ -7,28 +7,30 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  margin-bottom: 80px;
 }
 
 .faq-banner h2 {
-  font-size: 40px;
-  font-weight: 400;
+  font-size: 32px;
+  font-weight: 600;
   text-align: center;
 }
 
 .faq-banner p {
   text-align: center;
   font-weight: 300;
+  font-size: 24px;
 }
 
 .faqAccordion {
-  padding: 20px 10%;
+  padding: 40px 10% 0 10%;
   width: 100%;
 }
 
 .faqAccordion h3 {
   color: #ff0000;
   font-family: Inter;
-  font-size: 24px;
+  font-size: 32px;
   font-weight: 600;
 }
 
@@ -44,8 +46,8 @@
 
 .accordion-header {
   color: Grayscale/800;
-  font-size: 18px;
-  font-weight: 400;
+  font-size: 24px;
+  font-weight: 500;
   background: none;
   border: none;
 }

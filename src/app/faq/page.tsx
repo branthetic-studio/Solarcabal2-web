@@ -68,8 +68,8 @@ const page = () => {
       </div>
 
 
-      <div>
-        <div className="faqAccordion">
+      <div className='pb-20'>
+        <div className="faqAccordion pt-10">
           <h3>Getting Started</h3>
           {items.map((item, index) => (
             <AccordionItem
