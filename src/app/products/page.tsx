@@ -38,6 +38,7 @@ const Page = () => {
   const maxPrice = 10000;
 
   return (
+    
     <div>
       <Navbar />
       <Topbar
@@ -50,7 +51,7 @@ const Page = () => {
         {/* Sidebar */}
         <Sidebar
           selectedCategorySlug={selectedCategorySlug}
-          onCategorySelect={(slug, brand) => {
+          onCategorySelect={(slug: string, brand?: string) => {
             setSelectedCategorySlug(slug);
             setSelectedBrand(brand ? [brand] : []);
           }}

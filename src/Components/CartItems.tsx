@@ -24,7 +24,7 @@ export default function CartItems() {
   const lines = isLoggedIn ? cart?.activeOrder?.lines ?? [] : localItems;
 
   return (
-    <div className="w-full max-w-2xl mx-auto py-6 bg-[#ffffff] px-4 border-[#888888] border-l mt-6">
+    <div className="w-full max-w-2xl mx-auto py-6 bg-[#ffffff] px-4 border-[#e3e3e3] border-l mt-6">
 
       {/* TOP BUTTONS */}
       <div className="flex flex-col gap-3">

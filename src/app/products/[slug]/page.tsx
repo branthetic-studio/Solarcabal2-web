@@ -283,7 +283,7 @@ const ProductDetailsPage = () => {
                     onClick={() => setSelectedImage(index)}
                     className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 ${
                       selectedImage === index
-                        ? "border-blue-500"
+                        ? "border-[#ff0000]"
                         : "border-gray-200"
                     }`}
                   >
@@ -388,7 +388,7 @@ const ProductDetailsPage = () => {
                   </button>
                 </div>
 
-                <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                <button className="w-full bg-[#ff0000] text-white py-3 px-6 rounded-lg font-medium hover:bg-[#751c1c] transition-colors">
                   Buy Now
                 </button>
               </div>
