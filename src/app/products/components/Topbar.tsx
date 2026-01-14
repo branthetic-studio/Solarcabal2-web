@@ -33,10 +33,36 @@ const Topbar: React.FC<Props> = ({
   };
 
   return (
-    <div className="w-full bg-white">
+    <div className="w-full bg-[#f5f5f5] px-16">
       {/* Header Section */}
       <div className="flex justify-between items-center py-4 px-0">
-        <h1 className="text-2xl font-bold text-black mb-1">Solar Products</h1>
+        <h1 className="text-2xl font-bold text-black mb-1">Solar Panel</h1>
+
+
+        {/* Brand filter */}
+        <div className="flex gap-8 pb-4">
+          {brands.map((brand) => {
+            const isSelected =
+              brand === "All"
+                ? selectedBrand.length === 0
+                : selectedBrand.includes(brand);
+
+            return (
+              <button
+                key={brand}
+                onClick={() => handleBrandClick(brand)}
+                className={`px-6 py-3 rounded-md text-sm font-medium border transition-colors ${isSelected
+                  ? "bg-none border-none text-black"
+                  : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                  }`}
+              >
+                {brand}
+              </button>
+            );
+          })}
+        </div>
+
+
         <div className="flex items-center gap-2">
           <span className="text-gray-700 text-sm font-medium">Sort By:</span>
           <select
@@ -53,29 +79,6 @@ const Topbar: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Brand filter */}
-      <div className="flex gap-2 pb-4">
-        {brands.map((brand) => {
-          const isSelected =
-            brand === "All"
-              ? selectedBrand.length === 0
-              : selectedBrand.includes(brand);
-
-          return (
-            <button
-              key={brand}
-              onClick={() => handleBrandClick(brand)}
-              className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
-                isSelected
-                  ? "bg-blue-50 border-blue-200 text-blue-700"
-                  : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              {brand}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 };

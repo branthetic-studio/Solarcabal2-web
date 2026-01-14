@@ -7,6 +7,7 @@ import Topbar from "./components/Topbar";
 import ProductGrid from "./components/ProductGrid";
 import Suscribe from "@/Components/Suscribe/Suscribe";
 import "./Product.css";
+import CartItems from "@/Components/CartItems";
 
 const Page = () => {
   const [selectedCategorySlug, setSelectedCategorySlug] =
@@ -39,7 +40,13 @@ const Page = () => {
   return (
     <div>
       <Navbar />
-      <div className="products-page">
+      <Topbar
+        selectedBrand={selectedBrand}
+        onBrandChange={setSelectedBrand}
+        sortOrder={sortOrder}
+        onSortChange={setSortOrder}
+      />
+      <div className="products-page px-12">
         {/* Sidebar */}
         <Sidebar
           selectedCategorySlug={selectedCategorySlug}
@@ -62,12 +69,7 @@ const Page = () => {
 
         {/* Main content */}
         <div className="main">
-          <Topbar
-            selectedBrand={selectedBrand}
-            onBrandChange={setSelectedBrand}
-            sortOrder={sortOrder}
-            onSortChange={setSortOrder}
-          />
+
 
           <ProductGrid
             categorySlug={selectedCategorySlug}
@@ -77,6 +79,7 @@ const Page = () => {
             priceRange={priceRange}
           />
         </div>
+        <CartItems />
       </div>
       {/* <Refer /> */}
       <Suscribe />

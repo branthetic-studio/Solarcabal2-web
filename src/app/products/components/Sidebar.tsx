@@ -1,16 +1,32 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import {
+  Search,
+  PanelsTopLeft,
+  Battery,
+  Gauge,
+  Cable,
+  Wrench,
+  Bolt,
+  Fan,
+  CableCar,
+  PackageSearch,
+  Circle,
+  Minus,
+  Plus,
+} from "lucide-react";
 
 type Category = {
   name: string;
   slug: string;
   brands: string[];
+  icon?: React.ReactNode;
 };
 
 type SidebarProps = {
   selectedCategorySlug: string;
-  onCategorySelect: (slug: string, brand?: string) => void;
+  onCategorySelect: (slug: string) => void;
   condition: string;
   setCondition: (c: string) => void;
   priceRange: [number, number];
@@ -18,11 +34,9 @@ type SidebarProps = {
   brand: string[];
   setBrand: (b: string[]) => void;
   categoriesFromApi: Category[];
-  currency?: string; // default to USD
+  currency?: string;
   minPrice: number;
   maxPrice: number;
-   sort: string;
-  setSort: React.Dispatch<React.SetStateAction<string>>;
 };
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -35,7 +49,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   priceRange,
   setPriceRange,
   categoriesFromApi = [],
-  currency = "USD",
+  currency = "NGN",
   minPrice,
   maxPrice,
 }) => {
@@ -55,139 +69,151 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-64 p-4 border-r border-gray-200 space-y-6">
-      {/* Categories */}
-      <div>
-        <h3 className="font-bold mb-2">Category</h3>
-        <ul className="space-y-2">
-          {categoriesFromApi.map((cat) => (
-            <li key={cat.slug}>
-              <div
-                className="flex justify-between items-center cursor-pointer font-medium"
-                onClick={() => toggleCategory(cat.slug)}
-              >
+    <aside className="w-64 p-4 border-r border-neutral-200 bg-white space-y-6">
+
+      {/* CATEGORY Header */}
+      <h3 className="text-md font-bold text-neutral-800 tracking-wide">
+        CATEGORY
+      </h3>
+
+      {/* Search Input */}
+      <div className="relative">
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
+        <input
+          type="text"
+          placeholder="Search for categories"
+          className="w-full rounded-full border border-neutral-300 py-2 pl-9 pr-3 text-sm placeholder:text-neutral-400 focus:outline-none focus:border-red-500"
+        />
+      </div>
+
+      {/* CATEGORY LIST */}
+      <ul className="mt-3 space-y-4">
+        {categoriesFromApi.map((cat) => (
+          <li key={cat.slug} className="border-b border-[#f5f5f5] pb-3">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => toggleCategory(cat.slug)}
+            >
+              {/* Icon + Label */}
+              <div className="flex items-center gap-2">
                 <span
                   className={`${
-                    selectedCategorySlug === cat.slug ? "text-red-500" : ""
+                    selectedCategorySlug === cat.slug
+                      ? "text-red-600"
+                      : "text-neutral-600"
+                  }`}
+                >
+                  {cat.icon ?? <PackageSearch size={18} />}
+                </span>
+
+                <span
+                  className={`text-sm font-medium ${
+                    selectedCategorySlug === cat.slug
+                      ? "text-red-600"
+                      : "text-neutral-700"
                   }`}
                 >
                   {cat.name}
                 </span>
-                <span>{openCategory === cat.slug ? "−" : "+"}</span>
               </div>
 
-              {/* Brand checkboxes */}
-              {openCategory === cat.slug && cat.brands.length > 0 && (
-                <div className="ml-4 mt-2 space-y-1">
-                  {cat.brands.map((b) => (
-                    <label
-                      key={b}
-                      className="flex items-center gap-2 text-sm cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={brand.includes(b)}
-                        onChange={() => handleBrandToggle(b)}
-                        className="accent-red-500"
-                      />
-                      {b}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
+              {/* Toggle Symbol */}
+              <span className="text-neutral-600">
+                {openCategory === cat.slug ? (
+                  <Minus className="h-4 w-4" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+              </span>
+            </div>
 
-      {/* Condition Section */}
-      <div>
-        <h3 className="font-bold mb-2">Conditions</h3>
-        <div className="space-y-2">
-          {["Any", "New", "Used"].map((c) => (
-            <label
-              key={c}
-              className={`flex items-center gap-2 cursor-pointer ${
-                condition === c ? "text-[#FF0000]" : ""
-              }`}
-            >
-              <input
-                type="radio"
-                checked={condition === c}
-                onChange={() => setCondition(c)}
-                className={`accent-[#FF0000]`}
-              />
-              {c}
-            </label>
-          ))}
-        </div>
-      </div>
+            {/* BRAND OPTIONS */}
+            {openCategory === cat.slug && cat.brands.length > 0 && (
+              <div className="mt-3 ml-7 space-y-2">
+                {cat.brands.map((b) => (
+                  <label
+                    key={b}
+                    className="flex items-center gap-2 text-sm cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={brand.includes(b)}
+                      onChange={() => handleBrandToggle(b)}
+                      className="h-4 w-4 accent-red-600"
+                    />
+                    <span className="text-neutral-700">{b}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
 
-      {/* Price Range Section */}
-      <div>
-        <h3 className="font-bold mb-2">Prices</h3>
-        <div className="flex gap-2 mb-3">
-          <div className="flex items-center border rounded px-2 w-1/2">
-            <input
-              type="number"
-              value={priceRange[0]}
-              min={minPrice}
-              max={priceRange[1]}
-              onChange={(e) =>
-                setPriceRange([+e.target.value, priceRange[1]])
-              }
-              className="w-full p-1 outline-none"
-            />
-            <span className="ml-1 text-gray-500 text-sm">{currency}</span>
-          </div>
-          <div className="flex items-center border rounded px-2 w-1/2">
-            <input
-              type="number"
-              value={priceRange[1]}
-              min={priceRange[0]}
-              max={maxPrice}
-              onChange={(e) =>
-                setPriceRange([priceRange[0], +e.target.value])
-              }
-              className="w-full p-1 outline-none"
-            />
-            <span className="ml-1 text-gray-500 text-sm">{currency}</span>
-          </div>
-        </div>
+      {/* PRICE HEADER */}
+      <h3 className="text-xs font-bold text-neutral-800 tracking-wide">
+        PRICES
+      </h3>
 
-        {/* Dual range slider */}
-        <div className="relative w-full h-2 bg-gray-200 rounded">
-          <div
-            className="absolute h-2 bg-red-500 rounded"
-            style={{
-              left: `${
-                ((priceRange[0] - minPrice) / (maxPrice - minPrice)) * 100
-              }%`,
-              right: `${
-                100 -
-                ((priceRange[1] - minPrice) / (maxPrice - minPrice)) * 100
-              }%`,
-            }}
-          />
+      {/* Price Inputs */}
+      <div className="flex gap-2 mb-3">
+        <div className="flex items-center border rounded px-2 w-1/2">
           <input
-            type="range"
-            min={minPrice}
-            max={maxPrice}
-            step={10}
+            type="number"
             value={priceRange[0]}
-            onChange={(e) => setPriceRange([+e.target.value, priceRange[1]])}
-            className="absolute w-full h-2 appearance-none bg-transparent pointer-events-none accent-[#FF0000]"
-          />
-          <input
-            type="range"
             min={minPrice}
-            max={maxPrice}
-            step={10}
-            value={priceRange[1]}
-            onChange={(e) => setPriceRange([priceRange[0], +e.target.value])}
-            className="absolute w-full h-2 appearance-none bg-transparent pointer-events-none accent-[#FF0000]"
+            max={priceRange[1]}
+            onChange={(e) => setPriceRange([+e.target.value, priceRange[1]])}
+            className="w-full p-1 outline-none text-sm"
           />
+          <span className="ml-1 text-neutral-400 text-xs">{currency}</span>
         </div>
+
+        <div className="flex items-center border rounded px-2 w-1/2">
+          <input
+            type="number"
+            value={priceRange[1]}
+            min={priceRange[0]}
+            max={maxPrice}
+            onChange={(e) => setPriceRange([priceRange[0], +e.target.value])}
+            className="w-full p-1 outline-none text-sm"
+          />
+          <span className="ml-1 text-neutral-400 text-xs">{currency}</span>
+        </div>
+      </div>
+
+      {/* Range Slider */}
+      <div className="relative w-full h-2 bg-neutral-200 rounded">
+        <div
+          className="absolute h-2 bg-red-500 rounded"
+          style={{
+            left: `${
+              ((priceRange[0] - minPrice) / (maxPrice - minPrice)) * 100
+            }%`,
+            right: `${
+              100 -
+              ((priceRange[1] - minPrice) / (maxPrice - minPrice)) * 100
+            }%`,
+          }}
+        />
+
+        <input
+          type="range"
+          min={minPrice}
+          max={maxPrice}
+          value={priceRange[0]}
+          onChange={(e) => setPriceRange([+e.target.value, priceRange[1]])}
+          className="absolute w-full h-2 appearance-none bg-transparent pointer-events-none accent-red-600"
+        />
+
+        <input
+          type="range"
+          min={minPrice}
+          max={maxPrice}
+          value={priceRange[1]}
+          onChange={(e) => setPriceRange([priceRange[0], +e.target.value])}
+          className="absolute w-full h-2 appearance-none bg-transparent pointer-events-none accent-red-600"
+        />
       </div>
     </aside>
   );

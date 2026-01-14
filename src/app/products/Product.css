@@ -5,15 +5,17 @@
 }
 
 .products-page {
-  display: flex;
+  display: grid;
+  grid-template-columns: .3fr 1.2fr .5fr;
   gap: 1rem;
+  background: #f5f5f5;
 }
 
 /* Sidebar.css */
 .sidebar {
   width: 250px;
   padding: 1rem;
-  background: #fff;
+  /* background-color: red; */
   border-right: 1px solid #ddd;
   height: 100vh;
   overflow-y: auto;
@@ -137,6 +139,7 @@
   display: flex;
   justify-content: space-between;
   margin-bottom: 1rem;
+  background-color: red;
 }
 
 .topbar select {
