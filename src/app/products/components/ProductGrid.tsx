@@ -319,7 +319,7 @@ const ProductGrid: React.FC<Props> = ({
                               +
                             </button>
                           </div>
-                          <div className="quantity-actions">
+                          {/* <div className="quantity-actions">
                             <button
                               onClick={() => addToCart(item)}
                               disabled={isAddingToCart}
@@ -335,7 +335,7 @@ const ProductGrid: React.FC<Props> = ({
                             >
                               Cancel
                             </button>
-                          </div>
+                          </div> */}
                         </div>
                       )}
                     </div>

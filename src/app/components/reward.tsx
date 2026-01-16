@@ -17,7 +17,7 @@ const Reward = () => {
     <div className="relative bg-linear-to-r from-[#f94848] via-[#ff0000] to-[#f94848] py-10 md:py-16 pt-20 md:pt-30 px-4 overflow-hidden -mx-4">
       {/* Background gradient decorations */}
       <div
-        className="absolute bottom-0 left-0 w-64 h-64 md:w-96 md:h-96 pointer-events-none opacity-100"
+        className="absolute bottom-0 left-0 w-64 h-64 md:w-96 md:h-96 pointer-events-none opacity-100 z-10"
         style={{
           background:
             "radial-gradient(circle, rgba(250, 82, 82, 0.951) 0%, rgba(243, 27, 27, 0.814) 30%, transparent 70%)",

@@ -265,9 +265,9 @@ const ProductDetailsPage = () => {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Left - Product Images */}
-            <div className="space-y-4">
+            <div className="space-y-4 ">
               {/* Main Image */}
-              <div className="bg-gray-100 rounded-lg p-4 aspect-square flex items-center justify-center">
+              <div className="bg-gray-100 rounded-lg p-4 aspect-square flex items-center align-center">
                 <img
                   src={mainImageSrc}
                   alt={product.name}
@@ -281,11 +281,10 @@ const ProductDetailsPage = () => {
                   <button
                     key={index}
                     onClick={() => setSelectedImage(index)}
-                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 ${
-                      selectedImage === index
+                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 ${selectedImage === index
                         ? "border-[#ff0000]"
                         : "border-gray-200"
-                    }`}
+                      }`}
                   >
                     <img
                       src={image}
@@ -298,7 +297,7 @@ const ProductDetailsPage = () => {
             </div>
 
             {/* Right - Product Info */}
-            <div className="space-y-6">
+            <div className="space-y-6 align-center">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
                   {product.name}
@@ -332,11 +331,10 @@ const ProductDetailsPage = () => {
                       <button
                         key={variant.id}
                         onClick={() => setSelectedVariant(variant)}
-                        className={`px-4 py-2 border rounded-lg text-sm font-medium transition-colors ${
-                          selectedVariant?.id === variant.id
+                        className={`px-4 py-2 border rounded-lg text-sm font-medium transition-colors ${selectedVariant?.id === variant.id
                             ? "border-blue-500 bg-blue-50 text-blue-700"
                             : "border-gray-300 hover:bg-gray-50"
-                        }`}
+                          }`}
                       >
                         {variant.name}
                       </button>
@@ -352,9 +350,13 @@ const ProductDetailsPage = () => {
                 </div>
               )}
 
+              <p>
+                Introducing the SKE 3.5KVA Inverter, a cutting-edge solution designed for maximum energy efficiency. With a robust 25-year warranty, this inverter is perfect for powering your home or office.
+              </p>
+
               {/* Quantity and Add to Cart */}
               <div className="space-y-4">
-                <div className="flex items-center gap-4">
+                {/* <div className="flex items-center gap-4">
                   <label className="text-gray-700 font-medium">Quantity:</label>
                   <div className="flex items-center border border-gray-300 rounded-lg">
                     <button
@@ -373,25 +375,32 @@ const ProductDetailsPage = () => {
                       +
                     </button>
                   </div>
-                </div>
+                </div> */}
 
                 <div className="flex gap-4">
+
                   <button
                     onClick={handleAddToCart}
                     disabled={isAdding || !selectedVariant}
-                    className="flex-1 bg-black text-white py-3 px-6 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                    className="flex-1 border-2 border-[#242425] text-[#242425] py-3 px-6 rounded-lg font-medium cursor-pointer transition-colors"
                   >
                     {isAdding ? "Adding..." : "Add to Cart"}
                   </button>
-                  <button className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                    ♡
+
+                  <button className=" flex-1 px-6 py-3 bg-[#242425] text-[#ffffff] rounded-lg cursor-pointer transition-colors">
+                    Buy Now
+                  </button>
+
+
+                  <button className=" flex-1 bg-[#ff0000] text-white py-3 rounded-lg font-medium hover:bg-[#751c1c] transition-colors cursor-pointer">
+                    Pay Later
                   </button>
                 </div>
 
-                <button className="w-full bg-[#ff0000] text-white py-3 px-6 rounded-lg font-medium hover:bg-[#751c1c] transition-colors">
-                  Buy Now
-                </button>
+
               </div>
+
+              
             </div>
           </div>
         </div>
@@ -405,11 +414,10 @@ const ProductDetailsPage = () => {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === tab
+                    className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
                         ? "border-blue-500 text-blue-600"
                         : "border-transparent text-gray-500 hover:text-gray-700"
-                    }`}
+                      }`}
                   >
                     {tab}
                   </button>
