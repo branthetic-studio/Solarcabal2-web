@@ -10,7 +10,7 @@ import Image from "next/image";
 import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
 
-// ✅ Your backend query
+// GraphQL Query
 const MY_REFERRAL_EARNING = gql`
   query MyReferralEarnings {
     myReferralEarningsDetails {
@@ -24,7 +24,6 @@ const MY_REFERRAL_EARNING = gql`
   }
 `;
 
-// ✅ Define the TypeScript type for the query response
 type ReferralEarning = {
   id: string;
   amount: number;
@@ -39,91 +38,44 @@ type ReferralQueryResponse = {
 };
 
 const ReferralPage = () => {
-  const { data, loading, error } =
-    useQuery<ReferralQueryResponse>(MY_REFERRAL_EARNING);
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-  if (loading) return <p className="loading">Loading referrals...</p>;
-
-  // If unauthorized, show empty state instead of crashing
-  if (error) {
-    if (error.message.includes("not currently authorized")) {
-      return (
-        <main>
-          <Navbar />
-          <Refer />
-
-          <section className="premium-data">
-            <div className="data1">
-              <div>
-                <span className="title">Premium 1 Earning</span>
-                <p className="data-price">₦0</p>
-              </div>
-              <hr />
-              <div>
-                <span className="text">Total invites</span>
-                <p className="num">0</p>
-              </div>
-            </div>
-            <div className="data">
-              <div>
-                <span className="title">Premium 2 Earning</span>
-                <p className="data-price">₦0</p>
-              </div>
-              <hr />
-              <div>
-                <span className="text">Active invites</span>
-                <p className="num">0</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="referrals">
-            <p>Referrals</p>
-            <div className="button">
-              <span>see all</span>
-              <a href="#">
-                <Image src={arrow} alt="See all referrals" />
-              </a>
-            </div>
-          </section>
-
-          <p style={{ textAlign: "center", marginTop: "20px", color: "red" }}>
-            You need to log in to see your referral details.
-          </p>
-
-          <Footer />
-        </main>
-      );
+  // Fetch only when token exists
+  const { data, loading, error } = useQuery<ReferralQueryResponse>(
+    MY_REFERRAL_EARNING,
+    {
+      skip: !token,
     }
+  );
 
-    // fallback for other errors
-    return <p className="error">Failed to fetch referrals: {error.message}</p>;
-  }
+  const referrals = token && data ? data.myReferralEarningsDetails : [];
 
-  // ✅ if authorized, render as before
-  const referrals = data?.myReferralEarningsDetails || [];
+  // Calculate values based on login state
+  const totalInvites = referrals?.length || 0;
+  const activeInvites = referrals?.filter((r) => r.status === "active").length || 0;
 
-  // Premium data calculation
   const premiumData = [
     {
       title: "Premium 1 Earning",
-      price: `₦${referrals.length * 1005}`,
+      price: token ? `₦${totalInvites * 1005}` : "₦0",
       text: "Total invites",
-      num: referrals.length.toString(),
+      num: totalInvites.toString(),
     },
     {
       title: "Premium 2 Earning",
-      price: `₦${referrals.filter((r) => r.status === "active").length * 630}`,
+      price: token ? `₦${activeInvites * 630}` : "₦0",
       text: "Active invites",
-      num: referrals.filter((r) => r.status === "active").length.toString(),
+      num: activeInvites.toString(),
     },
   ];
 
   return (
     <main>
       <Navbar />
-      <Refer />
 
+
+      {/* PREMIUM DATA */}
       <section className="premium-data">
         {premiumData.map((data, index) => (
           <div key={index} className={index === 1 ? "data" : "data1"}>
@@ -140,6 +92,7 @@ const ReferralPage = () => {
         ))}
       </section>
 
+      {/* REFERRALS HEADER */}
       <section className="referrals">
         <p>Referrals</p>
         <div className="button">
@@ -150,35 +103,57 @@ const ReferralPage = () => {
         </div>
       </section>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Referral ID</th>
-            <th>Amount</th>
-            <th>Level</th>
-            <th>Order Code</th>
-            <th>Status</th>
-            <th>Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {referrals.map((ref) => (
-            <tr key={ref.id}>
-              <td className="table-id">
-                <span>{ref.id}</span>
-              </td>
-              <td className="table-price">₦{ref.amount}</td>
-              <td>{ref.level}</td>
-              <td>{ref.orderCode}</td>
-              <td className={ref.status}>
-                <div>{ref.status}</div>
-              </td>
-              <td>{new Date(ref.createdAt).toLocaleDateString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* SHOW MESSAGE IF USER NOT LOGGED IN */}
+      {!token && (
+        <p style={{ textAlign: "center", marginTop: "20px", color: "red" }}>
+          Login to view your referral details.
+        </p>
+      )}
 
+      {/* TABLE ONLY IF LOGGED IN */}
+      {token && (
+        <>
+          {loading && <p className="loading">Loading referrals...</p>}
+
+          {error && (
+            <p style={{ color: "red", textAlign: "center" }}>
+              Failed to load referral data.
+            </p>
+          )}
+
+          {!loading && !error && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Referral ID</th>
+                  <th>Amount</th>
+                  <th>Level</th>
+                  <th>Order Code</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {referrals.map((ref) => (
+                  <tr key={ref.id}>
+                    <td className="table-id">
+                      <span>{ref.id}</span>
+                    </td>
+                    <td className="table-price">₦{ref.amount}</td>
+                    <td>{ref.level}</td>
+                    <td>{ref.orderCode}</td>
+                    <td className={ref.status}>
+                      <div>{ref.status}</div>
+                    </td>
+                    <td>{new Date(ref.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
+      <Refer />
       <Footer />
     </main>
   );
