@@ -266,7 +266,7 @@ const Page = () => {
               onClick={() => router.push("/cart")}
               className="text-red-500 text-sm font-medium flex items-center gap-2"
             >
-              ← Back to Cart
+              <Image src="/shopping-cart.png" alt="Back" width={16} height={16} /> Return to Cart
             </button>
 
             {/* Info rows */}
@@ -283,7 +283,7 @@ const Page = () => {
 
           {/* ---------------- RIGHT SIDE (SUMMARY) ---------------- */}
           <aside className="lg:sticky lg:top-6">
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-[#d1d1d1] bg-white p-6">
               <p className="text-sm font-semibold mb-3">Your Order</p>
 
               <div className="space-y-5">
@@ -396,7 +396,7 @@ function RadioRow({ checked, onChange, label, right }: any) {
 
 function Row({ label, value, bold, big }: any) {
   return (
-    <div className="flex justify-between">
+    <div className="flex justify-between text-[#717171] font-xs">
       <span>{label}</span>
       <span className={`${bold ? "font-bold" : ""} ${big ? "text-base" : ""}`}>
         {value}
@@ -411,13 +411,13 @@ function BrandDot({ className }: any) {
 
 function InfoRow({ icon, title, text }: InfoRowProps) {
   return (
-    <div className="flex items-center gap-3 border-b border-[#f0f0f0]">
+    <div className="flex items-center gap-3 border-b border-[#f0f0f0] pb-2">
       <div className="w-6 h-6 flex-shrink-0">
         {icon}
       </div>
       <div>
         <p className="font-medium">{title}</p>
-        <p className="text-sm text-gray-500">{text}</p>
+        <p className="text-xs text-gray-500">{text}</p>
       </div>
     </div>
   );
