@@ -1,6 +1,7 @@
 "use client";
+
 import { useParams } from "next/navigation";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import { GET_PRODUCT_DETAILS } from "@/graphql/queries";
 import Navbar from "@/Components/Navbar/Navbar";
@@ -9,6 +10,7 @@ import { useCart } from "@/context/CartContext";
 import Suscribe from "@/Components/Suscribe/Suscribe";
 import { Star } from "lucide-react";
 import Image from "next/image";
+import StarRating from "../components/StarRating";
 
 /* ===================== Types ===================== */
 
@@ -547,6 +549,7 @@ function LocalProductCard({
     // Simple placeholder reviews section (keeps UI light)
 
     const totalReviews = ratingData.reduce((a, b) => a + b.count, 0);
+    const [isOpen, setIsOpen] = useState(false);
     return (
       <div className=" space-y-8">
 
@@ -577,7 +580,7 @@ function LocalProductCard({
             <div>
               <div className="flex mt-1">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <Star key={i} className="w-4 h-4 fill-yellow-500 text-yellow-400" />
+                  <Star key={i} className="w-4 h-4 fill-[#FFA133] text-[#FFA133]" />
                 ))}
               </div>
               <p className="text-xs text-gray-500 mt-2">
@@ -588,9 +591,10 @@ function LocalProductCard({
 
           {/* Rating Breakdown */}
           <div className="flex-1 space-y-2">
+            const [isOpen, setIsOpen] = useState(false);
             {ratingData.map((r) => (
               <div key={r.stars} className="flex items-center gap-3">
-                <span className="flex gap-1 w-8 text-sm">{r.stars}.0<Star className="w-5 h-5 fill-yellow-500 text-yellow-400" /></span>
+                <span className="flex gap-1 w-8 text-sm">{r.stars}.0<Star className="w-5 h-5 fill-[#FFA133] text-[#FFA133]" /></span>
 
                 <div className="flex-1 h-2 bg-gray-200 rounded">
                   <div
@@ -619,7 +623,7 @@ function LocalProductCard({
               {[5, 4, 3, 2, 1].map((r) => (
                 <label key={r} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" />
-                  <Star className="w-4 h-4 fill-yellow-500 text-yellow-400" /> {r} Star
+                  <Star className="w-4 h-4 fill-[#FFA133] text-[#FFA133]" /> {r} Star
                 </label>
               ))}
             </div>
@@ -637,11 +641,45 @@ function LocalProductCard({
 
           {/* Review List */}
           <div className="col-span-10 space-y-6">
+            <>
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold">Review Lists</h2>
+
+                  <div className="flex gap-3">
+                    <button className="px-4 py-2 bg-red-500 text-white rounded-lg">
+                      All Reviews
+                    </button>
+                    <button className="px-4 py-2 border rounded-lg">
+                      With Photo & Video
+                    </button>
+                    <button className="px-4 py-2 border rounded-lg">
+                      With Description
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg"
+                >
+                  <Image src="/Edit Square.png" alt="Write a review" width={18} height={18} /> Write a review
+                </button>
+              </div>
+
+              {/* Popup */}
+              {isOpen && <ReviewModal onClose={() => setIsOpen(false)} />}
+            </>
+
+
             {reviews.map((review) => (
+
               <div
                 key={review.id}
                 className="border-b border-[#E4E9EE] flex justify-between pb-6 space-y-3"
               >
+
 
                 <div className="flex flex-col gap-3">
                   <div className="flex gap-1">
@@ -649,7 +687,7 @@ function LocalProductCard({
                       <Star
                         key={i}
                         className={`w-4 h-4 ${i <= review.rating
-                          ? "fill-yellow-400 text-yellow-400"
+                          ? "fill-[#FFA133] text-[#FFA133]"
                           : "text-gray-300"
                           }`}
                       />
@@ -739,3 +777,103 @@ function LocalProductCard({
 }
 
 export default ProductDetailsPage;
+
+type ReviewModalProps = {
+  onClose: () => void;
+};
+
+function ReviewModal({ onClose }: ReviewModalProps) {
+  const [rating, setRating] = useState<number>(0);
+  const [submitted, setSubmitted] = useState<boolean>(false);
+
+  // Auto-close 1 second after success
+  useEffect(() => {
+    if (submitted) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [submitted, onClose]);
+
+  const handleSubmit = () => {
+    // normally you'd submit to API here
+    setSubmitted(true);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-black/50"
+        onClick={!submitted ? onClose : undefined}
+      />
+
+      {/* Modal */}
+      <div className="relative bg-white rounded-xl p-4 w-full max-w-md z-10">
+        {!submitted ? (
+          <>
+            {/* Header */}
+            <div className="flex justify-between mb-6">
+              <h3 className="text-lg font-semibold">Review</h3>
+              <button onClick={onClose}>
+                <Image
+                  src="/close-circle.png"
+                  alt="Close"
+                  width={22}
+                  height={22}
+                />
+              </button>
+            </div>
+
+            {/* Rating */}
+            <div className="mb-4">
+              <h3 className="text-xs mb-1">Rating</h3>
+              <StarRating
+                value={rating}
+                onChange={(value) => setRating(value)}
+              />
+            </div>
+
+            {/* Comment */}
+            <div className="grid gap-2">
+              <label className="text-xs text-[#15171C]">
+                Leave your comments here for other customers
+              </label>
+              <textarea
+                className="w-full border border-[#E3EFFC] bg-[#FCFCFD] rounded-lg p-3 text-sm"
+                rows={4}
+                placeholder="Comment"
+              />
+            </div>
+
+            {/* Submit */}
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={handleSubmit}
+                disabled={rating === 0}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg disabled:opacity-50"
+              >
+                Submit
+              </button>
+            </div>
+          </>
+        ) : (
+          /* ✅ Success state */
+          <div className="flex flex-col items-center justify-center py-10 gap-4">
+            <Image
+              src="/tick-circle.png" // your success image
+              alt="Success"
+              width={80}
+              height={80}
+            />
+            <p className="text-sm font-medium text-gray-700">
+              Successful
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
