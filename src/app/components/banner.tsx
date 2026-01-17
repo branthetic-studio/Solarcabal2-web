@@ -56,7 +56,7 @@ const Banner = () => {
       <div className="w-full flex gap-6 py-8 px-12 mx-auto items-stretch">
         {/* Sidebar Categories */}
         <aside className="hidden lg:flex w-72 flex-shrink-0">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 w-full">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 w-full">
             <nav className="space-y-1">
               {categories.map((category) => {
                 const IconComponent = category.icon;
@@ -64,7 +64,7 @@ const Banner = () => {
                   <Link
                     key={category.name}
                     href={category.href}
-                    className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all duration-200 group"
+                    className="flex items-center gap-3 px-4 py-4 border-b border-gray-200 text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all duration-200 group"
                   >
                     <IconComponent className="w-5 h-5 text-red-500 group-hover:scale-110 transition-transform" />
                     <span className="text-sm font-medium">{category.name}</span>
