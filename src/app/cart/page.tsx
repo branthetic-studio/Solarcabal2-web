@@ -11,6 +11,7 @@ import { useUser } from "@/context/UserContext";
 import Footer from "@/Components/Footer/Footer";
 import Navbar from "@/Components/Navbar/Navbar";
 import { toast } from "sonner";
+import Suscribe from "@/Components/Suscribe/Suscribe";
 
 /** NGN with no decimals (adjust if you need decimals) */
 const money = (amount: number, currency = "NGN") =>
@@ -61,7 +62,8 @@ export default function CartPage() {
   // Empty states
   if (!isLoggedIn && localItems.length === 0) {
     return (
-      <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+      <main className="px-4 sm:px-6 lg:px-8 py-10">
+        <Navbar />
         <h1 className="text-xl sm:text-2xl font-semibold">Shopping Cart</h1>
         <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-neutral-200 bg-white p-10 text-center">
           <div className="text-5xl mb-3">🛒</div>
@@ -96,21 +98,23 @@ export default function CartPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 lg:py-0">
+    <main className="w-full">
       <Navbar />
-      {/* Title row */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl sm:text-2xl font-semibold">Shopping Cart</h1>
-        {/* Optional sort UI placeholder */}
-      </div>
+      <div className="w-full px-18">
 
-      {/* Grid: Items + Summary */}
-      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Items */}
-        <section className="lg:col-span-2">
-          <ul className="space-y-4">
-            {isLoggedIn
-              ? lines.map((line: any) => {
+        {/* Title row */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl sm:text-2xl font-semibold">Shopping Cart</h1>
+          {/* Optional sort UI placeholder */}
+        </div>
+
+        {/* Grid: Items + Summary */}
+        <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-3">
+          {/* Items */}
+          <section className="lg:col-span-2">
+            <ul className="space-y-4">
+              {isLoggedIn
+                ? lines.map((line: any) => {
                   const asset =
                     line?.featuredAsset?.preview ??
                     line?.productVariant?.product?.featuredAsset?.preview ??
@@ -163,7 +167,7 @@ export default function CartPage() {
                                   serverCurrency
                                 )}{" "}
                                 <span className="text-[11px] font-normal text-neutral-500">
-                                  / pcs
+                                  / pcssss
                                 </span>
                               </p>
                             </div>
@@ -226,14 +230,14 @@ export default function CartPage() {
                     </li>
                   );
                 })
-              : localItems.map((line) => (
+                : localItems.map((line) => (
                   <li
                     key={line.id}
-                    className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5"
+                    className="border-b border-neutral-200 bg-white p-4 sm:p-5"
                   >
                     <div className="flex items-start gap-4">
                       {/* Image */}
-                      <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
+                      <div className="h-20 w-20 p-2 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
                         {line.image ? (
                           <Image
                             src={line.image}
@@ -276,22 +280,8 @@ export default function CartPage() {
                             >
                               Remove <Trash2 className="h-4 w-4" />
                             </button>
-                            <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
-                              <span className="mr-1">Total</span>
-                              <span className="font-semibold text-neutral-900">
-                                {money(
-                                  (line.priceWithTax ?? 0) *
-                                    (line.quantity ?? 1),
-                                  localCurrency
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Qty control */}
-                        <div className="mt-3 sm:mt-4 flex items-center gap-3">
-                          <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
+                             <div className="mt-3 sm:mt-4 flex items-center gap-3">
+                          <div className="flex items-center overflow-hidden">
                             <button
                               onClick={() =>
                                 updateQuantity(
@@ -299,7 +289,7 @@ export default function CartPage() {
                                   Math.max(0, (line.quantity ?? 1) - 1)
                                 )
                               }
-                              className="h-8 w-8 flex items-center justify-center"
+                              className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
                               aria-label="Decrease"
                             >
                               −
@@ -314,153 +304,170 @@ export default function CartPage() {
                                   (line.quantity ?? 1) + 1
                                 )
                               }
-                              className="h-8 w-8 flex items-center justify-center"
+                              className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
                               aria-label="Increase"
                             >
                               +
                             </button>
                           </div>
                         </div>
+                            <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
+                              <span className="mr-1 text-xs">Total</span>
+                              <span className="font-semibold text-neutral-900">
+                                {money(
+                                  (line.priceWithTax ?? 0) *
+                                  (line.quantity ?? 1),
+                                  localCurrency
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Qty control */}
+                       
                       </div>
                     </div>
                   </li>
                 ))}
-          </ul>
+            </ul>
 
-          {/* Continue shopping */}
-          <div className="mt-6">
-            <Link
-              href="/products"
-              className="inline-flex items-center justify-center rounded-full border border-neutral-200 px-5 py-2 text-sm font-medium hover:bg-neutral-50"
-            >
-              ← Continue shopping
-            </Link>
-          </div>
-        </section>
+            {/* Continue shopping */}
+            <div className="mt-6">
+              <Link
+                href="/products"
+                className="inline-flex items-center justify-center rounded-full border border-neutral-200 px-5 py-2 text-sm font-medium hover:bg-neutral-50"
+              >
+                ← Continue shopping
+              </Link>
+            </div>
+          </section>
 
-        {/* Summary */}
-        <aside className="lg:sticky lg:top-6 h-max rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
-          <h2 className="text-base sm:text-lg font-semibold">Order Summary</h2>
+          {/* Summary */}
+          <aside className="lg:sticky lg:top-6 h-max rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+            <h2 className="text-base sm:text-lg font-semibold">Order Summary</h2>
 
-          {/* Totals */}
-          {isLoggedIn ? (
-            <dl className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-neutral-600">Sub total products</dt>
-                <dd className="font-semibold">
-                  {money(serverSubtotal, serverCurrency)}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-neutral-600">Delivery fee</dt>
-                <dd className="font-semibold">
-                  {money(serverShipping, serverCurrency)}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-neutral-600">Tax</dt>
-                <dd className="font-semibold">
-                  {money(serverTax, serverCurrency)}
-                </dd>
-              </div>
-
-              <div className="mt-3 border-t border-neutral-200 pt-3 text-base">
+            {/* Totals */}
+            {isLoggedIn ? (
+              <dl className="mt-4 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <dt className="font-semibold">Total</dt>
+                  <dt className="text-neutral-600">Sub total products</dt>
                   <dd className="font-semibold">
-                    {money(serverTotal, serverCurrency)}
+                    {money(serverSubtotal, serverCurrency)}
                   </dd>
                 </div>
-              </div>
-            </dl>
-          ) : (
-            <dl className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-neutral-600">Sub total products</dt>
-                <dd className="font-semibold">
-                  {money(localSubtotal, localCurrency)}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-neutral-600">Delivery fee</dt>
-                <dd className="font-semibold">{money(0, localCurrency)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-neutral-600">Tax</dt>
-                <dd className="font-semibold">{money(0, localCurrency)}</dd>
-              </div>
-
-              <div className="mt-3 border-t border-neutral-200 pt-3 text-base">
                 <div className="flex justify-between">
-                  <dt className="font-semibold">Total</dt>
+                  <dt className="text-neutral-600">Delivery fee</dt>
+                  <dd className="font-semibold">
+                    {money(serverShipping, serverCurrency)}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-neutral-600">Tax</dt>
+                  <dd className="font-semibold">
+                    {money(serverTax, serverCurrency)}
+                  </dd>
+                </div>
+
+                <div className="mt-3 border-t border-neutral-200 pt-3 text-base">
+                  <div className="flex justify-between">
+                    <dt className="font-semibold">Total</dt>
+                    <dd className="font-semibold">
+                      {money(serverTotal, serverCurrency)}
+                    </dd>
+                  </div>
+                </div>
+              </dl>
+            ) : (
+              <dl className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-neutral-600">Sub total products</dt>
                   <dd className="font-semibold">
                     {money(localSubtotal, localCurrency)}
                   </dd>
                 </div>
+                <div className="flex justify-between">
+                  <dt className="text-neutral-600">Delivery fee</dt>
+                  <dd className="font-semibold">{money(0, localCurrency)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-neutral-600">Tax</dt>
+                  <dd className="font-semibold">{money(0, localCurrency)}</dd>
+                </div>
+
+                <div className="mt-3 border-t border-neutral-200 pt-3 text-base">
+                  <div className="flex justify-between">
+                    <dt className="font-semibold">Total</dt>
+                    <dd className="font-semibold">
+                      {money(localSubtotal, localCurrency)}
+                    </dd>
+                  </div>
+                </div>
+              </dl>
+            )}
+
+            {/* Customer details (placeholder – match your screenshot) */}
+            <div className="mt-6 rounded-xl border border-neutral-200 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold">Customer Details</p>
+                <button
+                  onClick={() => router.push("/account")}
+                  className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                >
+                  Change <PencilLine className="h-3.5 w-3.5" />
+                </button>
               </div>
-            </dl>
-          )}
+              <div className="mt-3 text-xs text-neutral-700">
+                {/* Replace with real user values if available */}
+                <p className="font-medium">—</p>
+                <p className="mt-1 text-neutral-500">—</p>
+                <p className="mt-1 text-neutral-500">—</p>
+              </div>
+            </div>
 
-          {/* Customer details (placeholder – match your screenshot) */}
-          <div className="mt-6 rounded-xl border border-neutral-200 p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold">Customer Details</p>
-              <button
-                onClick={() => router.push("/account")}
-                className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
-              >
-                Change <PencilLine className="h-3.5 w-3.5" />
-              </button>
+            {/* Delivery details (placeholder – match your screenshot) */}
+            <div className="mt-4 rounded-xl border border-neutral-200 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold">Delivery Details</p>
+                <button
+                  // onClick={() => router.push("/checkout")}
+                  className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                >
+                  Change <PencilLine className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="mt-3 text-xs text-neutral-700">
+                <p>Door Delivery</p>
+                <p className="mt-1 text-neutral-500">Delivery between —</p>
+              </div>
             </div>
-            <div className="mt-3 text-xs text-neutral-700">
-              {/* Replace with real user values if available */}
-              <p className="font-medium">—</p>
-              <p className="mt-1 text-neutral-500">—</p>
-              <p className="mt-1 text-neutral-500">—</p>
-            </div>
-          </div>
 
-          {/* Delivery details (placeholder – match your screenshot) */}
-          <div className="mt-4 rounded-xl border border-neutral-200 p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold">Delivery Details</p>
-              <button
-                // onClick={() => router.push("/checkout")}
-                className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
-              >
-                Change <PencilLine className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <div className="mt-3 text-xs text-neutral-700">
-              <p>Door Delivery</p>
-              <p className="mt-1 text-neutral-500">Delivery between —</p>
-            </div>
-          </div>
-
-          {/* CTA */}
-          <button
-            onClick={() => {
-              if (!isLoggedIn) {
-                toast.info("Please log in to checkout", {
-                  action: {
-                    label: "Log in",
-                    onClick: () => router.push("/login"), // or your auth route
-                  },
-                  duration: 4000,
-                });
-                router.push("/"); // send them to homepage as you requested
-                return;
-              }
-              router.push("/checkout");
-            }}
-            className="mt-6 w-full rounded-full bg-red-600 py-3 text-sm font-semibold text-white hover:bg-red-700"
-          >
-            Checkout
-          </button>
-        </aside>
+            {/* CTA */}
+            <button
+              onClick={() => {
+                if (!isLoggedIn) {
+                  toast.info("Please log in to checkout", {
+                    action: {
+                      label: "Log in",
+                      onClick: () => router.push("/login"), // or your auth route
+                    },
+                    duration: 4000,
+                  });
+                  router.push("/"); // send them to homepage as you requested
+                  return;
+                }
+                router.push("/checkout");
+              }}
+              className="mt-6 w-full rounded-full bg-red-600 py-3 text-sm font-semibold text-white hover:bg-red-700"
+            >
+              Checkout
+            </button>
+          </aside>
+        </div>
+        <Suscribe />
+        <Footer />
       </div>
-
-      <Footer />
     </main>
+
   );
 }
