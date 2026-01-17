@@ -8,6 +8,7 @@ import Footer from "@/Components/Footer/Footer";
 import { useCart } from "@/context/CartContext";
 import Suscribe from "@/Components/Suscribe/Suscribe";
 import { Star } from "lucide-react";
+import Image from "next/image";
 
 /* ===================== Types ===================== */
 
@@ -101,6 +102,8 @@ const reviews = [
     rating: 5,
     text: "This is amazing product I have.",
     likes: 128,
+    dislikes: 2,
+    image: "/reviewimg.png",
   },
   {
     id: 2,
@@ -109,6 +112,8 @@ const reviews = [
     rating: 5,
     text: "This is amazing product I have.",
     likes: 82,
+    dislikes: 2,
+    image: "/reviewimg.png",
   },
   {
     id: 3,
@@ -117,6 +122,8 @@ const reviews = [
     rating: 5,
     text: "This is amazing product I have.",
     likes: 74,
+    dislikes: 2,
+    image: "/reviewimg.png",
   },
 ];
 
@@ -539,114 +546,147 @@ function LocalProductCard({
   if (status === "Reviews") {
     // Simple placeholder reviews section (keeps UI light)
 
-     const totalReviews = ratingData.reduce((a, b) => a + b.count, 0);
+    const totalReviews = ratingData.reduce((a, b) => a + b.count, 0);
     return (
-       <div className=" space-y-8">
+      <div className=" space-y-8">
 
-      {/* ===== Rating Summary ===== */}
-      <div className="flex gap-10 border border-[#E4E9EE] rounded-xl p-6">
+        {/* ===== Rating Summary ===== */}
+        <div className="flex gap-10 border border-[#E4E9EE] rounded-xl p-6">
 
-        {/* Average Rating */}
-        <div className="flex gap-3 items-center min-w-[160px]">
-          <div className="text-3xl">4.8</div>
-          <div>
-            <div className="flex mt-1">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Star key={i} className="w-4 h-4 fill-yellow-500 text-yellow-400" />
-            ))}
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            from {totalReviews.toLocaleString()} reviews
-          </p>
-          </div>
-        </div>
-
-        {/* Rating Breakdown */}
-        <div className="flex-1 space-y-2">
-          {ratingData.map((r) => (
-            <div key={r.stars} className="flex items-center gap-3">
-              <span className="flex gap-1 w-8 text-sm">{r.stars}.0<Star className="w-5 h-5 fill-yellow-500 text-yellow-400" /></span>
-
-              <div className="flex-1 h-2 bg-gray-200 rounded">
-                <div
-                  className="h-2 bg-black rounded"
-                  style={{
-                    width: `${(r.count / totalReviews) * 100}%`,
-                  }}
+          {/* Average Rating */}
+          <div className="flex gap-3 items-center min-w-40">
+            <div className="relative w-20 h-20 flex items-center justify-center">
+              {/* Circular ring */}
+              <svg className="absolute inset-0" viewBox="0 0 100 100">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="45"
+                  fill="none"
+                  stroke="#FFA133"
+                  strokeWidth="6"
                 />
-              </div>
+              </svg>
 
-              <span className="w-12 text-sm text-right text-gray-500">
-                {r.count}
+              {/* Rating text */}
+              <span className="text-3xl font-semibold text-gray-800">
+                4.8
               </span>
             </div>
-          ))}
+
+            <div>
+              <div className="flex mt-1">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Star key={i} className="w-4 h-4 fill-yellow-500 text-yellow-400" />
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                from {totalReviews.toLocaleString()} reviews
+              </p>
+            </div>
+          </div>
+
+          {/* Rating Breakdown */}
+          <div className="flex-1 space-y-2">
+            {ratingData.map((r) => (
+              <div key={r.stars} className="flex items-center gap-3">
+                <span className="flex gap-1 w-8 text-sm">{r.stars}.0<Star className="w-5 h-5 fill-yellow-500 text-yellow-400" /></span>
+
+                <div className="flex-1 h-2 bg-gray-200 rounded">
+                  <div
+                    className="h-2 bg-black rounded"
+                    style={{
+                      width: `${(r.count / totalReviews) * 100}%`,
+                    }}
+                  />
+                </div>
+
+                <span className="w-12 text-sm text-right text-gray-500">
+                  {r.count}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* ===== Reviews Section ===== */}
-      <div className="grid grid-cols-12 gap-8">
+        {/* ===== Reviews Section ===== */}
+        <div className="grid grid-cols-12 gap-8">
 
-        {/* Filters */}
-        <aside className="col-span-3 space-y-6 text-[#818B9C]">
-          <div>
-            <h3 className="mb-3 text-black">Rating</h3>
-            {[5, 4, 3, 2, 1].map((r) => (
-              <label key={r} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" />
-               <Star className="w-4 h-4 fill-yellow-500 text-yellow-400" /> {r} Star
-              </label>
-            ))}
-          </div>
+          {/* Filters */}
+          <aside className="col-span-2 space-y-6 text-[#818B9C]">
+            <div>
+              <h3 className="mb-3 text-black">Rating</h3>
+              {[5, 4, 3, 2, 1].map((r) => (
+                <label key={r} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" />
+                  <Star className="w-4 h-4 fill-yellow-500 text-yellow-400" /> {r} Star
+                </label>
+              ))}
+            </div>
 
-          <div>
-            <h3 className="text-black mb-3">Review Topics</h3>
-            {["Product Quality", "Product Price", "Shipment"].map((t) => (
-              <label key={t} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" />
-                {t}
-              </label>
-            ))}
-          </div>
-        </aside>
+            <div>
+              <h3 className="text-black mb-3">Review Topics</h3>
+              {["Product Quality", "Product Price", "Shipment"].map((t) => (
+                <label key={t} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" />
+                  {t}
+                </label>
+              ))}
+            </div>
+          </aside>
 
-        {/* Review List */}
-        <div className="col-span-9 space-y-6">
-          {reviews.map((review) => (
-            <div
-              key={review.id}
-              className="border-b border-[#E4E9EE] pb-6 space-y-3"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-semibold">{review.name}</p>
-                  <p className="text-xs text-gray-500">{review.date}</p>
+          {/* Review List */}
+          <div className="col-span-10 space-y-6">
+            {reviews.map((review) => (
+              <div
+                key={review.id}
+                className="border-b border-[#E4E9EE] flex justify-between pb-6 space-y-3"
+              >
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Star
+                        key={i}
+                        className={`w-4 h-4 ${i <= review.rating
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "text-gray-300"
+                          }`}
+                      />
+                    ))}
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-700">{review.text}</p>
+                    <p className="text-xs text-gray-500">{review.date}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <img src={review.image} alt={review.name} className="w-8 h-8 object-cover rounded-full" />
+                    <p className="font-semibold">{review.name}</p>
+                  </div>
+
                 </div>
 
                 <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star
-                      key={i}
-                      className={`w-4 h-4 ${
-                        i <= review.rating
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-gray-300"
-                      }`}
-                    />
-                  ))}
+                  <button className="text-sm hover:bg-gray-100">
+                    <div className="flex items-center border p-2 border-[#d7d7d7] rounded-sm gap-1 ">
+                      <Image src="/like.png" alt="Like" width={18} height={18} /> {review.likes}
+                    </div>
+                  </button>
+
+                  <button className="text-sm hover:bg-gray-100">
+                    <div className="flex items-center border p-2 border-[#d7d7d7] rounded-sm gap-1 ">
+                      <Image src="/dislike.png" alt="Like" width={18} height={18} /> {review.dislikes}
+                    </div>
+                  </button>
                 </div>
+
+
               </div>
-
-              <p className="text-sm text-gray-700">{review.text}</p>
-
-              <button className="flex items-center gap-2 border rounded-full px-4 py-1 text-sm hover:bg-gray-100">
-                👍 {review.likes}
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
-    </div>
 
     );
   }
