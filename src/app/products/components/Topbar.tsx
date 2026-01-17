@@ -66,7 +66,7 @@ const Topbar: React.FC<Props> = ({
         <div className="flex items-center gap-2">
           <span className="text-gray-700 text-sm font-medium">Sort By:</span>
           <select
-            className="border border-gray-300 rounded px-3 py-1 text-sm bg-white min-w-[160px] focus:outline-none focus:border-gray-400"
+            className="border border-gray-300 rounded px-4 py-2 text-sm bg-white min-w-40 focus:outline-none focus:border-gray-400"
             value={sortOrder}
             onChange={(e) => onSortChange(e.target.value)}
           >

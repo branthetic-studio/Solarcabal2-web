@@ -158,55 +158,57 @@ export default function ProductGrid({
   if (error) return <div>Failed to load products.</div>;
 
   return (
-    <div className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {items.map((item) => {
         const qty = quantityMap[item.id];
 
         return (
           <div
             key={item.id}
-            className="rounded-xl border p-4 shadow-sm bg-white"
+            className="w-full rounded-xl p-2 shadow-sm bg-white"
           >
-            <Link href={`/products/${item.slug}`}>
-              <img
-                src={item.image || "/placeholder.png"}
-                className="w-full h-40 object-contain rounded-md"
-                alt={item.name}
-              />
-            </Link>
+            <div className="bg-[#F3F5F7] p-3 pb-1 rounded-t-md">
+              <Link href={`/products/${item.slug}`}>
+                <img
+                  src={item.image || "/placeholder.png"}
+                  className="w-full h-40 object-contain rounded-md"
+                  alt={item.name}
+                />
+              </Link>
 
-            {/* BUTTON OR COUNTER */}
-            {qty === undefined ? (
-              <button
-                className="w-full bg-black text-white py-2 rounded-md mt-3"
-                onClick={() => handleAddToCart(item.id)}
-              >
-                Add to Cart
-              </button>
-            ) : (
-              <div className="flex items-center justify-between mt-3 bg-gray-100 rounded-md px-3 py-2">
+              {/* BUTTON OR COUNTER */}
+              {qty === undefined ? (
                 <button
-                  className="text-lg font-bold"
-                  onClick={() => adjustQuantity(item.id, -1)}
+                  className="w-full bg-black text-white py-2 rounded-md mt-3"
+                  onClick={() => handleAddToCart(item.id)}
                 >
-                  –
+                  Add to Cart
                 </button>
+              ) : (
+                <div className="flex items-center justify-between mt-3 bg-gray-100 rounded-md -px-6 py-2">
+                  <button
+                    className="text-lg font-bold bg-black rounded-md text-white px-2"
+                    onClick={() => adjustQuantity(item.id, -1)}
+                  >
+                    –
+                  </button>
 
-                <span className="font-semibold">{qty}</span>
+                  <span className="font-semibold">{qty}</span>
 
-                <button
-                  className="text-lg font-bold"
-                  onClick={() => adjustQuantity(item.id, 1)}
-                >
-                  +
-                </button>
-              </div>
-            )}
+                  <button
+                    className="text-lg font-bold bg-black rounded-md text-white px-2"
+                    onClick={() => adjustQuantity(item.id, 1)}
+                  >
+                    +
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* PRODUCT INFO */}
             <p className="text-sm text-gray-500 mt-2">{item.brand}</p>
-            <p className="font-semibold">{item.name}</p>
-            <p className="text-lg font-bold mt-1">
+            <p className="font-semibold text-sm">{item.name}</p>
+            <p className="text-md font-bold mt-4">
               {item.currencyCode} {item.priceRaw.toLocaleString()}
             </p>
           </div>

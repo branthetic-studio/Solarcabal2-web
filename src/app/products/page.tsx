@@ -74,7 +74,7 @@ const Page = () => {
 
           <ProductGrid
             categorySlug={selectedCategorySlug}
-            brand={selectedBrand.length === 0 ? null : selectedBrand} // ✅ now passes string[] | null
+            brand={selectedBrand.length === 0 ? null : selectedBrand}
             sort={sortOrder}
             condition={condition}
             priceRange={priceRange}
