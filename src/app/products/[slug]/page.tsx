@@ -6,6 +6,7 @@ import { GET_PRODUCT_DETAILS } from "@/graphql/queries";
 import Navbar from "@/Components/Navbar/Navbar";
 import Footer from "@/Components/Footer/Footer";
 import { useCart } from "@/context/CartContext";
+import Suscribe from "@/Components/Suscribe/Suscribe";
 
 /* ===================== Types ===================== */
 
@@ -281,9 +282,9 @@ const ProductDetailsPage = () => {
                   <button
                     key={index}
                     onClick={() => setSelectedImage(index)}
-                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 ${selectedImage === index
-                        ? "border-[#ff0000]"
-                        : "border-gray-200"
+                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 p-2 ${selectedImage === index
+                      ? "border-[#00AAFF]"
+                      : "border-gray-200"
                       }`}
                   >
                     <img
@@ -332,8 +333,8 @@ const ProductDetailsPage = () => {
                         key={variant.id}
                         onClick={() => setSelectedVariant(variant)}
                         className={`px-4 py-2 border rounded-lg text-sm font-medium transition-colors ${selectedVariant?.id === variant.id
-                            ? "border-blue-500 bg-blue-50 text-blue-700"
-                            : "border-gray-300 hover:bg-gray-50"
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-gray-300 hover:bg-gray-50"
                           }`}
                       >
                         {variant.name}
@@ -400,13 +401,13 @@ const ProductDetailsPage = () => {
 
               </div>
 
-              
+
             </div>
           </div>
         </div>
 
         {/* Tabs Section */}
-        <div className="bg-white rounded-lg shadow-sm">
+        <div className="">
           <div className="border-b border-gray-200">
             <nav className="flex">
               {(["Product Detail", "Reviews", "Related Product"] as const).map(
@@ -414,9 +415,9 @@ const ProductDetailsPage = () => {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
-                        ? "border-blue-500 text-blue-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
+                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
+                      ? "border-black text-black"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
                       }`}
                   >
                     {tab}
@@ -483,7 +484,7 @@ const ProductDetailsPage = () => {
           </div>
         </div>
       </div>
-
+      <Suscribe />
       <Footer />
     </div>
   );
@@ -548,9 +549,9 @@ function LocalProductCard({
       {product.description && (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            Description
+            {product.name}
           </h3>
-          <p className="text-gray-700 leading-relaxed">{product.description}</p>
+          <p className="text-[#818B9C] leading-relaxed">{product.description}</p>
         </div>
       )}
 
@@ -560,14 +561,14 @@ function LocalProductCard({
           <h3 className="text-lg font-semibold text-gray-900 mb-3">
             Specifications
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 pr-60">
             {specs.map((s, idx) => (
               <div
                 key={idx}
-                className="border border-gray-200 rounded-lg p-3 flex items-center justify-between"
+                className="flex flex-2 items-center mr-8 justify-between"
               >
-                <span className="text-gray-600">{s.label}</span>
-                <span className="font-medium text-gray-900">{s.value}</span>
+                <span className="text-[#818B9C]">{s.label}</span>
+                <span className="font-medium text-[#141718]">{s.value}</span>
               </div>
             ))}
           </div>
