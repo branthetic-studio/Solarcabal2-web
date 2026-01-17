@@ -35,6 +35,12 @@ type ActiveOrderLine = {
   } | null;
 };
 
+interface InfoRowProps {
+  icon: React.ReactNode; // <- allow image, emoji, or anything
+  title: string;
+  text: string;
+}
+
 type ActiveOrder = {
   id: string;
   code: string;
@@ -227,7 +233,7 @@ const Page = () => {
                 <RadioRow
                   checked={method === "paypal"}
                   onChange={() => setMethod("paypal")}
-                  label={<span className="text-[#0070ba]">PayPal</span>}
+                  label={<span className="">PayPal</span>}
                 />
               </div>
 
@@ -237,17 +243,18 @@ const Page = () => {
               <div className="mt-6">
                 <p className="mb-2 text-sm font-semibold">Billing Address</p>
 
-                <div className="flex justify-between items-center border rounded-xl p-3">
+                <div className="flex justify-between items-center bg-neutral-100 rounded-xl p-3">
                   <label className="flex gap-2 items-center text-sm">
                     <input
                       type="checkbox"
                       checked={sameAsShipping}
                       onChange={(e) => setSameAsShipping(e.target.checked)}
+                      className="accent-red-500"
                     />
                     Same as shipping
                   </label>
 
-                  <button className="text-neutral-400 hover:text-neutral-600">
+                  <button className="text-neutral-600 hover:text-neutral-600">
                     ✎
                   </button>
                 </div>
@@ -263,12 +270,14 @@ const Page = () => {
             </button>
 
             {/* Info rows */}
-            <div className="rounded-2xl border bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-semibold mb-4">Delivery & Products</h3>
+            <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5 pt-8">
+              <h3 className="text-sm font-semibold mb-4 border-b border-[#d1d1d1] pb-4">Delivery & Products</h3>
 
-              <InfoRow icon="🚚" title="Delivery" text="1–9 business days" />
-              <InfoRow icon="↩️" title="Returns" text="7-day return policy" />
-              <InfoRow icon="🛡️" title="Warranty" text="Varies per item" />
+           <div className="flex flex-col gap-5">
+               <InfoRow icon={<Image src="/truck.png" alt="Delivery" width={24} height={24} />} title="Delivery" text="1–9 business days" />
+              <InfoRow icon={<Image src="/repeat.png" alt="Delivery" width={24} height={24} />} title="Returns" text="7-day return policy" />
+              <InfoRow icon={<Image src="/shield.png" alt="Delivery" width={24} height={24} />} title="Warranty" text="Varies per item" />
+           </div>
             </div>
           </section>
 
@@ -375,9 +384,9 @@ const Page = () => {
 /* ---------------- Helper Components ---------------- */
 function RadioRow({ checked, onChange, label, right }: any) {
   return (
-    <label className="flex justify-between items-center p-3 border rounded-lg cursor-pointer">
+    <label className="flex justify-between items-center p-3 bg-neutral-100 rounded-lg cursor-pointer">
       <div className="flex gap-3 items-center">
-        <input type="radio" checked={checked} onChange={onChange} />
+        <input type="radio" checked={checked} onChange={onChange} className="accent-red-500" />
         <span>{label}</span>
       </div>
       {right}
@@ -400,13 +409,15 @@ function BrandDot({ className }: any) {
   return <div className={`w-6 h-6 rounded-full ${className}`} />;
 }
 
-function InfoRow({ icon, title, text }: any) {
+function InfoRow({ icon, title, text }: InfoRowProps) {
   return (
-    <div className="flex items-start gap-3 py-3 border-b last:border-none">
-      <span>{icon}</span>
+    <div className="flex items-center gap-3 border-b border-[#f0f0f0]">
+      <div className="w-6 h-6 flex-shrink-0">
+        {icon}
+      </div>
       <div>
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-xs text-neutral-500">{text}</p>
+        <p className="font-medium">{title}</p>
+        <p className="text-sm text-gray-500">{text}</p>
       </div>
     </div>
   );
