@@ -83,7 +83,7 @@ const ReferralPage = () => {
   return (
     <main>
       <Navbar />
-      <div className="relative bg-[#181818] py-10 md:py-16 pt-20 md:pt-30 px-4 overflow-hidden -mx-4">
+      <div className="relative bg-[#181818] py-10 md:py-16 pt-20 md:pt-30 px-4 overflow-hidden">
         {/* Background gradient decorations */}
         <div
           className="absolute bottom-0 left-0  opacity-100 z-10">
