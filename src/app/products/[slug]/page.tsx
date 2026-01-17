@@ -473,7 +473,7 @@ const ProductDetailsPage = () => {
             </nav>
           </div>
 
-          <div className="p-6">
+          <div className="p-6 pb-12">
             {activeTab === "Related Product" ? (
               <div>
                 <h3 className="text-xl font-bold mb-6">Related Products</h3>
@@ -860,7 +860,7 @@ function ReviewModal({ onClose }: ReviewModalProps) {
             </div>
           </>
         ) : (
-          /* ✅ Success state */
+          /* Success state */
           <div className="flex flex-col items-center justify-center py-10 gap-4">
             <Image
               src="/tick-circle.png" // your success image

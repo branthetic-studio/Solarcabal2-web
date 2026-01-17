@@ -412,9 +412,9 @@ export default function CartPage() {
                 <p className="text-sm font-semibold">Customer Details</p>
                 <button
                   onClick={() => router.push("/account")}
-                  className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                  className="inline-flex items-center gap-1 text-xs hover:text-red-700"
                 >
-                  Change <PencilLine className="h-3.5 w-3.5" />
+                  Change <Image src="/edit-rectangle.png" alt="edit" className="h-3.5 w-3.5" width={20} height={20} />
                 </button>
               </div>
               <div className="mt-3 text-xs text-neutral-700">
@@ -431,9 +431,9 @@ export default function CartPage() {
                 <p className="text-sm font-semibold">Delivery Details</p>
                 <button
                   // onClick={() => router.push("/checkout")}
-                  className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                  className="inline-flex items-center gap-1 text-xs hover:text-red-700"
                 >
-                  Change <PencilLine className="h-3.5 w-3.5" />
+                  Change <Image src="/edit-rectangle.png" alt="edit" className="h-3.5 w-3.5" width={20} height={20} />
                 </button>
               </div>
               <div className="mt-3 text-xs text-neutral-700">
