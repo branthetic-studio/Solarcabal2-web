@@ -69,6 +69,12 @@ const ReferralPage = () => {
       text: "Active invites",
       num: activeInvites.toString(),
     },
+    {
+      title: "Premium 2 Earning",
+      price: token ? `₦${activeInvites * 630}` : "₦0",
+      text: "Active invites",
+      num: activeInvites.toString(),
+    },
   ];
 
   const [copied, setCopied] = useState(false);
@@ -139,10 +145,18 @@ const ReferralPage = () => {
           </div>
         </div>
       </div>
-
+      <h3 className="pl-46 mt-8 py-3">Earnings Overview</h3>
 
       {/* PREMIUM DATA */}
-      <section className="premium-data">
+      <section className="premium-data relative bg-[#181818]">
+
+        <div
+          className="absolute bottom-0 left-0  opacity-100 z-10">
+          <Image src="/footershadow2.png" alt="Background decoration" width={300} height={300}></Image></div>
+        <div
+          className="absolute top-0 right-0 opacity-100 z-100">
+          <Image src="/footershadow1.png" alt="Background decoration" width={300} height={300}></Image>
+        </div>
         {premiumData.map((data, index) => (
           <div key={index} className={index === 1 ? "data" : "data1"}>
             <div>
