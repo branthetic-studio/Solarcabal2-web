@@ -99,7 +99,7 @@ const Page = () => {
 
   const [isPaying, setIsPaying] = useState(false);
 
-  
+
 
   /* ------------------- Active Order Query ------------------- */
   const { data: activeOrderData, refetch } =
@@ -122,15 +122,33 @@ const Page = () => {
         variables: { lineId, quantity: qty },
       });
 
-      if (res.data.adjustOrderLineQuantity.__typename === "Order") {
+      // Type-safe narrowing for build mode
+      const payload = res.data as {
+        adjustOrderLineQuantity:
+        | {
+          __typename: "Order";
+          id: string;
+          totalQuantity: number;
+          lines: ActiveOrderLine[];
+          totalWithTax: number;
+          subTotalWithTax?: number;
+        }
+        | {
+          __typename: "OrderModificationError";
+          message: string;
+        };
+      };
+
+      if (payload.adjustOrderLineQuantity.__typename === "Order") {
         await refetch();
       } else {
-        alert(res.data.adjustOrderLineQuantity.message);
+        alert(payload.adjustOrderLineQuantity.message);
       }
     } catch (err) {
       console.error("Error updating cart:", err);
     }
   };
+
 
   /* ------------------- Checkout + Paystack ------------------- */
   const handleCheckout = async () => {
@@ -273,11 +291,11 @@ const Page = () => {
             <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5 pt-8">
               <h3 className="text-sm font-semibold mb-4 border-b border-[#d1d1d1] pb-4">Delivery & Products</h3>
 
-           <div className="flex flex-col gap-5">
-               <InfoRow icon={<Image src="/truck.png" alt="Delivery" width={24} height={24} />} title="Delivery" text="1–9 business days" />
-              <InfoRow icon={<Image src="/repeat.png" alt="Delivery" width={24} height={24} />} title="Returns" text="7-day return policy" />
-              <InfoRow icon={<Image src="/shield.png" alt="Delivery" width={24} height={24} />} title="Warranty" text="Varies per item" />
-           </div>
+              <div className="flex flex-col gap-5">
+                <InfoRow icon={<Image src="/truck.png" alt="Delivery" width={24} height={24} />} title="Delivery" text="1–9 business days" />
+                <InfoRow icon={<Image src="/repeat.png" alt="Delivery" width={24} height={24} />} title="Returns" text="7-day return policy" />
+                <InfoRow icon={<Image src="/shield.png" alt="Delivery" width={24} height={24} />} title="Warranty" text="Varies per item" />
+              </div>
             </div>
           </section>
 

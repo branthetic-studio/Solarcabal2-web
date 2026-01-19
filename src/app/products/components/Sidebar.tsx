@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Dispatch, SetStateAction } from "react";
 import {
   Search,
   PanelsTopLeft,
@@ -26,18 +26,21 @@ type Category = {
 
 type SidebarProps = {
   selectedCategorySlug: string;
-  onCategorySelect: (slug: string) => void;
+  onCategorySelect: (slug: string, brand?: string) => void; // brand optional
   condition: string;
-  setCondition: (c: string) => void;
+  setCondition: Dispatch<SetStateAction<string>>; // use React types
   priceRange: [number, number];
-  setPriceRange: (range: [number, number]) => void;
+  setPriceRange: Dispatch<SetStateAction<[number, number]>>;
   brand: string[];
-  setBrand: (b: string[]) => void;
+  setBrand: Dispatch<SetStateAction<string[]>>;
+  sort: string; // add this
+  setSort: Dispatch<SetStateAction<string>>; // add this
   categoriesFromApi: Category[];
   currency?: string;
   minPrice: number;
   maxPrice: number;
 };
+
 
 const Sidebar: React.FC<SidebarProps> = ({
   selectedCategorySlug,

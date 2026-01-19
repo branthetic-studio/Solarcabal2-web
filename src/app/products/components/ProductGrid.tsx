@@ -20,6 +20,49 @@ type Props = {
   priceRange: [number, number];
 };
 
+type UseCartContext = {
+  removeFromCartMutation: (options: { variables: { productVariantId: string } }) => Promise<void>;
+};
+
+type GetProductDetailsResponse = {
+  product: {
+    id: string;
+    name: string;
+    variants: {
+      id: string;
+      name: string;
+      priceWithTax: number;
+      currencyCode: string;
+      featuredAsset?: { preview?: string | null } | null;
+    }[];
+    featuredAsset?: { preview?: string | null } | null;
+    assets?: { preview?: string | null }[] | null;
+  };
+};
+
+
+interface GetCollectionProductsResponse {
+  search: {
+    totalItems: number;
+    items: Array<{
+      productName: string;
+      slug: string;
+      productVariantId: string;
+      productVariantName: string;
+      productAsset?: { preview: string };
+      priceWithTax: {
+        __typename: string;
+        value?: number;
+        min?: number;
+        max?: number;
+      };
+      currencyCode: string;
+    }>;
+  };
+}
+
+
+
 export default function ProductGrid({
   categorySlug,
   brand,
@@ -31,14 +74,15 @@ export default function ProductGrid({
   const { addToCartMutation, handleAdjustQuantity, removeFromCartMutation } = useCart();
   const { addItem: addLocalItem, removeItem: removeLocalItem } = useLocalCart();
 
-  const [quantityMap, setQuantityMap] = useState<Record<string, number>>({});
+  const [quantityMap, setQuantityMap] = useState<Record<string, number | undefined>>({});
   const autoAddedRef = useRef<Record<string, boolean>>({});
 
-  const [loadDetails] = useLazyQuery(GET_PRODUCT_DETAILS, {
-    fetchPolicy: "cache-first",
-  });
+  const [loadDetails] = useLazyQuery<GetProductDetailsResponse>(GET_PRODUCT_DETAILS, {
+  fetchPolicy: "cache-first",
+});
 
-  const { data, loading, error } = useQuery(GET_COLLECTION_PRODUCTS, {
+
+  const { data, loading, error } = useQuery<GetCollectionProductsResponse>(GET_COLLECTION_PRODUCTS, {
     variables: {
       collectionSlug: categorySlug,
       groupByProduct: true,
@@ -98,7 +142,7 @@ export default function ProductGrid({
       if (qty === undefined) {
         // Remove when returning to Add to Cart
         removeLocalItem(item.id);
-        if (me) removeFromCartMutation({ variables: { productVariantId: item.id } });
+        if (me) removeFromCartMutation(item.id);
         return;
       }
 

@@ -12,6 +12,7 @@ import {
   GET_ACTIVE_ORDER,
   ADD_TO_CART,
   ADJUST_QUANTITY,
+  REMOVE_FROM_CART,
 } from "@/graphql/queries";
 import {
   GetActiveOrderData,
@@ -33,15 +34,19 @@ type UseCartContext = {
   getCount: () => number;
   addToCartMutation: AddToCartFn;
   handleAdjustQuantity: (lineId: string, quantity: number) => Promise<void>;
+  removeFromCartMutation: (lineId: string) => Promise<void>;
 };
+
+
 
 // Initial (empty) context
 const initialCtx: UseCartContext = {
   cart: undefined,
   activeOrder: undefined,
   getCount: () => 0,
-  addToCartMutation: async () => {},
-  handleAdjustQuantity: async () => {},
+  addToCartMutation: async () => { },
+  handleAdjustQuantity: async () => { },
+  removeFromCartMutation: async () => { },
 };
 
 const CartContext = createContext<UseCartContext>(initialCtx);
@@ -69,6 +74,12 @@ const CartProvider = ({ children }: PropsWithChildren) => {
     awaitRefetchQueries: true,
   });
 
+  const [removeLine] = useMutation(REMOVE_FROM_CART, {
+    refetchQueries: [{ query: GET_ACTIVE_ORDER }],
+    awaitRefetchQueries: true,
+  });
+
+
   const getCount = useMemo(() => {
     return () =>
       data?.activeOrder?.totalQuantity ??
@@ -87,6 +98,16 @@ const CartProvider = ({ children }: PropsWithChildren) => {
     await adjustLine({ variables: { orderLineId: lineId, quantity } });
   };
 
+  const removeFromCartMutation = async (lineId: string) => {
+    await removeLine({
+      variables: { orderLineId: lineId },
+    });
+
+    await refetch();
+  };
+
+
+
   useEffect(() => {
     void refetch();
   }, [refetch]);
@@ -99,8 +120,10 @@ const CartProvider = ({ children }: PropsWithChildren) => {
         getCount,
         addToCartMutation,
         handleAdjustQuantity,
+        removeFromCartMutation,
       }}
     >
+
       {children}
     </CartContext.Provider>
   );

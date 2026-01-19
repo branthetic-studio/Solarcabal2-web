@@ -1,5 +1,6 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, Dispatch, SetStateAction } from "react";
+
 import Navbar from "../../Components/Navbar/Navbar";
 import Footer from "../../Components/Footer/Footer";
 import Sidebar from "./components/Sidebar";
@@ -8,6 +9,8 @@ import ProductGrid from "./components/ProductGrid";
 import Suscribe from "@/Components/Suscribe/Suscribe";
 import "./Product.css";
 import CartItems from "@/Components/CartItems";
+
+
 
 const Page = () => {
   const [selectedCategorySlug, setSelectedCategorySlug] =
@@ -37,8 +40,10 @@ const Page = () => {
   const minPrice = 0;
   const maxPrice = 10000;
 
+
+
   return (
-    
+
     <div>
       <Navbar />
       <Topbar

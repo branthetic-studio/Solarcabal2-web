@@ -545,3 +545,18 @@ export const DELETE_MY_ACCOUNT = gql`
     }
   }
 `;
+
+
+export const REMOVE_FROM_CART = gql`
+  mutation RemoveOrderLine($orderLineId: ID!) {
+    removeOrderLine(orderLineId: $orderLineId) {
+      ...ActiveOrder
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+  ${ACTIVE_ORDER_FRAGMENT}
+`;
+
