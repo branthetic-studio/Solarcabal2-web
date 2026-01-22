@@ -52,7 +52,7 @@ const Page = () => {
         sortOrder={sortOrder}
         onSortChange={setSortOrder}
       />
-      <div className="products-page px-12 pb-12">
+      <div className="products-page px-3 sm:px-6 md:px-10 lg:px-12 pb-10">
         {/* Sidebar */}
         <Sidebar
           selectedCategorySlug={selectedCategorySlug}
