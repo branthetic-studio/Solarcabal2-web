@@ -55,7 +55,7 @@ const page = () => {
   ];
 
   return (
-    <div>
+    <div className='w-full'>
       <Navbar />
       <div className='faq-banner'>
         <h2>
