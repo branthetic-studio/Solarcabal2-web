@@ -530,11 +530,11 @@
     object-fit: cover;
   }
   .installation-banner-container {
-    top: auto;
-    bottom: 6%;
-    left: 50%;
-    transform: translateX(-50%) skewY(-3.5deg); /* keep your skew vibe */
-    width: calc(100% - 24px);
+    /* top: auto;
+    bottom: 6%; */
+    /* left: 50%; */
+    /* transform: translateX(-50%) skewY(-3.5deg); */
+    /* width: calc(100% - 24px); */
     padding: 14px;
   }
   .installation-banner-content {
