@@ -57,7 +57,7 @@ const Page = () => {
   };
 
   return (
-    <div className="pb-12">
+    <div className="">
       <Navbar />
       <div className="enquiries-banner">
         <h2>Reach Us Anytime</h2>
