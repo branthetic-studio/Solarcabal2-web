@@ -28,9 +28,9 @@ export default function CartItems() {
 
       {/* TOP BUTTONS */}
       <div className="flex flex-col gap-3">
-        <button className="w-full bg-red-600 text-white py-3 rounded-full font-semibold text-sm">
+        <Link href="/checkout" className="w-full bg-red-600 text-white py-3 text-center rounded-full font-semibold text-sm">
           Checkout now
-        </button>
+        </Link>
 
         <Link
           href="/cart"

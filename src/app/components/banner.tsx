@@ -80,7 +80,7 @@ const Banner = () => {
         </aside>
 
         {/* Hero Banner */}
-        <div className="flex-1 relative rounded-2xl overflow-hidden shadow-lg min-h-[320px] sm:min-h-[380px] md:min-h-[450px] lg:min-h-[500px]">
+        <div className="flex-1 relative rounded-2xl overflow-hidden shadow-lg min-h-80 sm:min-h-95 md:min-h-112 lg:min-h-125">
 
           {/* Background Image */}
           <Image
@@ -92,27 +92,42 @@ const Banner = () => {
           />
 
           {/* Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/30 to-transparent" />
 
           {/* Centered Content */}
-          <div className="absolute inset-0 flex flex-col justify-center items-center text-center px-4 md:px-14">
+          <div className="absolute inset-0 flex flex-col justify-center px-4 md:px-40">
             <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-3 md:mb-4 leading-tight">
               Your One-Stop
               <br />
               Solar Shop
             </h1>
 
-            <p className="text-sm sm:text-base md:text-lg text-gray-200 mb-5 md:mb-8 max-w-xl leading-relaxed">
+            <p className="text-sm sm:text-base md:text-md text-gray-200 mb-5 md:mb-8 max-w-xl leading-relaxed">
               Explore top-quality solar energy products, track your orders, and
               manage everything in one place.
             </p>
 
-            <Link
-              href="/products"
-              className="inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit text-sm sm:text-base font-medium"
-            >
-              Shop Now
-            </Link>
+            <div className="flex gap-4 flex-wrap ">
+              <Link
+                href="/products"
+                className="inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit text-xs sm:text-xs font-medium"
+              >
+                Shop Now
+              </Link>
+              <Link
+                href="/installation"
+                className="inline-flex items-center justify-center border boreder-red-600  hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit text-xs sm:text-xs font-medium"
+              >
+                Installation
+              </Link>
+              <Link
+                href="/referral"
+                className="inline-flex items-center justify-center bg-white hover:bg-red-700 hover:text-white text-red-600 px-6 sm:px-8 py-3 sm:py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit text-xs sm:text-xs font-medium"
+              >
+                Referral
+              </Link>
+
+            </div>
           </div>
         </div>
       </div>

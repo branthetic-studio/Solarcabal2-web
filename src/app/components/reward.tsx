@@ -13,7 +13,7 @@ const Reward = () => {
   };
 
   return (
-    <div className="relative bg-linear-to-r from-[#f94848] via-[#ff0000] to-[#f94848] py-10 sm:py-14 md:py-20 pt-16 sm:pt-20 md:pt-28 px-4 sm:px-6 md:px-10 overflow-hidden -mx-4">
+    <div className="relative bg-linear-to-r from-[#f94848] via-[#ff0000] to-[#f94848] py-10 sm:py-14 md:py-20 pt-16 sm:pt-20 md:pt-28 px-4 sm:px-6 md:px-10 overflow-hidden ">
 
       {/* Background gradient decorations */}
       <div
@@ -48,7 +48,7 @@ const Reward = () => {
           alt="Rewards"
           width={56}
           height={56}
-          className="sm:w-[60px] sm:h-[60px]"
+          className=""
         />
 
         {/* Heading */}

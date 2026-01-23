@@ -17,7 +17,7 @@ export default function Home() {
     <div className="w-full bg-[#FAFAFA]">
       <Navbar />
       <Banner />
-      <Services />
+      {/* <Services /> */}
       {/* <Category /> */}
       <Products />
       <ChooseUs />
