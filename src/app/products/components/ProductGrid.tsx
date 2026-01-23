@@ -78,8 +78,8 @@ export default function ProductGrid({
   const autoAddedRef = useRef<Record<string, boolean>>({});
 
   const [loadDetails] = useLazyQuery<GetProductDetailsResponse>(GET_PRODUCT_DETAILS, {
-  fetchPolicy: "cache-first",
-});
+    fetchPolicy: "cache-first",
+  });
 
 
   const { data, loading, error } = useQuery<GetCollectionProductsResponse>(GET_COLLECTION_PRODUCTS, {
@@ -202,14 +202,14 @@ export default function ProductGrid({
   if (error) return <div>Failed to load products.</div>;
 
   return (
-    <div className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       {items.map((item) => {
         const qty = quantityMap[item.id];
 
         return (
           <div
             key={item.id}
-            className="w-full rounded-xl p-2 shadow-sm bg-white"
+            className="rounded-xl p-1 shadow-sm bg-white"
           >
             <div className="bg-[#F3F5F7] p-3 pb-1 rounded-t-md">
               <Link href={`/products/${item.slug}`}>
@@ -250,11 +250,13 @@ export default function ProductGrid({
             </div>
 
             {/* PRODUCT INFO */}
-            <p className="text-sm text-gray-500 mt-2">{item.brand}</p>
-            <p className="font-semibold text-sm">{item.name}</p>
-            <p className="text-md font-bold mt-4">
-              {item.currencyCode} {item.priceRaw.toLocaleString()}
-            </p>
+            <div className="p-2">
+              <p className="text-sm text-gray-500 mt-2">{item.brand}</p>
+              <p className="font-semibold text-sm">{item.name}</p>
+              <p className="text-md font-bold mt-4">
+                {item.currencyCode} {item.priceRaw.toLocaleString()}
+              </p>
+            </div>
           </div>
         );
       })}

@@ -14,7 +14,7 @@ import "./home.css";
 
 export default function Home() {
   return (
-    <div className="w-full bg-[#FAFAFA] px-4">
+    <div className="w-full bg-[#FAFAFA]">
       <Navbar />
       <Banner />
       <Services />

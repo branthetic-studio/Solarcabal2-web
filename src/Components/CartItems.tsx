@@ -42,7 +42,7 @@ export default function CartItems() {
 
       {/* TITLE */}
       <div className="flex items-center justify-between mt-6">
-        <h2 className="text-lg font-semibold">
+        <h2 className="text-md font-semibold">
           Cart Items <span className="text-red-600">({lines.length})</span>
         </h2>
         <button className="text-xl">✕</button>
@@ -56,12 +56,12 @@ export default function CartItems() {
             className="w-full flex items-start gap-4 border-b-[#f3f5f7] pb-4"
           >
             {/* IMAGE */}
-            <div className="h-full bg-[#f3f5f7] p-2 w-20 rounded-lg overflow-hidden">
+            <div className="h-full bg-[#f3f5f7] rounded-lg overflow-hidden">
               <Image
                 src={
                   isLoggedIn
                     ? item?.featuredAsset?.preview ??
-                      item?.productVariant?.product?.featuredAsset?.preview
+                    item?.productVariant?.product?.featuredAsset?.preview
                     : item.image
                 }
                 alt={item.name}
@@ -72,7 +72,7 @@ export default function CartItems() {
             </div>
 
             {/* DETAILS */}
-            <div className="flex-1 w-full">
+            <div className="w-full">
               <p className=" text-xs font-semibold">{item.name}</p>
               <p className="text-neutral-500 text-xs mt-2">
                 {item.category ?? "Battery"}
@@ -84,10 +84,10 @@ export default function CartItems() {
               </p> */}
 
               {/* QUANTITY */}
-              <div className="w-full flex justify-between items-center gap-3 mt-2">
+              <div className="w-full flex justify-between items-center mt-2">
                 <div className="flex items-center rounded-full overflow-hidden">
                   <button
-                    className="h-7 w-7 flex items-center border border-[#dbdcdd] rounded-full justify-center"
+                    className="h-6 w-6 text-xs flex items-center border border-[#dbdcdd] rounded-full justify-center"
                     onClick={() =>
                       isLoggedIn
                         ? handleAdjustQuantity(item.id, item.quantity - 1)
@@ -100,7 +100,7 @@ export default function CartItems() {
                     {item.quantity}
                   </span>
                   <button
-                    className="h-7 w-7 flex items-center justify-center border border-[#dbdcdd] rounded-full"
+                    className="h-6 w-6 text-xs flex items-center justify-center border border-[#dbdcdd] rounded-full"
                     onClick={() =>
                       isLoggedIn
                         ? handleAdjustQuantity(item.id, item.quantity + 1)
@@ -113,22 +113,22 @@ export default function CartItems() {
 
                 {/* REMOVE */}
                 <button
-                  className="text-red-600 flex items-center gap-1 text-sm"
+                  className="text-red-600 flex items-center gap-1 text-xs"
                   onClick={() =>
                     isLoggedIn
                       ? handleAdjustQuantity(item.id, 0)
                       : removeItem(item.id)
                   }
                 >
-                  Remove <Trash2 size={16} />
+                  Remove <Trash2 size={12} />
                 </button>
               </div>
             </div>
 
             {/* TOTAL ON RIGHT */}
             <div className="text-right">
-              <p className="text-sm text-neutral-500">Total</p>
-              <p className="font-semibold text-sm">
+              <p className="text-xs text-neutral-500">Total</p>
+              <p className="font-semibold text-xs">
                 {money(
                   (isLoggedIn
                     ? item.unitPriceWithTax

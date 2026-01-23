@@ -14,8 +14,8 @@ const Suscribe = () => {
   return (
     <div className="bg-[#1C1C1C] py-12 md:py-16 px-4 sm:px-6 md:px-12 lg:px-20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 text-center md:text-left">
 
-      <div className="flex justify-center md:justify-start">
-        <Image src="/full logo.png" alt="Logo" width={180} height={180} />
+      <div className="">
+        <Image src="/full logo.png" alt="Logo" className="object-contain" width={180} height={180} />
       </div>
 
       <div className="pr-16">
@@ -23,7 +23,7 @@ const Suscribe = () => {
           Subscribe to our Newsletter
         </h3>
 
-        <p className="text-white text-md mb-8 max-w-2xl text-left">
+        <p className="text-sm text-gray-300 mb-8 max-w-2xl text-left">
           Subscribe to our newsletter to receive updates
         </p>
 
@@ -32,12 +32,12 @@ const Suscribe = () => {
             type="email"
             placeholder="Enter your email address"
             required
-            className="w-full sm:flex-1 px-6 py-3 rounded-full bg-white text-gray-800 placeholder-gray-500 focus:outline-none"
+            className="w-full text-sm sm:flex-1 px-6 py-3 rounded-full bg-white text-gray-800 placeholder-gray-500 focus:outline-none"
           />
 
           <button
             type="submit"
-            className="px-8 py-3 bg-[#FF0000] text-white rounded-full text-sm hover:bg-gray-900 transition"
+            className="px-8 py-3 bg-[#FF0000] text-white rounded-full text-xs hover:bg-gray-900 transition"
           >
             Subscribe
           </button>
@@ -69,6 +69,8 @@ const Suscribe = () => {
           </div>
         </div>
       </div>
+
+
       <div>
         <section className="text-white">
 
@@ -118,7 +120,7 @@ const Suscribe = () => {
                   height={30}
                 />
                 <div className="text-left leading-tight">
-                  <p className="text-xs">Download on the</p>
+                  <p className="text-xs text-gray-300">Download on the</p>
                   <p className="text-md font-semibold">App Store</p>
                 </div>
               </a>
@@ -135,8 +137,8 @@ const Suscribe = () => {
                   height={30}
                 />
                 <div className="text-left leading-tight">
-                  <p className="text-xs">Get it on</p>
-                  <p className="text-md font-semibold">Google Play</p>
+                  <p className="text-xs text-gray-300">Get it on</p>
+                  <span className="text-md font-semibold">Google Play</span>
                 </div>
               </a>
 

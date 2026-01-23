@@ -19,28 +19,43 @@ const Topbar: React.FC<Props> = ({
 
   const handleBrandClick = (brand: string) => {
     if (brand === "All") {
-      // Reset to only "All"
       onBrandChange([]);
     } else {
       if (selectedBrand.includes(brand)) {
-        // Remove brand
         onBrandChange(selectedBrand.filter((b) => b !== brand));
       } else {
-        // Add brand
         onBrandChange([...selectedBrand, brand]);
       }
     }
   };
 
   return (
-    <div className="w-full bg-[#f5f5f5] px-16">
+    <div className="w-full bg-[#f5f5f5] px-4 sm:px-8 lg:px-16">
+
       {/* Header Section */}
-      <div className="flex justify-between items-center py-4 px-0">
-        <h1 className="text-2xl font-bold text-black mb-1">Solar Panel</h1>
+      <div
+        className="
+          flex flex-col gap-4
+          md:flex-row md:items-center md:justify-between
+          py-4
+        "
+      >
+        {/* Title */}
+        <h1 className="text-xl sm:text-2xl font-bold text-black">
+          Solar Panel
+        </h1>
 
-
-        {/* Brand filter */}
-        <div className="flex gap-8 pb-4">
+        {/* Brand Filter (Scrollable on Mobile) */}
+        <div
+          className="
+            flex gap-3
+            overflow-x-auto
+            pb-2
+            md:pb-0
+            md:overflow-visible
+            scrollbar-hide
+          "
+        >
           {brands.map((brand) => {
             const isSelected =
               brand === "All"
@@ -51,10 +66,21 @@ const Topbar: React.FC<Props> = ({
               <button
                 key={brand}
                 onClick={() => handleBrandClick(brand)}
-                className={`px-6 py-3 rounded-md text-sm font-medium border transition-colors ${isSelected
-                  ? "bg-none border-none text-black"
-                  : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                  }`}
+                className={`
+                  whitespace-nowrap
+                  px-4 sm:px-5
+                  py-2
+                  rounded-md
+                  text-xs sm:text-sm
+                  font-medium
+                  border
+                  transition-colors
+                  ${
+                    isSelected
+                      ? "bg-black text-white border-black"
+                      : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                  }
+                `}
               >
                 {brand}
               </button>
@@ -62,11 +88,24 @@ const Topbar: React.FC<Props> = ({
           })}
         </div>
 
+        {/* Sort */}
+        <div className="flex items-center gap-2 justify-between sm:justify-start">
+          <span className="text-gray-700 text-sm font-medium whitespace-nowrap">
+            Sort By:
+          </span>
 
-        <div className="flex items-center gap-2">
-          <span className="text-gray-700 text-sm font-medium">Sort By:</span>
           <select
-            className="border border-gray-300 rounded px-4 py-2 text-sm bg-white min-w-40 focus:outline-none focus:border-gray-400"
+            className="
+              border border-gray-300
+              rounded
+              px-3 sm:px-4
+              py-2
+              text-sm
+              bg-white
+              w-full sm:w-auto sm:min-w-40
+              focus:outline-none
+              focus:border-gray-400
+            "
             value={sortOrder}
             onChange={(e) => onSortChange(e.target.value)}
           >
@@ -78,7 +117,6 @@ const Topbar: React.FC<Props> = ({
           </select>
         </div>
       </div>
-
     </div>
   );
 };
