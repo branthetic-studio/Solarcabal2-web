@@ -87,7 +87,7 @@ const Page = () => {
         </div>
         <CartItems />
       </div>
-      {/* <Refer /> */}
+     
       <Suscribe />
       <Footer />
     </div>
