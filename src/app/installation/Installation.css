@@ -218,7 +218,7 @@
 .package-sidebar {
   /* width: 200px; */
   display: flex;
-  flex: 1.2;
+  flex: 1;
   flex-direction: column;
   gap: 20px;
   padding: 20px;
@@ -242,7 +242,7 @@
 }
 
 .package-cart{
-  flex: 1.2;
+  flex: 1.4;
 }
 
 .package-header {

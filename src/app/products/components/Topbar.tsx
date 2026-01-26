@@ -77,7 +77,7 @@ const Topbar: React.FC<Props> = ({
                   transition-colors
                   ${
                     isSelected
-                      ? "bg-black text-white border-black"
+                      ? " text-[#ff0000] border-0"
                       : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
                   }
                 `}

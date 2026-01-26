@@ -7,7 +7,7 @@ import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import ProductGrid from "./components/ProductGrid";
 import Suscribe from "@/Components/Suscribe/Suscribe";
-import "./Product.css";
+// import "./Product.css";
 import CartItems from "@/Components/CartItems";
 
 
@@ -52,31 +52,32 @@ const Page = () => {
         sortOrder={sortOrder}
         onSortChange={setSortOrder}
       />
-      <div className="products-page px-3 sm:px-6 md:px-10 lg:px-12 pb-10">
+      <div className="flex bg-[#f5f5f5] px-3 sm:px-6 md:px-10 lg:px-12 pb-10">
         {/* Sidebar */}
-        <Sidebar
-          selectedCategorySlug={selectedCategorySlug}
-          onCategorySelect={(slug: string, brand?: string) => {
-            setSelectedCategorySlug(slug);
-            setSelectedBrand(brand ? [brand] : []);
-          }}
-          condition={condition}
-          setCondition={setCondition}
-          priceRange={priceRange}
-          setPriceRange={setPriceRange}
-          brand={selectedBrand}
-          setBrand={setSelectedBrand}
-          sort={sortOrder}
-          setSort={setSortOrder}
-          categoriesFromApi={categoriesFromApi}
-          minPrice={minPrice}
-          maxPrice={maxPrice}
-        />
+        <div className="product-sidebar">
+          <Sidebar
+            selectedCategorySlug={selectedCategorySlug}
+            onCategorySelect={(slug: string, brand?: string) => {
+              setSelectedCategorySlug(slug);
+              setSelectedBrand(brand ? [brand] : []);
+            }}
+            condition={condition}
+            setCondition={setCondition}
+            priceRange={priceRange}
+            setPriceRange={setPriceRange}
+            brand={selectedBrand}
+            setBrand={setSelectedBrand}
+            sort={sortOrder}
+            setSort={setSortOrder}
+            categoriesFromApi={categoriesFromApi}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+
+          />
+        </div>
 
         {/* Main content */}
-        <div className="main">
-
-
+        <div className="flex gap-8 p-6">
           <ProductGrid
             categorySlug={selectedCategorySlug}
             brand={selectedBrand.length === 0 ? null : selectedBrand}
@@ -85,10 +86,15 @@ const Page = () => {
             priceRange={priceRange}
           />
         </div>
-        <CartItems />
+        <div className="product-cart">
+          <CartItems />
+        </div>
       </div>
-     
-      <Suscribe />
+
+      <div className="">
+        <Suscribe />
+      </div>
+
       <Footer />
     </div>
   );

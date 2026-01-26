@@ -12,7 +12,7 @@ import { TbBrandX } from "react-icons/tb";
 const Suscribe = () => {
   const [checked, setChecked] = useState(false);
   return (
-    <div className="bg-[#1C1C1C] py-12 md:py-16 px-4 sm:px-6 md:px-12 lg:px-20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 text-center md:text-left">
+    <div className="bg-[#1C1C1C] w-full py-12 md:py-16 px-4 sm:px-6 md:px-12 lg:px-20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 text-center md:text-left">
 
       <div className="">
         <Image src="/full logo.png" alt="Logo" className="object-contain" width={180} height={180} />
