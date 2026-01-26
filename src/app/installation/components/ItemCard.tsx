@@ -14,12 +14,15 @@ interface Props {
 
 const ItemCard: React.FC<Props> = ({ item }) => {
   return (
-    <div className="item-card">
-      <div className='item-img'>
-        <img src={item.img} alt={item.name} />
+    <div className="my-4">
+      <div className='flex gap-3 items-center'>
+        <div className='flex-1'>
+          <p className="text-xs">{item.name}</p>
+          <p className="text-xs">{item.desc}</p>
+        </div>
+        <img src={item.img} alt={item.name} className='flex-1' width={12} height={12}/>
       </div>
-      <p className="item-title">{item.name}</p>
-      <p className="item-desc">{item.desc}</p>
+
     </div>
   );
 };

@@ -3,10 +3,13 @@ import React, { useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import { gql } from "@apollo/client";
 import PackageCard from "./PackageCard";
+import { Search } from "lucide-react";
 import {
   GetTopLevelCollectionsResponse,
   GetCollectionProductsResponse,
 } from "@/types/catalog";
+import CartItems from "@/Components/CartItems";
+import { ChevronRight } from "lucide-react";
 
 // ================== QUERIES ==================
 
@@ -91,40 +94,53 @@ const PackageList: React.FC = () => {
   return (
     <div className="package-container flex">
       {/* Sidebar Categories */}
-      <div className="package-sidebar w-1/4 ">
+      <div className="package-sidebar">
+        <h1 className="text-lg font-semibold">Installation Package</h1>
+        {/* Search */}
+        <div className="relative mb-4">
+          <div className="absolute top-[50%] left-3 transform -translate-y-1/2">
+            <Search className="text-[#e0e0e0]" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search for categories"
+            className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded-full px-12 py-2 text-sm focus:outline-none"
+          />
+
+        </div>
+
         {categories.map((cat: any) => (
           <button
             key={cat.id}
-            className={`
-            relative py-10
-            bg-[url('/btnpanel.png')] bg-no-repeat bg-cover bg-center
-            text-left font-semibold text-xl block px-8 rounded-[6px]
-            transition-[opacity,transform] hover:opacity-90 active:scale-[0.99]
-            ${
-              selectedSlug === cat.slug
-                ? ""
-                : "ring-1 ring-gray-200"
-            }
-          `}
             onClick={() => setSelectedSlug(cat.slug)}
-          >
-            <span
-              className={`
-              absolute inset-0 rounded-[6px]
-              ${
-                selectedSlug === cat.slug
-                  ? "bg-linear-to-b from-red-900/60 to-red-500/80"
-                  : "bg-linear-to-t from-black/100 to-black-500/80"
+            className={`
+        w-full flex items-center justify-between border-b border-[#f5f5f5]
+        px-4 py-2 text-left text-sm
+        transition
+        ${selectedSlug === cat.slug
+                ? " text-red-600 font-semibold"
+                : "hover:bg-gray-100 text-gray-700"
               }
-            `}
-            />
-            <span className="relative z-10 text-white">{cat.name}</span>
+      `}
+          >
+            <span>{cat.name}</span>
+
+            <ChevronRight size={20} />
           </button>
         ))}
       </div>
 
+
       {/* Products */}
       <div className="package-main">
+
+        {/* Header */}
+        {selectedSlug && (
+          <h2 className="text-md font-semibold mb-6 text-red-600 border-b pb-2 border-[#e0e0e0]">
+            {selectedSlug.replace("-", " ")} package
+          </h2>
+        )}
+
         {!selectedSlug && (
           <p className="text-gray-500">
             Select a category to view available products.
@@ -134,32 +150,42 @@ const PackageList: React.FC = () => {
         {productsLoading && <p>Loading products...</p>}
         {productsError && <p>Error loading products.</p>}
 
-        {productsData?.search.items.map((product: any, idx: number) => {
-          const price =
-            product.priceWithTax.__typename === "SinglePrice"
-              ? `${product.priceWithTax.value}`
-              : `${product.priceWithTax.min} - ${product.priceWithTax.max}`;
+        {/* Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-          return (
-            <PackageCard
-              key={idx}
-              option={{
-                title: product.productName,
-                price,
-                features: [product.currencyCode],
-                items: [
-                  {
-                    name: product.productName,
-                    desc: product.slug,
-                    img: product.productAsset?.preview ?? "",
-                  },
-                ],
-              }}
-              collectionSlug={selectedSlug ?? undefined}
-            />
-          );
-        })}
+          {productsData?.search.items.map((product: any, idx: number) => {
+            const price =
+              product.priceWithTax.__typename === "SinglePrice"
+                ? `${product.priceWithTax.value}`
+                : `${product.priceWithTax.min} - ${product.priceWithTax.max}`;
+
+            return (
+              <PackageCard
+                key={idx}
+                option={{
+                  title: product.productName,
+                  price,
+                  features: [product.currencyCode],
+                  items: [
+                    {
+                      name: product.productName,
+                      desc: product.slug,
+                      img: product.productAsset?.preview ?? "",
+                    },
+                  ],
+                }}
+                collectionSlug={selectedSlug ?? undefined}
+              />
+            );
+          })}
+
+        </div>
       </div>
+
+      <div className="flex-2 package-cart">
+        <CartItems />
+      </div>
+
     </div>
   );
 };
