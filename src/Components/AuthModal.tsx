@@ -12,6 +12,8 @@ import { useUser } from "@/context/UserContext";
 import { GET_ACTIVE_ORDER, GET_CURRENT_USER } from "@/graphql/queries";
 import { MdEmail } from "react-icons/md";
 import { FaGoogle } from "react-icons/fa";
+import { signIn } from "next-auth/react";
+
 
 // --- GraphQL Mutations (Register only here) ---
 const REGISTER_MUTATION: TypedDocumentNode<
@@ -143,8 +145,8 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
             <button
               onClick={() => setActiveTab("login")}
               className={`flex-1 py-2 text-center ${activeTab === "login"
-                  ? "border-b border-[#3C3C3C] font-semibold"
-                  : "text-gray-500"
+                ? "border-b border-[#3C3C3C] font-semibold"
+                : "text-gray-500"
                 }`}
             >
               Log in
@@ -152,8 +154,8 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
             <button
               onClick={() => setActiveTab("register")}
               className={`flex-1 py-2 text-center ${activeTab === "register"
-                  ? "border-b border-black font-light"
-                  : "text-gray-500"
+                ? "border-b border-black font-light"
+                : "text-gray-500"
                 }`}
             >
               Create Account
@@ -333,16 +335,18 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  className="flex-1 flex items-center text-sm justify-center gap-2 rounded-lg border py-1"
+                  className="flex-1 flex items-center text-xs justify-center gap-2 rounded-lg border py-2 bg-black text-white"
                 >
                   <MdEmail /> Email
                 </button>
                 <button
                   type="button"
-                  className="flex-1 flex items-center test-sm justify-center gap-2 rounded-lg border py-1"
+                  onClick={() => signIn("google")}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-2 cursor-pointer text-xs"
                 >
-                  <FaGoogle /> Google
+                  <FaGoogle /> Continue with Google
                 </button>
+
               </div>
 
               {/* Switch link */}
