@@ -5,22 +5,20 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useApolloClient } from "@apollo/client/react";
 import { gql, TypedDocumentNode } from "@apollo/client";
 import { useMutation } from "@apollo/client/react";
-import Link from "next/link";
 import { X, Eye, EyeOff } from "lucide-react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useUser } from "@/context/UserContext";
-import { GET_ACTIVE_ORDER, GET_CURRENT_USER } from "@/graphql/queries";
+import { GET_ACTIVE_ORDER } from "@/graphql/queries";
 import { MdEmail } from "react-icons/md";
 import { FaGoogle } from "react-icons/fa";
 import { signIn } from "next-auth/react";
-
 
 // --- GraphQL Mutations (Register only here) ---
 const REGISTER_MUTATION: TypedDocumentNode<
   {
     registerCustomerAccount:
-    | { __typename: "Success"; success: boolean }
-    | { __typename: "ErrorResult"; errorCode: string; message: string };
+      | { __typename: "Success"; success: boolean }
+      | { __typename: "ErrorResult"; errorCode: string; message: string };
   },
   {
     input: {
@@ -49,13 +47,14 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
   const { login, loading: userLoading, me } = useUser();
 
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"login" | "register">("register");
+  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
 
   // --- Login form state ---
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginErr, setLoginErr] = useState<string | null>(null);
   const [loginSubmitting, setLoginSubmitting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true); // ✅ Keep me logged in
 
   // --- Register form state ---
   const [registerForm, setRegisterForm] = useState({
@@ -70,11 +69,9 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
     { loading: registerLoading, error: registerError, data: registerData },
   ] = useMutation(REGISTER_MUTATION);
 
-  // Close modal if already logged in (e.g., after a successful login)
+  // Close modal automatically on successful login
   useEffect(() => {
-    if (me && open) {
-      setOpen(false);
-    }
+    if (me && open) setOpen(false);
   }, [me, open]);
 
   // --- Handlers ---
@@ -83,12 +80,12 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
     setLoginErr(null);
     setLoginSubmitting(true);
     try {
-      await login(loginForm.email, loginForm.password, true);
-      // Ensure cart & user are fresh in cache after login
+      await login(loginForm.email, loginForm.password, rememberMe);
+
+      // Refetch cart & user after login
       await apollo.refetchQueries({
-        include: [GET_CURRENT_USER, GET_ACTIVE_ORDER],
+        include: [GET_ACTIVE_ORDER],
       });
-      // The `me` effect will close the modal
     } catch (err: any) {
       setLoginErr(err?.message ?? "Login failed");
     } finally {
@@ -111,9 +108,6 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
         },
       },
     });
-    // After success, do NOT auto-login (Vendure typical flow requires email verify).
-    // You can optionally toggle to login tab:
-    // if (registerData?.registerCustomerAccount?.__typename === "Success") setActiveTab("login");
   };
 
   return (
@@ -144,19 +138,21 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
           <div className="flex mb-6 border-b">
             <button
               onClick={() => setActiveTab("login")}
-              className={`flex-1 py-2 text-center ${activeTab === "login"
-                ? "border-b border-[#3C3C3C] font-semibold"
-                : "text-gray-500"
-                }`}
+              className={`flex-1 py-2 text-center ${
+                activeTab === "login"
+                  ? "border-b border-[#3C3C3C] font-semibold"
+                  : "text-gray-500"
+              }`}
             >
               Log in
             </button>
             <button
               onClick={() => setActiveTab("register")}
-              className={`flex-1 py-2 text-center ${activeTab === "register"
-                ? "border-b border-black font-light"
-                : "text-gray-500"
-                }`}
+              className={`flex-1 py-2 text-center ${
+                activeTab === "register"
+                  ? "border-b border-black font-light"
+                  : "text-gray-500"
+              }`}
             >
               Create Account
             </button>
@@ -186,41 +182,32 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                   className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none"
                   required
                 />
-                <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={registerForm.agree}
-                      onChange={(e) =>
-                        setRegisterForm({
-                          ...registerForm,
-                          agree: e.target.checked,
-                        })
-                      }
-                      className="mr-2"
-                    />
-                    Keep me logged in
-                  </label>
-
-                  <a
-                    href="/forgot-password"
-                    className="text-red-600 hover:underline font-medium"
-                  >
-                    Forgot password?
-                  </a>
-                </div>
                 <button
                   type="button"
                   onClick={() => setShowLoginPassword(!showLoginPassword)}
                   className="absolute right-3 top-3 text-gray-500"
                 >
-                  {showLoginPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
+                  {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
+
+              {/* Keep me logged in */}
+              <label className="flex items-center text-sm">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="mr-2"
+                />
+                Keep me logged in
+              </label>
+
+              <a
+                href="/forgot-password"
+                className="text-red-600 hover:underline font-medium text-sm"
+              >
+                Forgot password?
+              </a>
 
               <button
                 type="submit"
@@ -230,8 +217,6 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                 {loginSubmitting || userLoading ? "Logging in..." : "Sign in"}
               </button>
               {loginErr && <p className="text-red-500">{loginErr}</p>}
-              {/* You can also render a subtle success message once me is set */}
-              {/* {me && <p className="text-green-600">✅ Welcome {me.identifier}</p>} */}
             </form>
           )}
 
@@ -264,10 +249,7 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                   placeholder="Password"
                   value={registerForm.password}
                   onChange={(e) =>
-                    setRegisterForm({
-                      ...registerForm,
-                      password: e.target.value,
-                    })
+                    setRegisterForm({ ...registerForm, password: e.target.value })
                   }
                   className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none"
                   required
@@ -277,11 +259,7 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                   onClick={() => setShowRegisterPassword(!showRegisterPassword)}
                   className="absolute right-3 top-3 text-gray-500"
                 >
-                  {showRegisterPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
+                  {showRegisterPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
 
@@ -291,10 +269,7 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                   type="checkbox"
                   checked={registerForm.agree}
                   onChange={(e) =>
-                    setRegisterForm({
-                      ...registerForm,
-                      agree: e.target.checked,
-                    })
+                    setRegisterForm({ ...registerForm, agree: e.target.checked })
                   }
                   className="mr-2"
                 />
@@ -311,42 +286,34 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
               >
                 {registerLoading ? "Creating..." : "Create an Account"}
               </button>
-
-              {registerError && (
-                <p className="text-red-500">{registerError.message}</p>
+              {registerError && <p className="text-red-500">{registerError.message}</p>}
+              {registerData?.registerCustomerAccount?.__typename === "Success" && (
+                <p className="text-green-600">
+                  ✅ Registered! Please check your email to verify your account.
+                </p>
               )}
-              {registerData?.registerCustomerAccount?.__typename ===
-                "Success" && (
-                  <p className="text-green-600">
-                    ✅ Registered! Please check your email to verify your account.
-                  </p>
-                )}
 
-              {/* Divider */}
+              {/* Social login */}
               <div className="flex items-center my-2">
                 <div className="flex-1 border-t" />
-                <span className="px-2 text-gray-500 text-sm">
-                  Or Sign Up with
-                </span>
+                <span className="px-2 text-gray-500 text-sm">Or Sign Up with</span>
                 <div className="flex-1 border-t" />
               </div>
 
-              {/* Social buttons (placeholders) */}
               <div className="flex gap-3">
                 <button
                   type="button"
-                  className="flex-1 flex items-center text-xs justify-center gap-2 rounded-lg border py-2 bg-black text-white"
+                  className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-2 bg-black text-white text-xs"
                 >
                   <MdEmail /> Email
                 </button>
                 <button
                   type="button"
                   onClick={() => signIn("google")}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-2 cursor-pointer text-xs"
+                  className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-2 text-xs"
                 >
                   <FaGoogle /> Continue with Google
                 </button>
-
               </div>
 
               {/* Switch link */}
