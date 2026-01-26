@@ -280,37 +280,37 @@ export default function CartPage() {
                             >
                               Remove <Trash2 className="h-4 w-4" />
                             </button>
-                             <div className="mt-3 sm:mt-4 flex items-center gap-3">
-                          <div className="flex items-center overflow-hidden">
-                            <button
-                              onClick={() =>
-                                updateQuantity(
-                                  line.id,
-                                  Math.max(0, (line.quantity ?? 1) - 1)
-                                )
-                              }
-                              className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
-                              aria-label="Decrease"
-                            >
-                              −
-                            </button>
-                            <span className="w-8 text-center text-[13px] font-medium">
-                              {line.quantity}
-                            </span>
-                            <button
-                              onClick={() =>
-                                updateQuantity(
-                                  line.id,
-                                  (line.quantity ?? 1) + 1
-                                )
-                              }
-                              className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
-                              aria-label="Increase"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
+                            <div className="mt-3 sm:mt-4 flex items-center gap-3">
+                              <div className="flex items-center overflow-hidden">
+                                <button
+                                  onClick={() =>
+                                    updateQuantity(
+                                      line.id,
+                                      Math.max(0, (line.quantity ?? 1) - 1)
+                                    )
+                                  }
+                                  className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
+                                  aria-label="Decrease"
+                                >
+                                  −
+                                </button>
+                                <span className="w-8 text-center text-[13px] font-medium">
+                                  {line.quantity}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    updateQuantity(
+                                      line.id,
+                                      (line.quantity ?? 1) + 1
+                                    )
+                                  }
+                                  className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
+                                  aria-label="Increase"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
                             <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
                               <span className="mr-1 text-xs">Total</span>
                               <span className="font-semibold text-neutral-900">
@@ -325,7 +325,7 @@ export default function CartPage() {
                         </div>
 
                         {/* Qty control */}
-                       
+
                       </div>
                     </div>
                   </li>

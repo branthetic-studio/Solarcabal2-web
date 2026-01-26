@@ -15,6 +15,8 @@ import {
   Circle,
   Minus,
   Plus,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 
 type Category = {
@@ -100,21 +102,19 @@ const Sidebar: React.FC<SidebarProps> = ({
               {/* Icon + Label */}
               <div className="flex items-center gap-2">
                 <span
-                  className={`${
-                    selectedCategorySlug === cat.slug
-                      ? "text-red-600"
-                      : "text-neutral-600"
-                  }`}
+                  className={`${selectedCategorySlug === cat.slug
+                    ? "text-red-600"
+                    : "text-neutral-600"
+                    }`}
                 >
                   {cat.icon ?? <PackageSearch size={18} />}
                 </span>
 
                 <span
-                  className={`text-sm font-medium ${
-                    selectedCategorySlug === cat.slug
-                      ? "text-red-600"
-                      : "text-neutral-700"
-                  }`}
+                  className={`text-sm font-medium ${selectedCategorySlug === cat.slug
+                    ? "text-red-600"
+                    : "text-neutral-700"
+                    }`}
                 >
                   {cat.name}
                 </span>
@@ -123,9 +123,9 @@ const Sidebar: React.FC<SidebarProps> = ({
               {/* Toggle Symbol */}
               <span className="text-neutral-600">
                 {openCategory === cat.slug ? (
-                  <Minus className="h-4 w-4" />
+                  <ChevronUp className="h-4 w-4" />
                 ) : (
-                  <Plus className="h-4 w-4" />
+                  <ChevronDown className="h-4 w-4" />
                 )}
               </span>
             </div>
@@ -190,13 +190,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div
           className="absolute h-2 bg-red-500 rounded"
           style={{
-            left: `${
-              ((priceRange[0] - minPrice) / (maxPrice - minPrice)) * 100
-            }%`,
-            right: `${
-              100 -
+            left: `${((priceRange[0] - minPrice) / (maxPrice - minPrice)) * 100
+              }%`,
+            right: `${100 -
               ((priceRange[1] - minPrice) / (maxPrice - minPrice)) * 100
-            }%`,
+              }%`,
           }}
         />
 
