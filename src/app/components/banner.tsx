@@ -56,7 +56,7 @@ const Banner = () => {
       <div className="w-full flex flex-col lg:flex-row gap-4 md:gap-6 py-6 md:py-8 px-4 md:px-8 lg:px-12 mx-auto items-stretch">
 
         {/* Sidebar Categories */}
-        <aside className="hidden lg:flex w-72 flex-shrink-0">
+        <aside className="hidden lg:flex w-72 shrink-0">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 w-full">
             <nav className="space-y-1">
               {categories.map((category) => {

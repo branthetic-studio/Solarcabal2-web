@@ -328,7 +328,7 @@ const ProductDetailsPage = () => {
                   <button
                     key={index}
                     onClick={() => setSelectedImage(index)}
-                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 p-2 ${selectedImage === index
+                    className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 p-2 ${selectedImage === index
                       ? "border-[#00AAFF]"
                       : "border-gray-200"
                       }`}

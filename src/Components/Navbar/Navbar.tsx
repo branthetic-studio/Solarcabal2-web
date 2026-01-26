@@ -40,7 +40,7 @@ const Navbar = () => {
       <nav className="w-full flex items-center justify-center py-6 bg-[#FAFAFA]">
         <div className="w-full flex items-center justify-between gap- bg-white px-5 mx-12 py-3.5">
           {/* Logo */}
-          <Link href="/" className="flex-shrink-0">
+          <Link href="/" className="shrink-0">
             <Image
               src="/solarcabal.png"
               alt="Company Logo"
