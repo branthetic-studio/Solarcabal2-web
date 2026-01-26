@@ -17,8 +17,8 @@ import { FaGoogle } from "react-icons/fa";
 const REGISTER_MUTATION: TypedDocumentNode<
   {
     registerCustomerAccount:
-      | { __typename: "Success"; success: boolean }
-      | { __typename: "ErrorResult"; errorCode: string; message: string };
+    | { __typename: "Success"; success: boolean }
+    | { __typename: "ErrorResult"; errorCode: string; message: string };
   },
   {
     input: {
@@ -142,21 +142,19 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
           <div className="flex mb-6 border-b">
             <button
               onClick={() => setActiveTab("login")}
-              className={`flex-1 py-2 text-center ${
-                activeTab === "login"
-                  ? "border-b-1 border-[#3C3C3C] font-semibold"
+              className={`flex-1 py-2 text-center ${activeTab === "login"
+                  ? "border-b border-[#3C3C3C] font-semibold"
                   : "text-gray-500"
-              }`}
+                }`}
             >
               Log in
             </button>
             <button
               onClick={() => setActiveTab("register")}
-              className={`flex-1 py-2 text-center ${
-                activeTab === "register"
-                  ? "border-b-1 border-black font-light"
+              className={`flex-1 py-2 text-center ${activeTab === "register"
+                  ? "border-b border-black font-light"
                   : "text-gray-500"
-              }`}
+                }`}
             >
               Create Account
             </button>
@@ -317,10 +315,10 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
               )}
               {registerData?.registerCustomerAccount?.__typename ===
                 "Success" && (
-                <p className="text-green-600">
-                  ✅ Registered! Please check your email to verify your account.
-                </p>
-              )}
+                  <p className="text-green-600">
+                    ✅ Registered! Please check your email to verify your account.
+                  </p>
+                )}
 
               {/* Divider */}
               <div className="flex items-center my-2">

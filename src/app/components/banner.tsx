@@ -112,7 +112,7 @@ const Banner = () => {
                 href="/products"
                 className="inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit text-xs sm:text-xs font-medium"
               >
-                Shop Now
+                Products
               </Link>
               <Link
                 href="/installation"
