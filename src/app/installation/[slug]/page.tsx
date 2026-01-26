@@ -7,6 +7,13 @@ import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
 import Navbar from "@/Components/Navbar/Navbar";
 import Footer from "@/Components/Footer/Footer";
+import Suscribe from "@/Components/Suscribe/Suscribe";
+import InstallProduct from "../components/PackageList";
+import solarPanelImage from "../../../Assets/sunvec (1).png";
+import hardwarelImage from "../../../Assets/Vector (1).png";
+import systemImage from "../../../Assets/Vector (2).png";
+import safetyImage from "../../../Assets/Vector (3).png";
+import "../Installation.css";
 
 // If you already have a query in queries.ts, you can delete this and import yours.
 // This returns products in a collection/category by slug.
@@ -299,29 +306,30 @@ export default function InstallationListingPage() {
         </section>
 
         {/* What's included */}
-        <section className="mx-auto max-w-6xl px-4 pb-10">
-          <p className="text-sm font-semibold text-neutral-800 mb-3">
-            What’s included
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { label: "Solar Panels" },
-              { label: "Mounting Hardware" },
-              { label: "System Testing" },
-              { label: "Safety Inspection" },
-            ].map((f) => (
-              <div
-                key={f.label}
-                className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700"
-              >
-                {f.label}
-              </div>
-            ))}
+        <div className="installation-info">
+          <h3>What&apos;s Included</h3>
+          <div className="included-items">
+            <div className="item">
+              <Image src={solarPanelImage} alt="" />
+              <h4>Solar Panels</h4>
+            </div>
+            <div className="item">
+              <Image src={hardwarelImage} alt="" />
+              <h4>Mounting Hardware</h4>
+            </div>
+            <div className="item">
+              <Image src={systemImage} alt="" />
+              <h4>System Testing</h4>
+            </div>
+            <div className="item">
+              <Image src={safetyImage} alt="" />
+              <h4>Safety Inspections</h4>
+            </div>
           </div>
-        </section>
+        </div>
 
         {/* CTA */}
-        <section className="bg-neutral-900">
+        {/* <section className="bg-neutral-900">
           <div className="mx-auto max-w-6xl px-4 py-10 md:py-14 text-center">
             <h2 className="text-white text-xl md:text-2xl font-semibold">
               Ready to Go Solar?
@@ -341,7 +349,9 @@ export default function InstallationListingPage() {
               </button>
             </div>
           </div>
-        </section>
+        </section> */}
+
+        <Suscribe />
 
         {/* Footer space handled by your global layout/footer */}
       </main>
