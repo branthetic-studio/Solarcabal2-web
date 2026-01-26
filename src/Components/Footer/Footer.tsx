@@ -25,10 +25,10 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold text-lg mb-4">Need Help?</h3>
             <ul className="space-y-2 text-sm text-gray-300">
-              <li><a href="#" className="hover:text-red-500">FAQs</a></li>
+              <li><a href="/faq" className="hover:text-red-500">FAQs</a></li>
               <li><a href="#" className="hover:text-red-500">Shipping & Returns</a></li>
-              <li><a href="#" className="hover:text-red-500">Products</a></li>
-              <li><a href="#" className="hover:text-red-500">Contact Us</a></li>
+              <li><a href="/products" className="hover:text-red-500">Products</a></li>
+              <li><a href="/enquiries" className="hover:text-red-500">Contact Us</a></li>
             </ul>
           </div>
 
@@ -51,7 +51,7 @@ const Footer = () => {
             <h3 className="font-semibold text-lg mb-4">Useful Links</h3>
             <ul className="space-y-2 text-sm text-gray-300">
               <li><a href="#" className="hover:text-red-500">Shipping & Returns</a></li>
-              <li><a href="#" className="hover:text-red-500">Products</a></li>
+              <li><a href="/products" className="hover:text-red-500">Products</a></li>
               <li><a href="#" className="hover:text-red-500">Warranty Information</a></li>
               <li><a href="#" className="hover:text-red-500">Track Your Order</a></li>
               <li><a href="#" className="hover:text-red-500">Gallery</a></li>
@@ -62,7 +62,7 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold text-lg mb-4">Earn Money with Solarcabal</h3>
             <ul className="space-y-2 text-sm text-gray-300 mb-4">
-              <li><a href="#" className="hover:text-red-500">Referral</a></li>
+              <li><a href="/referral" className="hover:text-red-500">Referral</a></li>
               <li><a href="#" className="hover:text-red-500">Sell on Solarcabal</a></li>
             </ul>
 
@@ -86,7 +86,7 @@ const Footer = () => {
         <div className="border-t border-gray-700 my-6"></div>
 
         {/* Bottom Section */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-3 md:gap-6 px-4 md:px-0 pb-8 pt-2 text-center md:text-left">
+        <div className="flex flex-col md:flex-row justify-between items-center w-[40%] mx-auto gap-3 md:gap-6 px-4 md:px-0 pb-8 pt-2 text-center md:text-left">
 
 
           {/* Copyright */}
