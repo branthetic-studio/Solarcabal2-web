@@ -4,6 +4,7 @@ import './Faq.css';
 import Navbar from '../../Components/Navbar/Navbar';
 import Footer from '../../Components/Footer/Footer';
 import Refer from '../../Components/Suscribe/Suscribe';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 
 type AccordionItemProps = {
@@ -21,7 +22,7 @@ const AccordionItem = ({ title, content, isOpen, onClick }: AccordionItemProps) 
       <div className='accordian-flex'>
         <span className="">{title}</span>
 
-        <span className="arrow">{isOpen ? 'x' : '+'}</span>
+        <span className="arrow">{isOpen ? <ChevronUp /> : <ChevronDown />}</span>
       </div>
     </button>
     {isOpen && <div className="accordion-content">{content}</div>}

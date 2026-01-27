@@ -52,9 +52,9 @@ const Page = () => {
         sortOrder={sortOrder}
         onSortChange={setSortOrder}
       />
-      <div className="flex bg-[#f5f5f5] px-3 sm:px-6 md:px-10 lg:px-12 pb-10">
+      <div className="flex flex-col md:flex-row bg-[#f5f5f5] px-3 sm:px-6 md:px-10 lg:px-12 pb-10">
         {/* Sidebar */}
-        <div className="product-sidebar">
+        <div className="flex-1">
           <Sidebar
             selectedCategorySlug={selectedCategorySlug}
             onCategorySelect={(slug: string, brand?: string) => {
