@@ -442,7 +442,7 @@ function BrandDot({ className }: any) {
 function InfoRow({ icon, title, text }: InfoRowProps) {
   return (
     <div className="flex items-center gap-3 border-b border-[#f0f0f0] pb-2">
-      <div className="w-6 h-6 flex-shrink-0">
+      <div className="w-6 h-6 flex-0">
         {icon}
       </div>
       <div>
