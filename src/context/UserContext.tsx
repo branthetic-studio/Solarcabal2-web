@@ -32,15 +32,13 @@ const Ctx = createContext<UserCtx>({
 export const useUser = () => useContext(Ctx);
 
 const UserProvider = ({ children }: { children: React.ReactNode }) => {
-  const { data, loading, refetch } = useQuery<GetCurrentUserData>(
-    GET_CURRENT_USER,
-    {
-      fetchPolicy: "cache-and-network",
-    }
-  );
+  const { data, loading, refetch } = useQuery<GetCurrentUserData>(GET_CURRENT_USER, {
+    fetchPolicy: "network-only", // always fetch fresh user data
+  });
+
+  const [isActing, setIsActing] = useState(false);
 
   const [loginMut] = useMutation<LoginData, LoginVars>(LOGIN, {
-    // refresh me/activeCustomer after login
     refetchQueries: [{ query: GET_CURRENT_USER }],
     awaitRefetchQueries: true,
   });
@@ -50,24 +48,20 @@ const UserProvider = ({ children }: { children: React.ReactNode }) => {
     awaitRefetchQueries: true,
   });
 
-  const [isActing, setIsActing] = useState(false);
-
-  const login = async (
-    username: string,
-    password: string,
-    rememberMe = true
-  ) => {
+  const login = async (username: string, password: string, rememberMe = true) => {
     setIsActing(true);
     try {
       const res = await loginMut({
         variables: { username, password, rememberMe },
+        context: { fetchOptions: { credentials: "include" } }, // ✅ important for cookies
       });
+
       const payload: any = res.data?.login;
       if (payload?.errorCode) {
         throw new Error(payload?.message ?? "Login failed");
       }
-      // At this point, Vendure has set the session cookie
-      // GET_CURRENT_USER is refetched by the mutation config
+
+      // user data is refetched automatically via refetchQueries
     } finally {
       setIsActing(false);
     }
@@ -76,8 +70,8 @@ const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     setIsActing(true);
     try {
-      await logoutMut();
-      await refetch(); // makes sure UI sees null user
+      await logoutMut({ context: { fetchOptions: { credentials: "include" } } });
+      await refetch();
     } finally {
       setIsActing(false);
     }

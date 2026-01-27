@@ -1,19 +1,25 @@
-import { ApolloClient, InMemoryCache, HttpLink, ApolloLink, concat } from "@apollo/client";
+import {
+  ApolloClient,
+  InMemoryCache,
+  HttpLink,
+  ApolloLink,
+  concat,
+} from "@apollo/client";
 
-// ✅ Replace with your actual backend GraphQL endpoint
+// Make sure cookies are included
 const httpLink = new HttpLink({
-  uri: "/api/graphql-proxy", 
+  uri: "/api/graphql-proxy",
+  credentials: "include", 
 });
 
-// ✅ Middleware to add Authorization header
 const authMiddleware = new ApolloLink((operation, forward) => {
-  // Get token from localStorage (or cookies, depending on your setup)
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   operation.setContext(({ headers = {} }) => ({
     headers: {
       ...headers,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}), // ✅ only add if token exists
+      ...(token ? { Authorization: `Bearer ${token}` } : {}), // only add if token exists
     },
   }));
 

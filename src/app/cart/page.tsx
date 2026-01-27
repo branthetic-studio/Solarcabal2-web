@@ -100,7 +100,7 @@ export default function CartPage() {
   return (
     <main className="w-full">
       <Navbar />
-      <div className="w-full">
+      <div className="w-full px-18">
 
         {/* Title row */}
         <div className="flex items-center justify-between">
@@ -464,9 +464,10 @@ export default function CartPage() {
             </button>
           </aside>
         </div>
-        <Suscribe />
-        <Footer />
+
       </div>
+       <Suscribe />
+        <Footer />
     </main>
 
   );
