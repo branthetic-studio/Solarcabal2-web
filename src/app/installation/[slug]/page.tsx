@@ -14,6 +14,7 @@ import hardwarelImage from "../../../Assets/Vector (1).png";
 import systemImage from "../../../Assets/Vector (2).png";
 import safetyImage from "../../../Assets/Vector (3).png";
 import "../Installation.css";
+import AddressModal from "@/Components/AddressModal";
 
 // If you already have a query in queries.ts, you can delete this and import yours.
 // This returns products in a collection/category by slug.
@@ -199,6 +200,11 @@ export default function InstallationListingPage() {
     );
   }
 
+
+  const handleSubmit = (data: any) => {
+    console.log("Form submitted:", data);
+  };
+
   return (
     <>
       <Navbar />
@@ -245,63 +251,97 @@ export default function InstallationListingPage() {
             {/* Right: summary / selector */}
             <aside className="lg:sticky lg:top-6">
               <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-                <p className="text-sm font-semibold text-neutral-800">
-                  Package Summary
-                </p>
+                {/* Delivery Location */}
+                <div className="mb-6">
+                  <div className="flex flex-col gap-2 mb-2">
+                    <AddressModal
+                      trigger={
+                        <button className="cursor-pointer">
+                          <Image src="/edit-rectangle.png" alt="Location" width={20} height={20} className="fill" />
+                        </button>
+                      }
+                      onSubmit={handleSubmit}
+                    />
 
-                <div className="mt-3 space-y-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-neutral-600">Selected package</span>
-                    <span className="font-medium text-neutral-900">
-                      {packageTitle}
-                    </span>
+                    <p className="text-sm font-semibold text-neutral-800">Delivery Location</p>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-neutral-600">Items</span>
-                    <span className="font-medium text-neutral-900">
-                      {items.length}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-neutral-600">Est. total</span>
-                    <span className="font-semibold text-neutral-900">
-                      {estimatedTotalNGN}
-                    </span>
+                  <p className="text-sm font-medium">Home Address</p>
+                  <p className="text-xs text-neutral-500">+234 85 678 4321</p>
+                  <p className="text-xs text-neutral-500">
+                    Adeola Odeku St, Victoria Island, Lagos
+                  </p>
+                </div>
+
+
+
+                {/* Payment Methods */}
+                <div className="mb-6">
+                  <p className="text-sm font-semibold text-neutral-800 mb-1">Payment Method</p>
+                  <p className="text-xs text-neutral-500 mb-2">List of all credit cards you saved</p>
+                  <div className="flex items-center gap-2">
+                    <button className="flex items-center justify-center w-8 h-8 rounded border">
+                      <span className="text-xs font-bold">+</span>
+                    </button>
+                    <img src="/icons/mastercard.png" className="w-8 h-8" />
+                    <img src="/icons/paypal.png" className="w-8 h-8" />
+                    <img src="/icons/applepay.png" className="w-8 h-8" />
                   </div>
                 </div>
 
-                <div className="mt-5">
-                  <label className="mb-2 block text-xs font-medium text-neutral-700">
-                    Installation Location
-                  </label>
-                  <select className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm">
-                    <option>Lagos</option>
-                    <option>Abuja</option>
-                    <option>Port Harcourt</option>
-                    <option>Other</option>
-                  </select>
+                {/* Summary */}
+                <div className="mb-6">
+                  <p className="text-sm font-semibold text-neutral-800 mb-3">Summary</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between text-xs text-[#808D9E]">
+                      <span className="">Sub total products</span>
+                      <span className="font-medium ">₦201,100</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-[#808D9E]">
+                      <span className="">Delivery fee</span>
+                      <span className="font-medium ">₦1,100</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-[#808D9E]">
+                      <span className="">Tax</span>
+                      <span className="font-medium ">₦249</span>
+                    </div>
+                    <div className="flex justify-between mt-2 pt-2 border-t font-semibold text-neutral-900">
+                      <span>Total</span>
+                      <span>₦202,349</span>
+                    </div>
+                  </div>
+                  <button className="mt-5 w-full rounded-full bg-red-600 py-3 text-sm font-semibold text-white hover:opacity-95" onClick={() => router.push("/checkout")} > Checkout </button>
                 </div>
 
-                <button
-                  className="mt-5 w-full rounded-full bg-red-600 py-3 text-sm font-semibold text-white hover:opacity-95"
-                  onClick={() => router.push("/checkout")}
-                >
-                  Proceed to Checkout
-                </button>
+                {/* Delivery & Products */}
+                <div className="space-y-4 text-sm text-neutral-700">
+                  <h3>Delivery & Products</h3>
+                  <div className="flex items-start gap-3">
+                    <Image src="/truck.png" alt="Warranty" width={20} height={20} className="fill mt-1" />
+                    <div>
+                      <p className="text-sm">Delivery</p>
+                      <p className="text-xs text-neutral-500">Estimated delivery time 1-9 business days</p>
+                    </div>
+                  </div>
 
-                <div className="mt-6 space-y-2 text-xs text-neutral-600">
-                  <div className="flex items-center gap-2">
-                    <span>•</span> Certified installers
+                  <div className="flex items-start gap-3">
+                    <Image src="/repeat.png" alt="Warranty" width={20} height={20} className="fill mt-1" />
+                    <div>
+                      <p className="text-sm">Return Policy</p>
+                      <p className="text-xs text-neutral-500">Guaranteed 7-Day Return Policy</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span>•</span> Safety inspection
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>•</span> System testing
+
+                  <div className="flex items-start gap-3">
+                    <Image src="/shield.png" alt="Warranty" width={20} height={20} className="fill mt-1" />
+                    <div>
+                      <p className="text-sm">Warranty</p>
+                      <p className="text-xs text-neutral-500">Warranty information unavailable for this item.</p>
+                    </div>
                   </div>
                 </div>
               </div>
             </aside>
+
           </div>
         </section>
 

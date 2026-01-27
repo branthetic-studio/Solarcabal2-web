@@ -9,6 +9,7 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import { gql } from "@apollo/client";
 import Suscribe from "@/Components/Suscribe/Suscribe";
+import AddressModal from "@/Components/AddressModal";
 
 import {
   GET_ACTIVE_ORDER,
@@ -21,7 +22,7 @@ import {
 
 
 /* ------------------- Types ------------------- */
-type PaymentMethod = "bank" | "card" | "paypal";
+type PaymentMethod = "bank" | "card" | "Installment Payment";
 
 type ActiveOrderLine = {
   id: string;
@@ -192,6 +193,12 @@ const Page = () => {
     }
   };
 
+
+  const handleSubmit = (data: any) => {
+    console.log("Form submitted:", data);
+  };
+
+
   return (
     <main className="min-h-screen bg-neutral-50">
       <Navbar />
@@ -249,9 +256,9 @@ const Page = () => {
                 />
 
                 <RadioRow
-                  checked={method === "paypal"}
-                  onChange={() => setMethod("paypal")}
-                  label={<span className="">PayPal</span>}
+                  checked={method === "Installment Payment"}
+                  onChange={() => setMethod("Installment Payment")}
+                  label={<span className="">Installment Payment</span>}
                 />
               </div>
 
@@ -263,18 +270,23 @@ const Page = () => {
 
                 <div className="flex justify-between items-center bg-neutral-100 rounded-xl p-3">
                   <label className="flex gap-2 items-center text-sm">
-                    <input
+                    {/* <input
                       type="checkbox"
                       checked={sameAsShipping}
                       onChange={(e) => setSameAsShipping(e.target.checked)}
                       className="accent-red-500"
-                    />
+                    /> */}
                     Same as shipping
                   </label>
 
-                  <button className="text-neutral-600 hover:text-neutral-600">
-                    ✎
-                  </button>
+                  <AddressModal
+                    trigger={
+                      <button className="cursor-pointer">
+                        <Image src="/edit-rectangle.png" alt="Location" width={24} height={24} className="fill cursor-pointer" />
+                      </button>
+                    }
+                    onSubmit={handleSubmit}
+                  />
                 </div>
               </div>
             </div>
