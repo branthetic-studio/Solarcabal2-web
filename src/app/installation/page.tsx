@@ -39,7 +39,7 @@ const page = () => {
   return (
     <div>
       <Navbar />
-      <div className="installation-banner">
+      {/* <div className="installation-banner">
         <Image src={BannerImg} alt="installation-banner-image" />
         <div className="installation-banner-container">
           <div className="installation-banner-content">
@@ -52,7 +52,7 @@ const page = () => {
             <button>Request Installation</button>
           </div>
         </div>
-      </div>
+      </div> */}
 
       <InstallProduct />
 

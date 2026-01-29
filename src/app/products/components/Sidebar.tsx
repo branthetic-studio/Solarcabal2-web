@@ -80,7 +80,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* ✅ MOBILE TOGGLE BUTTON */}
       <div className="flex items-center justify-between p-4 md:hidden border-b">
-        <h3 className="text-sm font-bold text-neutral-800">Filters</h3>
+        <h3 className="text-sm font-bold text-neutral-800">Category</h3>
 
         <button
           onClick={() => setIsOpen(!isOpen)}
