@@ -21,7 +21,9 @@ type Props = {
 };
 
 type UseCartContext = {
-  removeFromCartMutation: (options: { variables: { productVariantId: string } }) => Promise<void>;
+  removeFromCartMutation: (options: {
+    variables: { productVariantId: string };
+  }) => Promise<void>;
 };
 
 type GetProductDetailsResponse = {
@@ -39,7 +41,6 @@ type GetProductDetailsResponse = {
     assets?: { preview?: string | null }[] | null;
   };
 };
-
 
 interface GetCollectionProductsResponse {
   search: {
@@ -61,8 +62,6 @@ interface GetCollectionProductsResponse {
   };
 }
 
-
-
 export default function ProductGrid({
   categorySlug,
   brand,
@@ -70,31 +69,41 @@ export default function ProductGrid({
   condition,
   priceRange,
 }: Props) {
-  const { me } = useUser();
-  const { addToCartMutation, handleAdjustQuantity, removeFromCartMutation } = useCart();
+  const { customer } = useUser();
+  const {
+    addToCartMutation,
+    handleAdjustQuantity,
+    removeFromCartMutation,
+    getOrderLineIdByVariantId, // ✅ Get helper
+  } = useCart();
   const { addItem: addLocalItem, removeItem: removeLocalItem } = useLocalCart();
 
-  const [quantityMap, setQuantityMap] = useState<Record<string, number | undefined>>({});
+  const [quantityMap, setQuantityMap] = useState<
+    Record<string, number | undefined>
+  >({});
+  const [variantIdMap, setVariantIdMap] = useState<Record<string, string>>({}); // ✅ Track variantId by itemId
   const autoAddedRef = useRef<Record<string, boolean>>({});
 
-  const [loadDetails] = useLazyQuery<GetProductDetailsResponse>(GET_PRODUCT_DETAILS, {
-    fetchPolicy: "cache-first",
-  });
+  const [loadDetails] = useLazyQuery<GetProductDetailsResponse>(
+    GET_PRODUCT_DETAILS,
+    { fetchPolicy: "cache-first" }
+  );
 
-
-  const { data, loading, error } = useQuery<GetCollectionProductsResponse>(GET_COLLECTION_PRODUCTS, {
-    variables: {
-      collectionSlug: categorySlug,
-      groupByProduct: true,
-      skip: 0,
-      take: 20,
-      filter: {
-        price: { between: { start: priceRange[0], end: priceRange[1] } },
+  const { data, loading, error } = useQuery<GetCollectionProductsResponse>(
+    GET_COLLECTION_PRODUCTS,
+    {
+      variables: {
+        collectionSlug: categorySlug,
+        groupByProduct: true,
+        skip: 0,
+        take: 20,
+        filter: {
+          price: { between: { start: priceRange[0], end: priceRange[1] } },
+        },
       },
-    },
-  });
+    }
+  );
 
-  // Prepare product card items
   const items = useMemo(() => {
     return (
       data?.search.items.map((it: any) => ({
@@ -112,16 +121,10 @@ export default function ProductGrid({
     );
   }, [data]);
 
-  // -----------------------------
-  // ADD TO CART INITIAL
-  // -----------------------------
   const handleAddToCart = async (itemId: string) => {
     setQuantityMap((prev) => ({ ...prev, [itemId]: 1 }));
   };
 
-  // -----------------------------
-  // CHANGE QUANTITY
-  // -----------------------------
   const adjustQuantity = (itemId: string, change: number) => {
     setQuantityMap((prev) => {
       const newQty = (prev[itemId] || 1) + change;
@@ -132,22 +135,39 @@ export default function ProductGrid({
     });
   };
 
-  // -----------------------------
-  // AUTO SYNC CART WHEN QUANTITY CHANGES
-  // -----------------------------
+  // ✅ FIXED: Auto sync with proper orderLineId tracking
   useEffect(() => {
     items.forEach(async (item) => {
       const qty = quantityMap[item.id];
 
       if (qty === undefined) {
-        // Remove when returning to Add to Cart
+        // ✅ Remove using orderLineId, not item.id
         removeLocalItem(item.id);
-        if (me) removeFromCartMutation(item.id);
+
+        if (customer) {
+          const variantId = variantIdMap[item.id];
+          if (variantId) {
+            const orderLineId = getOrderLineIdByVariantId(variantId);
+            if (orderLineId) {
+              await removeFromCartMutation(orderLineId);
+            }
+          }
+        }
+
+        // Clean up tracking
+        setVariantIdMap((prev) => {
+          const newMap = { ...prev };
+          delete newMap[item.id];
+          return newMap;
+        });
+        autoAddedRef.current[item.id] = false;
         return;
       }
 
-      // Fetch product variant details
-      const { data: pd } = await loadDetails({ variables: { slug: item.slug } });
+      // Fetch variant details
+      const { data: pd } = await loadDetails({
+        variables: { slug: item.slug },
+      });
       const variant = pd?.product?.variants?.[0];
       if (!variant) return;
 
@@ -156,6 +176,9 @@ export default function ProductGrid({
         pd?.product?.featuredAsset?.preview ??
         pd?.product?.assets?.[0]?.preview ??
         undefined;
+
+      // ✅ Track variantId for this item
+      setVariantIdMap((prev) => ({ ...prev, [item.id]: variant.id }));
 
       // First-time add
       if (!autoAddedRef.current[item.id]) {
@@ -172,9 +195,10 @@ export default function ProductGrid({
           quantity: qty,
         });
 
-        if (me) {
-          addToCartMutation({
-            variables: { productVariantId: variant.id, quantity: qty },
+        if (customer) {
+          await addToCartMutation({
+            productVariantId: variant.id,
+            quantity: qty,
           });
         }
 
@@ -182,7 +206,7 @@ export default function ProductGrid({
         return;
       }
 
-      // Update existing quantity
+      // ✅ Update using orderLineId, not variantId
       addLocalItem({
         id: variant.id,
         name: item.name,
@@ -194,7 +218,12 @@ export default function ProductGrid({
         quantity: qty,
       });
 
-      if (me) handleAdjustQuantity(variant.id, qty);
+      if (customer) {
+        const orderLineId = getOrderLineIdByVariantId(variant.id);
+        if (orderLineId) {
+          await handleAdjustQuantity(orderLineId, qty);
+        }
+      }
     });
   }, [quantityMap, items]);
 
@@ -207,10 +236,7 @@ export default function ProductGrid({
         const qty = quantityMap[item.id];
 
         return (
-          <div
-            key={item.id}
-            className="rounded-xl p-1 shadow-sm bg-white"
-          >
+          <div key={item.id} className="rounded-xl p-1 shadow-sm bg-white">
             <div className="bg-[#F3F5F7] p-3 pb-1 rounded-t-md">
               <Link href={`/products/${item.slug}`}>
                 <img
@@ -220,7 +246,6 @@ export default function ProductGrid({
                 />
               </Link>
 
-              {/* BUTTON OR COUNTER */}
               {qty === undefined ? (
                 <button
                   className="w-full bg-black text-white py-2 rounded-md mt-3"
@@ -229,7 +254,7 @@ export default function ProductGrid({
                   Add to Cart
                 </button>
               ) : (
-                <div className="flex items-center justify-between mt-3 bg-gray-100 rounded-md -px-6 py-2">
+                <div className="flex items-center justify-between mt-3 bg-gray-100 rounded-md px-3 py-2">
                   <button
                     className="text-lg font-bold bg-black rounded-md text-white px-2"
                     onClick={() => adjustQuantity(item.id, -1)}
@@ -241,7 +266,7 @@ export default function ProductGrid({
 
                   <button
                     className="text-lg font-bold bg-black rounded-md text-white px-2"
-                    onClick={() => adjustQuantity(item.id, 1)}
+                    onClick={() => adjustQuantity(item.id, +1)}
                   >
                     +
                   </button>
@@ -249,7 +274,6 @@ export default function ProductGrid({
               )}
             </div>
 
-            {/* PRODUCT INFO */}
             <div className="p-2">
               <p className="text-sm text-gray-500 mt-2">{item.brand}</p>
               <p className="font-semibold text-sm">{item.name}</p>

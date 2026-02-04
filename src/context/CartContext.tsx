@@ -1,6 +1,6 @@
 "use client";
 
-import React, {
+import {
   createContext,
   PropsWithChildren,
   useContext,
@@ -32,21 +32,26 @@ type UseCartContext = {
   cart: GetActiveOrderData | undefined;
   activeOrder: ActiveOrder | null | undefined;
   getCount: () => number;
-  addToCartMutation: AddToCartFn;
-  handleAdjustQuantity: (lineId: string, quantity: number) => Promise<void>;
-  removeFromCartMutation: (lineId: string) => Promise<void>;
+  addToCartMutation: (
+    variables: AddItemToOrderMutationVariables
+  ) => Promise<any>;
+  handleAdjustQuantity: (
+    orderLineId: string,
+    quantity: number
+  ) => Promise<void>;
+  removeFromCartMutation: (orderLineId: string) => Promise<void>;
+  getOrderLineIdByVariantId: (variantId: string) => string | undefined;
 };
-
-
 
 // Initial (empty) context
 const initialCtx: UseCartContext = {
   cart: undefined,
   activeOrder: undefined,
   getCount: () => 0,
-  addToCartMutation: async () => { },
-  handleAdjustQuantity: async () => { },
-  removeFromCartMutation: async () => { },
+  addToCartMutation: async () => {},
+  handleAdjustQuantity: async () => {},
+  removeFromCartMutation: async () => {},
+  getOrderLineIdByVariantId: () => undefined,
 };
 
 const CartContext = createContext<UseCartContext>(initialCtx);
@@ -79,34 +84,39 @@ const CartProvider = ({ children }: PropsWithChildren) => {
     awaitRefetchQueries: true,
   });
 
-
   const getCount = useMemo(() => {
     return () =>
-      data?.activeOrder?.totalQuantity ??
       data?.activeOrder?.lines?.reduce(
         (sum, l) => sum + (l?.quantity ?? 0),
         0
-      ) ??
-      0;
+      ) ?? 0;
   }, [data]);
 
-  const addToCartMutation: AddToCartFn = async ({ variables }) => {
-    await addItem({ variables });
+  const getOrderLineIdByVariantId = (variantId: string) => {
+    return data?.activeOrder?.lines?.find(
+      (line) => line?.productVariant?.id === variantId
+    )?.id;
   };
 
-  const handleAdjustQuantity = async (lineId: string, quantity: number) => {
-    await adjustLine({ variables: { orderLineId: lineId, quantity } });
+  const addToCartMutation = async (
+    variables: AddItemToOrderMutationVariables
+  ) => {
+    const result = await addItem({ variables });
+    return result.data?.addItemToOrder;
   };
 
-  const removeFromCartMutation = async (lineId: string) => {
+  const handleAdjustQuantity = async (
+    orderLineId: string,
+    quantity: number
+  ) => {
+    await adjustLine({ variables: { orderLineId, quantity } });
+  };
+
+  const removeFromCartMutation = async (orderLineId: string) => {
     await removeLine({
-      variables: { orderLineId: lineId },
+      variables: { orderLineId },
     });
-
-    await refetch();
   };
-
-
 
   useEffect(() => {
     void refetch();
@@ -121,9 +131,9 @@ const CartProvider = ({ children }: PropsWithChildren) => {
         addToCartMutation,
         handleAdjustQuantity,
         removeFromCartMutation,
+        getOrderLineIdByVariantId,
       }}
     >
-
       {children}
     </CartContext.Provider>
   );
