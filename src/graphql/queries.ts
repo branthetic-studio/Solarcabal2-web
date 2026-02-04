@@ -351,10 +351,6 @@ export const GET_PRODUCTS_FOR_GRID = gql`
 
 export const GET_CURRENT_USER = gql`
   query GetCurrentUser {
-    me {
-      id
-      identifier
-    }
     activeCustomer {
       id
       emailAddress
@@ -515,12 +511,26 @@ export const RESET_PASSWORD = gql`
 `;
 
 export const VERIFY_EMAIL_ADDRESS_MUTATION = gql`
-  mutation VerifyEmailAddress($token: String!) {
-    verifyEmailAddress(token: $token) {
+  mutation VerifyCustomerAccount($token: String!) {
+    verifyCustomerAccount(token: $token) {
       __typename
+      ... on CurrentUser {
+        id
+        identifier
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+`;
+
+export const REFRESH_CUSTOMER_VERIFICATION = gql`
+  mutation RefreshCustomerVerification($emailAddress: String!) {
+    refreshCustomerVerification(emailAddress: $emailAddress) {
       ... on Success {
         success
-        message
       }
       ... on ErrorResult {
         errorCode
@@ -546,7 +556,6 @@ export const DELETE_MY_ACCOUNT = gql`
   }
 `;
 
-
 export const REMOVE_FROM_CART = gql`
   mutation RemoveOrderLine($orderLineId: ID!) {
     removeOrderLine(orderLineId: $orderLineId) {
@@ -559,4 +568,3 @@ export const REMOVE_FROM_CART = gql`
   }
   ${ACTIVE_ORDER_FRAGMENT}
 `;
-

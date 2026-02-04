@@ -1,10 +1,12 @@
 "use client";
+
+
 import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import AuthModal from "../AuthModal";
-import { Search, User, ShoppingCart, Menu, X } from "lucide-react";
+import { Search, User, ShoppingCart, Menu, X, LogOut } from "lucide-react";
 import SearchUI from "../SearchUI";
 import { useCart } from "@/context/CartContext";
 import { useLocalCart } from "@/context/LocalCartContext";
@@ -14,14 +16,14 @@ const Navbar = () => {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const { cart } = useCart();
   const { items: localItems } = useLocalCart();
-  const u = useUser() as any;
-  const isLoggedIn = !!(u?.me || u?.user || u?.activeCustomer || u?.customer);
+  const { customer, logout, loading } = useUser();
 
   const getCartCount = () => {
-    if (isLoggedIn) {
+    if (customer) {
       const lines = cart?.activeOrder?.lines ?? [];
       return lines.length;
     } else {
@@ -34,6 +36,11 @@ const Navbar = () => {
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
+
+  const handleLogout = async () => {
+    await logout();
+    setShowUserMenu(false);
+  };
 
   return (
     <>
@@ -55,11 +62,10 @@ const Navbar = () => {
             <li>
               <Link
                 href="/"
-                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
-                  pathname === "/"
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/"
                     ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2 font-bold"
                     : "text-gray-700"
-                }`}
+                  }`}
               >
                 Home
               </Link>
@@ -67,11 +73,10 @@ const Navbar = () => {
             <li>
               <Link
                 href="/products"
-                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
-                  pathname === "/products"
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/products"
                     ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
                     : "text-gray-700"
-                }`}
+                  }`}
               >
                 Products
               </Link>
@@ -79,11 +84,10 @@ const Navbar = () => {
             <li>
               <Link
                 href="/installation"
-                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
-                  pathname === "/installation"
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/installation"
                     ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
                     : "text-gray-700"
-                }`}
+                  }`}
               >
                 Installation
               </Link>
@@ -91,11 +95,10 @@ const Navbar = () => {
             <li>
               <Link
                 href="/enquiries"
-                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
-                  pathname === "/enquiries"
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/enquiries"
                     ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
                     : "text-gray-700"
-                }`}
+                  }`}
               >
                 Enquiries
               </Link>
@@ -103,11 +106,10 @@ const Navbar = () => {
             <li>
               <Link
                 href="/referral"
-                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
-                  pathname === "/referral"
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/referral"
                     ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
                     : "text-gray-700"
-                }`}
+                  }`}
               >
                 Referral Program
               </Link>
@@ -115,11 +117,10 @@ const Navbar = () => {
             <li>
               <Link
                 href="/faq"
-                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${
-                  pathname === "/faq"
+                className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/faq"
                     ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
                     : "text-gray-700"
-                }`}
+                  }`}
               >
                 FAQ
               </Link>
@@ -135,16 +136,81 @@ const Navbar = () => {
             >
               <Search className="w-5 h-5 text-gray-700" />
             </button>
-            <AuthModal
-              trigger={
+
+            {/* User Account Button/Menu */}
+            {customer ? (
+              <div className="relative">
                 <button
                   aria-label="Account"
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  onClick={() => setShowUserMenu(!showUserMenu)}
                 >
                   <Image src="/profile.png" alt="User" width={24} height={24} />
+                  <span className="text-sm font-medium text-gray-700">
+                    Hi,{" "}
+                    {customer.firstName || customer.emailAddress?.split("@")[0]}
+                  </span>
                 </button>
-              }
-            />
+
+                {/* Dropdown Menu */}
+                {showUserMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowUserMenu(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-20">
+                      <div className="p-3 border-b">
+                        <p className="text-sm font-medium text-gray-900">
+                          {customer.firstName} {customer.lastName}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {customer.emailAddress}
+                        </p>
+                      </div>
+                      <Link
+                        href="/account"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        My Account
+                      </Link>
+                      <Link
+                        href="/orders"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        Orders
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Logout
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <AuthModal
+                trigger={
+                  <button
+                    aria-label="Account"
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <Image
+                      src="/profile.png"
+                      alt="User"
+                      width={24}
+                      height={24}
+                    />
+                  </button>
+                }
+              />
+            )}
+
             <Link
               href="/cart"
               aria-label="Cart"
@@ -183,9 +249,8 @@ const Navbar = () => {
       {/* Mobile Drawer */}
       <div
         id="mobile-menu"
-        className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
+        className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${open ? "translate-x-0" : "translate-x-full"
+          }`}
         role="dialog"
         aria-modal="true"
       >
@@ -208,16 +273,28 @@ const Navbar = () => {
             </button>
           </div>
 
+          {/* User Greeting (Mobile) */}
+          {customer && (
+            <div className="p-6 border-b bg-gray-50">
+              <p className="text-sm font-medium text-gray-900">
+                Hi, {customer.firstName || customer.emailAddress?.split("@")[0]}
+                ! 👋
+              </p>
+              <p className="text-xs text-gray-500 truncate">
+                {customer.emailAddress}
+              </p>
+            </div>
+          )}
+
           {/* Mobile Links */}
           <ul className="flex flex-col p-6 space-y-1">
             <li>
               <Link
                 href="/"
-                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/"
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/"
                     ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
                 onClick={() => setOpen(false)}
               >
                 Home
@@ -226,11 +303,10 @@ const Navbar = () => {
             <li>
               <Link
                 href="/products"
-                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/products"
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/products"
                     ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
                 onClick={() => setOpen(false)}
               >
                 Products
@@ -239,11 +315,10 @@ const Navbar = () => {
             <li>
               <Link
                 href="/installation"
-                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/installation"
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/installation"
                     ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
                 onClick={() => setOpen(false)}
               >
                 Installation
@@ -252,11 +327,10 @@ const Navbar = () => {
             <li>
               <Link
                 href="/enquiries"
-                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/enquiries"
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/enquiries"
                     ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
                 onClick={() => setOpen(false)}
               >
                 Enquiries
@@ -265,11 +339,10 @@ const Navbar = () => {
             <li>
               <Link
                 href="/referral"
-                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/referral"
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/referral"
                     ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
                 onClick={() => setOpen(false)}
               >
                 Referral Program
@@ -278,16 +351,51 @@ const Navbar = () => {
             <li>
               <Link
                 href="/faq"
-                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/faq"
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/faq"
                     ? "bg-orange-50 text-[#FF0000]"
                     : "text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
                 onClick={() => setOpen(false)}
               >
                 FAQ
               </Link>
             </li>
+
+            {/* Mobile Account Links (when logged in) */}
+            {customer && (
+              <>
+                <li className="pt-4 border-t">
+                  <Link
+                    href="/account"
+                    className="block px-4 py-3 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+                    onClick={() => setOpen(false)}
+                  >
+                    My Account
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/orders"
+                    className="block px-4 py-3 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+                    onClick={() => setOpen(false)}
+                  >
+                    Orders
+                  </Link>
+                </li>
+                <li>
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </li>
+              </>
+            )}
           </ul>
 
           {/* Mobile Actions */}
@@ -304,12 +412,23 @@ const Navbar = () => {
                 <Search className="w-6 h-6 text-gray-700" />
               </button>
 
-              <button
-                aria-label="Account"
-                className="p-3 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <Image src="/profile.png" alt="User" width={24} height={24} />
-              </button>
+              {!customer && (
+                <AuthModal
+                  trigger={
+                    <button
+                      aria-label="Account"
+                      className="p-3 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <Image
+                        src="/profile.png"
+                        alt="User"
+                        width={24}
+                        height={24}
+                      />
+                    </button>
+                  }
+                />
+              )}
 
               <Link
                 href="/cart"

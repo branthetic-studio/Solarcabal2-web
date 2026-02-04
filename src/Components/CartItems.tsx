@@ -24,7 +24,7 @@ export default function CartItems() {
   const lines = isLoggedIn ? cart?.activeOrder?.lines ?? [] : localItems;
 
   return (
-    <div className="w-full max-w-2xl mx-auto py-6 bg-[#ffffff] px-4 border-[#e3e3e3] border-l mt-6">
+    <div className="w-full min-w-2xs mx-auto py-6 bg-[#ffffff] px-4 border-[#e3e3e3] border-l mt-6">
 
       {/* TOP BUTTONS */}
       <div className="flex flex-col gap-3">
@@ -42,10 +42,10 @@ export default function CartItems() {
 
       {/* TITLE */}
       <div className="flex items-center justify-between mt-6">
-        <h2 className="text-md font-semibold">
+        <h2 className="text-sm font-semibold">
           Cart Items <span className="text-red-600">({lines.length})</span>
         </h2>
-        <button className="text-xl">✕</button>
+        <button className="text-xs">✕</button>
       </div>
 
       {/* CART LIST */}

@@ -10,6 +10,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useUser } from "@/context/UserContext";
 import { GET_ACTIVE_ORDER } from "@/graphql/queries";
 import { MdEmail } from "react-icons/md";
+import { toast } from "sonner";
 import { FaGoogle } from "react-icons/fa";
 import { signIn } from "next-auth/react";
 
@@ -44,7 +45,7 @@ const REGISTER_MUTATION: TypedDocumentNode<
 
 export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
   const apollo = useApolloClient();
-  const { login, loading: userLoading, me } = useUser();
+  const { login, loading: userLoading, customer } = useUser();
 
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
@@ -70,23 +71,40 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
   ] = useMutation(REGISTER_MUTATION);
 
   // Close modal automatically on successful login
-  useEffect(() => {
-    if (me && open) setOpen(false);
-  }, [me, open]);
+  // useEffect(() => {
+  //   if (customer && open) setOpen(false);
+  // }, [customer, open]);
 
   // --- Handlers ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginErr(null);
     setLoginSubmitting(true);
+
     try {
+      console.log("🔵 Attempting login with:", {
+        email: loginForm.email,
+        rememberMe,
+      });
+
       await login(loginForm.email, loginForm.password, rememberMe);
+      toast("✅ Login successful");
 
       // Refetch cart & user after login
       await apollo.refetchQueries({
         include: [GET_ACTIVE_ORDER],
       });
+
+      // ✅ Close modal on successful login
+      setOpen(false);
     } catch (err: any) {
+      console.error("❌ Login error:", err);
+      console.error("❌ Error details:", {
+        message: err?.message,
+        graphQLErrors: err?.graphQLErrors,
+        networkError: err?.networkError,
+        extraInfo: err?.extraInfo,
+      });
       setLoginErr(err?.message ?? "Login failed");
     } finally {
       setLoginSubmitting(false);
@@ -187,7 +205,11 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                   onClick={() => setShowLoginPassword(!showLoginPassword)}
                   className="absolute right-3 top-3 text-gray-500"
                 >
-                  {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {showLoginPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
                 </button>
               </div>
 
@@ -249,7 +271,10 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                   placeholder="Password"
                   value={registerForm.password}
                   onChange={(e) =>
-                    setRegisterForm({ ...registerForm, password: e.target.value })
+                    setRegisterForm({
+                      ...registerForm,
+                      password: e.target.value,
+                    })
                   }
                   className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none"
                   required
@@ -259,7 +284,11 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                   onClick={() => setShowRegisterPassword(!showRegisterPassword)}
                   className="absolute right-3 top-3 text-gray-500"
                 >
-                  {showRegisterPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {showRegisterPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
                 </button>
               </div>
 
@@ -269,7 +298,10 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                   type="checkbox"
                   checked={registerForm.agree}
                   onChange={(e) =>
-                    setRegisterForm({ ...registerForm, agree: e.target.checked })
+                    setRegisterForm({
+                      ...registerForm,
+                      agree: e.target.checked,
+                    })
                   }
                   className="mr-2"
                 />
@@ -286,8 +318,11 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
               >
                 {registerLoading ? "Creating..." : "Create an Account"}
               </button>
-              {registerError && <p className="text-red-500">{registerError.message}</p>}
-              {registerData?.registerCustomerAccount?.__typename === "Success" && (
+              {registerError && (
+                <p className="text-red-500">{registerError.message}</p>
+              )}
+              {registerData?.registerCustomerAccount?.__typename ===
+                "Success" && (
                 <p className="text-green-600">
                   ✅ Registered! Please check your email to verify your account.
                 </p>
@@ -296,7 +331,9 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
               {/* Social login */}
               <div className="flex items-center my-2">
                 <div className="flex-1 border-t" />
-                <span className="px-2 text-gray-500 text-sm">Or Sign Up with</span>
+                <span className="px-2 text-gray-500 text-sm">
+                  Or Sign Up with
+                </span>
                 <div className="flex-1 border-t" />
               </div>
 
