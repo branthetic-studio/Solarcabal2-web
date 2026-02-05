@@ -19,6 +19,7 @@ export const GET_TOP_LEVEL_COLLECTIONS = gql`
 export const GET_COLLECTION_PRODUCTS = gql`
   query GetCollectionProducts(
     $collectionSlug: String!
+    $groupByProduct: Boolean = true
     $skip: Int = 0
     $take: Int = 20
     $facetValueIds: [ID!]
@@ -26,7 +27,7 @@ export const GET_COLLECTION_PRODUCTS = gql`
     search(
       input: {
         collectionSlug: $collectionSlug
-        groupByProduct: false
+        groupByProduct: $groupByProduct
         skip: $skip
         take: $take
         facetValueIds: $facetValueIds
@@ -34,20 +35,15 @@ export const GET_COLLECTION_PRODUCTS = gql`
     ) {
       totalItems
       items {
-        productId
         productName
         slug
-
         productVariantId
         productVariantName
-
         facetValueIds
-
         productAsset {
           id
           preview
         }
-
         priceWithTax {
           __typename
           ... on SinglePrice {
@@ -58,13 +54,11 @@ export const GET_COLLECTION_PRODUCTS = gql`
             max
           }
         }
-
         currencyCode
       }
     }
   }
 `;
-
 
 export const GET_PRODUCT_DETAILS = gql`
   query GetProductDetail($slug: String!) {
@@ -388,7 +382,9 @@ export const LOGIN = gql`
 
 export const LOGOUT = gql`
   mutation Logout {
-    logout
+    logout {
+      success
+    }
   }
 `;
 
@@ -573,4 +569,120 @@ export const REMOVE_FROM_CART = gql`
     }
   }
   ${ACTIVE_ORDER_FRAGMENT}
+`;
+
+export const GET_ACCOUNT_DETAILS = gql`
+  query GetAccountDetails {
+    activeCustomer {
+      id
+      title
+      firstName
+      lastName
+      emailAddress
+      addresses {
+        id
+        fullName
+        company
+        streetLine1
+        streetLine2
+        city
+        province
+        postalCode
+        phoneNumber
+        defaultShippingAddress
+        defaultBillingAddress
+        country {
+          code
+          name
+        }
+      }
+    }
+  }
+`;
+
+export const UPDATE_CUSTOMER = gql`
+  mutation UpdateCustomer($input: UpdateCustomerInput!) {
+    updateCustomer(input: $input) {
+      id
+      title
+      firstName
+      lastName
+      emailAddress
+    }
+  }
+`;
+
+export const CREATE_CUSTOMER_ADDRESS = gql`
+  mutation CreateCustomerAddress($input: CreateAddressInput!) {
+    createCustomerAddress(input: $input) {
+      id
+      fullName
+      company
+      streetLine1
+      streetLine2
+      city
+      province
+      postalCode
+      phoneNumber
+      defaultShippingAddress
+      defaultBillingAddress
+      country {
+        code
+        name
+      }
+    }
+  }
+`;
+
+export const UPDATE_CUSTOMER_ADDRESS = gql`
+  mutation UpdateCustomerAddress($input: UpdateAddressInput!) {
+    updateCustomerAddress(input: $input) {
+      id
+      fullName
+      company
+      streetLine1
+      streetLine2
+      city
+      province
+      postalCode
+      phoneNumber
+      defaultShippingAddress
+      defaultBillingAddress
+      country {
+        code
+        name
+      }
+    }
+  }
+`;
+
+export const DELETE_CUSTOMER_ADDRESS = gql`
+  mutation DeleteCustomerAddress($id: ID!) {
+    deleteCustomerAddress(id: $id) {
+      success
+      message
+    }
+  }
+`;
+
+export const GET_CUSTOMER_ADDRESSES = gql`
+  query GetCustomerAddresses {
+    activeCustomer {
+      id
+      addresses {
+        id
+        fullName
+        phoneNumber
+        streetLine1
+        streetLine2
+        city
+        province
+        postalCode
+        defaultShippingAddress
+        country {
+          code
+        }
+      }
+    }
+  }
 `;
