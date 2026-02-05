@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import Navbar from "../../Components/Navbar/Navbar";
 import Footer from "../../Components/Footer/Footer";
 import Image from "next/image";
@@ -7,19 +7,21 @@ import PaymentScreens from "@/Components/payment/PaymentScreens";
 import { Plus } from "lucide-react";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { gql } from "@apollo/client";
 import Suscribe from "@/Components/Suscribe/Suscribe";
 import AddressModal from "@/Components/AddressModal";
 
 import {
   GET_ACTIVE_ORDER,
+  GET_SHIPPING_METHODS,
+  SET_SHIPPING_METHOD,
+  SET_SHIPPING_ADDRESS,
   GET_CUSTOMER_ORDERS,
   TRANSITION_TO_STATE,
   PAYSTACK_INTENT,
   RECREATE_FAILED_ORDER,
 } from "@/graphql/queries";
-
-
 
 /* ------------------- Types ------------------- */
 type PaymentMethod = "bank" | "card" | "Installment Payment";
@@ -36,12 +38,6 @@ type ActiveOrderLine = {
   } | null;
 };
 
-interface InfoRowProps {
-  icon: React.ReactNode; // <- allow image, emoji, or anything
-  title: string;
-  text: string;
-}
-
 type ActiveOrder = {
   id: string;
   code: string;
@@ -50,7 +46,44 @@ type ActiveOrder = {
   subTotalWithTax?: number | null;
   lines: ActiveOrderLine[];
   customer?: { emailAddress?: string | null } | null;
+  shippingAddress?: any;
+  shippingLines?: any[];
 };
+
+type ShippingMethod = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+};
+
+type SetShippingAddressResponse = {
+  setOrderShippingAddress:
+    | ActiveOrder
+    | {
+        errorCode: string;
+        message: string;
+      };
+};
+
+type TransitionToStateResponse = {
+  transitionOrderToState:
+    | ActiveOrder
+    | {
+        __typename: "OrderStateTransitionError";
+        errorCode: string;
+        message: string;
+        transitionError: string;
+        fromState: string;
+        toState: string;
+      };
+};
+
+interface InfoRowProps {
+  icon: React.ReactNode; // <- allow image, emoji, or anything
+  title: string;
+  text: string;
+}
 
 /* ------------------- Formatter ------------------- */
 const NGN = new Intl.NumberFormat("en-NG", {
@@ -91,26 +124,45 @@ const UPDATE_CART = gql`
 
 const Page = () => {
   const router = useRouter();
-
   const [method, setMethod] = useState<PaymentMethod>("card");
-  const [sameAsShipping, setSameAsShipping] = useState(true);
-
+  const [selectedShippingMethod, setSelectedShippingMethod] = useState<
+    string | null
+  >(null);
+  const [shippingAddress, setShippingAddress] = useState<any>(null);
   const [showPayment, setShowPayment] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-
+  // const [showSuccess, setShowSuccess] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
 
-
-
   /* ------------------- Active Order Query ------------------- */
-  const { data: activeOrderData, refetch } =
-    useQuery<{ activeOrder: ActiveOrder }>(GET_ACTIVE_ORDER);
+  const { data: activeOrderData, refetch } = useQuery<{
+    activeOrder: ActiveOrder;
+  }>(GET_ACTIVE_ORDER);
 
   const activeOrder = activeOrderData?.activeOrder;
 
+  /*----------------- shipping methods query ---------------- */
+  const { data: shippingMethodsData } = useQuery<{
+    eligibleShippingMethods: ShippingMethod[];
+  }>(GET_SHIPPING_METHODS, {
+    skip: !activeOrder, // Only fetch if there's an active order
+  });
+
+  const shippingMethods = shippingMethodsData?.eligibleShippingMethods || [];
+
+  /* ------------------- Auto-select first shipping method ------------------- */
+  useEffect(() => {
+    if (shippingMethods.length > 0 && !selectedShippingMethod) {
+      setSelectedShippingMethod(shippingMethods[0].id);
+    }
+  }, [shippingMethods, selectedShippingMethod]);
+
   /* ------------------- Mutations ------------------- */
   const [updateCartMutation] = useMutation(UPDATE_CART);
-  const [transitionToState] = useMutation(TRANSITION_TO_STATE);
+  const [setShippingAddressMutation] =
+    useMutation<SetShippingAddressResponse>(SET_SHIPPING_ADDRESS);
+  const [setShippingMethodMutation] = useMutation(SET_SHIPPING_METHOD);
+  const [transitionToState] =
+    useMutation<TransitionToStateResponse>(TRANSITION_TO_STATE);
   const [createPaystackIntent] = useMutation(PAYSTACK_INTENT);
   const [recreateFailedOrder] = useMutation(RECREATE_FAILED_ORDER);
 
@@ -126,48 +178,123 @@ const Page = () => {
       // Type-safe narrowing for build mode
       const payload = res.data as {
         adjustOrderLineQuantity:
-        | {
-          __typename: "Order";
-          id: string;
-          totalQuantity: number;
-          lines: ActiveOrderLine[];
-          totalWithTax: number;
-          subTotalWithTax?: number;
-        }
-        | {
-          __typename: "OrderModificationError";
-          message: string;
-        };
+          | {
+              __typename: "Order";
+              id: string;
+              totalQuantity: number;
+              lines: ActiveOrderLine[];
+              totalWithTax: number;
+              subTotalWithTax?: number;
+            }
+          | {
+              __typename: "OrderModificationError";
+              message: string;
+            };
       };
 
       if (payload.adjustOrderLineQuantity.__typename === "Order") {
         await refetch();
       } else {
-        alert(payload.adjustOrderLineQuantity.message);
+        toast.error(payload.adjustOrderLineQuantity.message);
       }
     } catch (err) {
       console.error("Error updating cart:", err);
+      toast.error("Failed to update cart.");
     }
   };
 
+  /* ------------------- Handle Address Submission ------------------- */
+  const handleAddressSubmit = async (addressData: any) => {
+    try {
+      const result = await setShippingAddressMutation({
+        variables: {
+          input: {
+            fullName: addressData.fullName,
+            streetLine1: addressData.streetLine1,
+            streetLine2: addressData.streetLine2 || "",
+            city: addressData.city,
+            province: addressData.province || "",
+            postalCode: addressData.postalCode || "",
+            countryCode: addressData.countryCode || "NG",
+            phoneNumber: addressData.phoneNumber,
+          },
+        },
+      });
+
+      // ✅ Type-safe check
+      const response = result.data?.setOrderShippingAddress;
+      if (response && "id" in response) {
+        setShippingAddress(addressData);
+        toast.success("Shipping address saved");
+        await refetch();
+      } else if (response && "errorCode" in response) {
+        toast.error(response.message);
+      }
+    } catch (err) {
+      console.error("Error setting shipping address:", err);
+      toast.error("Failed to set shipping address");
+    }
+  };
 
   /* ------------------- Checkout + Paystack ------------------- */
   const handleCheckout = async () => {
-    if (!activeOrder) return alert("No active order found.");
+    if (!activeOrder) {
+      toast.error("No active order found.");
+      return;
+    }
+
+    // ✅ Validate shipping address
+    if (!activeOrder.shippingAddress && !shippingAddress) {
+      toast.error("Please add a shipping address");
+      return;
+    }
+
+    // ✅ Validate shipping method
+    if (!selectedShippingMethod) {
+      toast.error("Please select a shipping method");
+      return;
+    }
 
     try {
       setIsPaying(true);
 
-      await transitionToState({ variables: { state: "ArrangingPayment" } });
+      // ✅ Step 1: Set shipping method if not already set
+      if (
+        !activeOrder.shippingLines ||
+        activeOrder.shippingLines.length === 0
+      ) {
+        console.log("Setting shipping method...");
+        await setShippingMethodMutation({
+          variables: { id: [selectedShippingMethod] },
+        });
+      }
 
+      // ✅ Step 2: Transition to ArrangingPayment
+      console.log("Transitioning to ArrangingPayment...");
+      const transitionResult = await transitionToState({
+        variables: { state: "ArrangingPayment" },
+      });
+
+      const transitionResponse = transitionResult.data?.transitionOrderToState;
+      if (
+        transitionResponse &&
+        "__typename" in transitionResponse &&
+        transitionResponse.__typename === "OrderStateTransitionError"
+      ) {
+        toast.error(`Cannot proceed: ${transitionResponse.transitionError}`);
+        setIsPaying(false);
+        return;
+      }
+
+      // ✅ Step 3: Create Paystack payment intent
+      console.log("Creating Paystack payment intent...");
       await createPaystackIntent({
         variables: { orderCode: activeOrder.code },
       });
 
+      // Step 4: Initialize Paystack
       const { default: PaystackPop } = await import("@paystack/inline-js");
-
       const paystack = new PaystackPop();
-
       paystack.newTransaction({
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
         amount: activeOrder.totalWithTax,
@@ -182,22 +309,17 @@ const Page = () => {
           await recreateFailedOrder({
             variables: { orderCode: activeOrder.code },
           });
-          router.replace("/main/home");
+          toast.error("Payment cancelled");
+          router.replace("/cart");
         },
       });
     } catch (err) {
       console.error(err);
-      alert("Payment failed.");
+      toast.error("Payment failed.");
     } finally {
       setIsPaying(false);
     }
   };
-
-
-  const handleSubmit = (data: any) => {
-    console.log("Form submitted:", data);
-  };
-
 
   return (
     <main className="min-h-screen bg-neutral-50">
@@ -217,7 +339,6 @@ const Page = () => {
             <div className="rounded-2xl border border-[#d1d1d1]  p-5">
               <p className="mb-4 text-lg font-semibold">Payment</p>
 
-
               {/* Radio Buttons */}
               <div className="flex flex-col gap-4">
                 <RadioRow
@@ -236,14 +357,15 @@ const Page = () => {
                         src="/master card.png"
                         alt="Visa"
                         width={36}
-                        height={36} />
-
+                        height={36}
+                      />
 
                       <Image
                         src="/visapay.png"
                         alt="Visa"
                         width={36}
-                        height={36} />
+                        height={36}
+                      />
 
                       <button
                         onClick={() => setShowPayment(true)}
@@ -262,31 +384,80 @@ const Page = () => {
                 />
               </div>
 
-
-
               {/* Billing address */}
               <div className="mt-6">
                 <p className="mb-2 text-sm font-semibold">Billing Address</p>
 
-                <div className="flex justify-between items-center bg-neutral-100 rounded-xl p-3">
-                  <label className="flex gap-2 items-center text-sm">
-                    {/* <input
-                      type="checkbox"
-                      checked={sameAsShipping}
-                      onChange={(e) => setSameAsShipping(e.target.checked)}
-                      className="accent-red-500"
-                    /> */}
-                    Same as shipping
-                  </label>
+                <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5">
+                  <p className="mb-4 text-lg font-semibold">Shipping Address</p>
 
-                  <AddressModal
-                    trigger={
-                      <button className="cursor-pointer">
-                        <Image src="/edit-rectangle.png" alt="Location" width={24} height={24} className="fill cursor-pointer" />
-                      </button>
-                    }
-                    onSubmit={handleSubmit}
-                  />
+                  {activeOrder?.shippingAddress || shippingAddress ? (
+                    <div className="bg-neutral-100 rounded-xl p-3">
+                      <p className="text-sm font-medium">
+                        {activeOrder?.shippingAddress?.fullName ||
+                          shippingAddress?.fullName}
+                      </p>
+                      <p className="text-xs text-neutral-600">
+                        {activeOrder?.shippingAddress?.streetLine1 ||
+                          shippingAddress?.streetLine1}
+                      </p>
+                      <p className="text-xs text-neutral-600">
+                        {activeOrder?.shippingAddress?.city ||
+                          shippingAddress?.city}
+                      </p>
+                      <AddressModal
+                        trigger={
+                          <button className="mt-2 text-xs text-red-500 hover:text-red-600">
+                            Change Address
+                          </button>
+                        }
+                        onSubmit={handleAddressSubmit}
+                      />
+                    </div>
+                  ) : (
+                    <AddressModal
+                      trigger={
+                        <button className="w-full py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600">
+                          Add Shipping Address
+                        </button>
+                      }
+                      onSubmit={handleAddressSubmit}
+                    />
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5">
+                  <p className="mb-4 text-lg font-semibold">Shipping Method</p>
+
+                  <div className="space-y-3">
+                    {shippingMethods.map((method) => (
+                      <label
+                        key={method.id}
+                        className="flex items-center justify-between p-3 bg-neutral-100 rounded-lg cursor-pointer hover:bg-neutral-200"
+                      >
+                        <div className="flex gap-3 items-center">
+                          <input
+                            type="radio"
+                            name="shipping"
+                            checked={selectedShippingMethod === method.id}
+                            onChange={() =>
+                              setSelectedShippingMethod(method.id)
+                            }
+                            className="accent-red-500"
+                          />
+                          <div>
+                            <p className="font-medium text-sm">{method.name}</p>
+                            <p className="text-xs text-neutral-600">
+                              {method.description}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-sm font-semibold">
+                          {NGN.format(method.price / 100)}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -296,17 +467,58 @@ const Page = () => {
               onClick={() => router.push("/cart")}
               className="text-red-500 text-sm font-medium flex items-center gap-2"
             >
-              <Image src="/shopping-cart.png" alt="Back" width={16} height={16} /> Return to Cart
+              <Image
+                src="/shopping-cart.png"
+                alt="Back"
+                width={16}
+                height={16}
+              />{" "}
+              Return to Cart
             </button>
 
             {/* Info rows */}
             <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5 pt-8">
-              <h3 className="text-sm font-semibold mb-4 border-b border-[#d1d1d1] pb-4">Delivery & Products</h3>
+              <h3 className="text-sm font-semibold mb-4 border-b border-[#d1d1d1] pb-4">
+                Delivery & Products
+              </h3>
 
               <div className="flex flex-col gap-5">
-                <InfoRow icon={<Image src="/truck.png" alt="Delivery" width={24} height={24} />} title="Delivery" text="1–9 business days" />
-                <InfoRow icon={<Image src="/repeat.png" alt="Delivery" width={24} height={24} />} title="Returns" text="7-day return policy" />
-                <InfoRow icon={<Image src="/shield.png" alt="Delivery" width={24} height={24} />} title="Warranty" text="Varies per item" />
+                <InfoRow
+                  icon={
+                    <Image
+                      src="/truck.png"
+                      alt="Delivery"
+                      width={24}
+                      height={24}
+                    />
+                  }
+                  title="Delivery"
+                  text="1–9 business days"
+                />
+                <InfoRow
+                  icon={
+                    <Image
+                      src="/repeat.png"
+                      alt="Delivery"
+                      width={24}
+                      height={24}
+                    />
+                  }
+                  title="Returns"
+                  text="7-day return policy"
+                />
+                <InfoRow
+                  icon={
+                    <Image
+                      src="/shield.png"
+                      alt="Delivery"
+                      width={24}
+                      height={24}
+                    />
+                  }
+                  title="Warranty"
+                  text="Varies per item"
+                />
               </div>
             </div>
           </section>
@@ -339,9 +551,7 @@ const Page = () => {
                       <div className="flex items-center gap-2 mt-2">
                         <button
                           className="w-6 h-6 border rounded"
-                          onClick={() =>
-                            updateQuantity(ln.id, ln.quantity - 1)
-                          }
+                          onClick={() => updateQuantity(ln.id, ln.quantity - 1)}
                         >
                           –
                         </button>
@@ -350,9 +560,7 @@ const Page = () => {
 
                         <button
                           className="w-6 h-6 border rounded"
-                          onClick={() =>
-                            updateQuantity(ln.id, ln.quantity + 1)
-                          }
+                          onClick={() => updateQuantity(ln.id, ln.quantity + 1)}
                         >
                           +
                         </button>
@@ -373,9 +581,7 @@ const Page = () => {
               <div className="mt-4 border-t pt-4 space-y-2 text-sm">
                 <Row
                   label="Subtotal"
-                  value={NGN.format(
-                    (activeOrder?.subTotalWithTax ?? 0) / 100
-                  )}
+                  value={NGN.format((activeOrder?.subTotalWithTax ?? 0) / 100)}
                 />
                 <Row label="Discount" value="- ₦1,011.87" />
                 <Row label="Shipping" value="₦252,000" />
@@ -393,8 +599,9 @@ const Page = () => {
               <button
                 onClick={handleCheckout}
                 disabled={isPaying}
-                className={`mt-4 w-full py-3 rounded-full text-white text-sm font-medium ${isPaying ? "bg-red-300" : "bg-red-500 hover:bg-red-600"
-                  }`}
+                className={`mt-4 w-full py-3 rounded-full text-white text-sm font-medium ${
+                  isPaying ? "bg-red-300" : "bg-red-500 hover:bg-red-600"
+                }`}
               >
                 {isPaying ? "Processing..." : "Checkout"}
               </button>
@@ -416,7 +623,12 @@ function RadioRow({ checked, onChange, label, right }: any) {
   return (
     <label className="flex justify-between items-center p-3 bg-neutral-100 rounded-lg cursor-pointer">
       <div className="flex gap-3 items-center">
-        <input type="radio" checked={checked} onChange={onChange} className="accent-red-500" />
+        <input
+          type="radio"
+          checked={checked}
+          onChange={onChange}
+          className="accent-red-500"
+        />
         <span>{label}</span>
       </div>
       {right}
@@ -442,9 +654,7 @@ function BrandDot({ className }: any) {
 function InfoRow({ icon, title, text }: InfoRowProps) {
   return (
     <div className="flex items-center gap-3 border-b border-[#f0f0f0] pb-2">
-      <div className="w-6 h-6 flex-0">
-        {icon}
-      </div>
+      <div className="w-6 h-6 flex-0">{icon}</div>
       <div>
         <p className="font-medium">{title}</p>
         <p className="text-xs text-gray-500">{text}</p>

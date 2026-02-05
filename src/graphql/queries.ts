@@ -19,7 +19,6 @@ export const GET_TOP_LEVEL_COLLECTIONS = gql`
 export const GET_COLLECTION_PRODUCTS = gql`
   query GetCollectionProducts(
     $collectionSlug: String!
-    $groupByProduct: Boolean = true
     $skip: Int = 0
     $take: Int = 20
     $facetValueIds: [ID!]
@@ -27,7 +26,7 @@ export const GET_COLLECTION_PRODUCTS = gql`
     search(
       input: {
         collectionSlug: $collectionSlug
-        groupByProduct: $groupByProduct
+        groupByProduct: false
         skip: $skip
         take: $take
         facetValueIds: $facetValueIds
@@ -35,15 +34,20 @@ export const GET_COLLECTION_PRODUCTS = gql`
     ) {
       totalItems
       items {
+        productId
         productName
         slug
+
         productVariantId
         productVariantName
+
         facetValueIds
+
         productAsset {
           id
           preview
         }
+
         priceWithTax {
           __typename
           ... on SinglePrice {
@@ -54,11 +58,13 @@ export const GET_COLLECTION_PRODUCTS = gql`
             max
           }
         }
+
         currencyCode
       }
     }
   }
 `;
+
 
 export const GET_PRODUCT_DETAILS = gql`
   query GetProductDetail($slug: String!) {

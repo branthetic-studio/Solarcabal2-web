@@ -1,190 +1,167 @@
 "use client";
+
 import React, { useState } from "react";
 import { useQuery } from "@apollo/client/react";
-import { gql } from "@apollo/client";
-import PackageCard from "./PackageCard";
-import { Search } from "lucide-react";
+import { Search, ChevronRight } from "lucide-react";
+
+import {
+  GET_TOP_LEVEL_COLLECTIONS,
+  GET_COLLECTION_PRODUCTS,
+} from "@/graphql/queries";
+
 import {
   GetTopLevelCollectionsResponse,
   GetCollectionProductsResponse,
 } from "@/types/catalog";
+
+import PackageCard from "./PackageCard";
 import CartItems from "@/Components/CartItems";
-import { ChevronRight } from "lucide-react";
 
-// ================== QUERIES ==================
-
-// Fetch top-level categories (collections)
-const GET_TOP_LEVEL_COLLECTIONS = gql`
-  query GetTopLevelCollections {
-    collections(options: { topLevelOnly: true }) {
-      items {
-        id
-        slug
-        name
-        featuredAsset {
-          id
-          preview
-        }
-      }
-    }
-  }
-`;
-
-// Fetch products in a given category (collection)
-const GET_CATEGORIES_PRODUCTS = gql`
-  query GetCollectionProducts($slug: String!, $skip: Int, $take: Int) {
-    search(
-      input: {
-        collectionSlug: $slug
-        groupByProduct: true
-        skip: $skip
-        take: $take
-      }
-    ) {
-      totalItems
-      items {
-        productName
-        slug
-        productAsset {
-          id
-          preview
-        }
-        priceWithTax {
-          ... on SinglePrice {
-            value
-          }
-          ... on PriceRange {
-            min
-            max
-          }
-        }
-        currencyCode
-      }
-    }
-  }
-`;
-
-// ================== COMPONENT ==================
+// ================= COMPONENT =================
 
 const PackageList: React.FC = () => {
-  const [selectedSlug, setSelectedSlug] = useState("panels");
+  const [selectedSlug, setSelectedSlug] = useState<string>("panels");
 
-  // Fetch categories
+  /* ---------------- Categories ---------------- */
+
   const {
     data: categoriesData,
     loading: categoriesLoading,
     error: categoriesError,
   } = useQuery<GetTopLevelCollectionsResponse>(GET_TOP_LEVEL_COLLECTIONS);
 
-  // Fetch products when category is selected
+  /* ---------------- Products ---------------- */
+
   const {
     data: productsData,
     loading: productsLoading,
     error: productsError,
-  } = useQuery<GetCollectionProductsResponse>(GET_CATEGORIES_PRODUCTS, {
-    variables: { slug: selectedSlug ?? "", take: 6 },
-    skip: !selectedSlug, // don't run until category is chosen
+  } = useQuery<GetCollectionProductsResponse>(GET_COLLECTION_PRODUCTS, {
+    variables: {
+      collectionSlug: selectedSlug,
+      take: 12,
+      skip: 0,
+    },
+    skip: !selectedSlug,
   });
 
-  if (categoriesLoading) return <p>Loading categories...</p>;
-  if (categoriesError) return <p>Error loading categories.</p>;
+  /* ---------------- States ---------------- */
+
+  if (categoriesLoading) return <p>Loading categories…</p>;
+  if (categoriesError) return <p>Failed to load categories</p>;
 
   const categories = categoriesData?.collections.items ?? [];
+  const products = productsData?.search.items ?? [];
+
+  /* ================= RENDER ================= */
 
   return (
-    <div className="package-container flex">
-      {/* Sidebar Categories */}
-      <div className="package-sidebar">
-        <h1 className="text-lg font-semibold">Installation Package</h1>
-        {/* Search */}
+    <div className="package-container flex gap-6">
+
+      {/* ========== SIDEBAR ========== */}
+
+      <aside className="package-sidebar w-64 border-r">
+
+        <h1 className="text-lg font-semibold mb-4">
+          Installation Packages
+        </h1>
+
+        {/* Search (UI only for now) */}
         <div className="relative mb-4">
-          <div className="absolute top-[50%] left-3 transform -translate-y-1/2">
-            <Search className="text-[#e0e0e0]" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search for categories"
-            className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded-full px-12 py-2 text-sm focus:outline-none"
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            size={18}
           />
 
+          <input
+            type="text"
+            placeholder="Search categories"
+            className="w-full rounded-full border px-10 py-2 text-sm"
+          />
         </div>
 
-        {categories.map((cat: any) => (
+        {/* Categories */}
+
+        {categories.map((cat) => (
           <button
             key={cat.id}
             onClick={() => setSelectedSlug(cat.slug)}
-            className={`
-        w-full flex items-center justify-between border-b border-[#f5f5f5]
-        px-4 py-2 text-left text-sm
-        transition
-        ${selectedSlug === cat.slug
-                ? " text-red-600 font-semibold"
-                : "hover:bg-gray-100 text-gray-700"
+            className={`w-full flex items-center justify-between
+              border-b px-3 py-2 text-sm transition
+              ${
+                selectedSlug === cat.slug
+                  ? "text-red-600 font-semibold"
+                  : "text-gray-700 hover:bg-gray-100"
               }
-      `}
+            `}
           >
             <span>{cat.name}</span>
-
-            <ChevronRight size={20} />
+            <ChevronRight size={18} />
           </button>
         ))}
-      </div>
+      </aside>
 
+      {/* ========== MAIN ========== */}
 
-      {/* Products */}
-      <div className="package-main">
+      <main className="package-main flex-1">
 
         {/* Header */}
+
         {selectedSlug && (
-          <h2 className="text-md font-semibold mb-6 text-red-600 border-b pb-2 border-[#e0e0e0]">
-            {selectedSlug.replace("-", " ")} package
+          <h2 className="mb-6 border-b pb-2 text-md font-semibold text-red-600">
+            {selectedSlug.replace(/-/g, " ")} packages
           </h2>
         )}
 
-        {!selectedSlug && (
-          <p className="text-gray-500">
-            Select a category to view available products.
-          </p>
-        )}
+        {/* Loading / Error */}
 
-        {productsLoading && <p>Loading products...</p>}
-        {productsError && <p>Error loading products.</p>}
+        {productsLoading && <p>Loading packages…</p>}
+        {productsError && <p>Failed to load packages</p>}
 
         {/* Grid */}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-          {productsData?.search.items.map((product: any, idx: number) => {
+          {products.map((item) => {
             const price =
-              product.priceWithTax.__typename === "SinglePrice"
-                ? `${product.priceWithTax.value}`
-                : `${product.priceWithTax.min} - ${product.priceWithTax.max}`;
+              item.priceWithTax.__typename === "SinglePrice"
+                ? item.priceWithTax.value
+                : item.priceWithTax.min;
 
             return (
               <PackageCard
-                key={idx}
+                key={item.productVariantId}
+
                 option={{
-                  title: product.productName,
+                  title: `${item.productName} (${item.productVariantName})`,
+
                   price,
-                  features: [product.currencyCode],
+
+                  features: [item.currencyCode],
+
                   items: [
                     {
-                      name: product.productName,
-                      desc: product.slug,
-                      img: product.productAsset?.preview ?? "",
+                      name: item.productName,
+                      desc: item.slug,
+                      img: item.productAsset?.preview ?? "",
                     },
                   ],
                 }}
-                collectionSlug={selectedSlug ?? undefined}
+
+                productSlug={item.slug}
+                variantId={item.productVariantId!}
               />
             );
           })}
 
         </div>
-      </div>
+      </main>
 
-      <div className="flex-2 package-cart">
+      {/* ========== CART ========== */}
+
+      <aside className="w-80">
         <CartItems />
-      </div>
+      </aside>
 
     </div>
   );

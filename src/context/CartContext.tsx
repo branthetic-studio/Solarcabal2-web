@@ -32,6 +32,7 @@ type UseCartContext = {
   cart: GetActiveOrderData | undefined;
   activeOrder: ActiveOrder | null | undefined;
   getCount: () => number;
+  loading: boolean;
   addToCartMutation: (
     variables: AddItemToOrderMutationVariables
   ) => Promise<any>;
@@ -43,11 +44,11 @@ type UseCartContext = {
   getOrderLineIdByVariantId: (variantId: string) => string | undefined;
 };
 
-// Initial (empty) context
 const initialCtx: UseCartContext = {
   cart: undefined,
   activeOrder: undefined,
   getCount: () => 0,
+  loading: false,
   addToCartMutation: async () => {},
   handleAdjustQuantity: async () => {},
   removeFromCartMutation: async () => {},
@@ -59,9 +60,12 @@ const CartContext = createContext<UseCartContext>(initialCtx);
 export const useCart = () => useContext(CartContext);
 
 const CartProvider = ({ children }: PropsWithChildren) => {
-  const { data, refetch } = useQuery<GetActiveOrderData>(GET_ACTIVE_ORDER, {
-    fetchPolicy: "cache-and-network",
-  });
+  const { data, refetch, loading } = useQuery<GetActiveOrderData>(
+    GET_ACTIVE_ORDER,
+    {
+      fetchPolicy: "cache-and-network",
+    }
+  );
 
   const [addItem] = useMutation<
     AddItemToOrderMutation,
@@ -128,6 +132,7 @@ const CartProvider = ({ children }: PropsWithChildren) => {
         cart: data,
         activeOrder: data?.activeOrder,
         getCount,
+        loading,
         addToCartMutation,
         handleAdjustQuantity,
         removeFromCartMutation,
