@@ -146,11 +146,10 @@ const ProductDetailsPage = () => {
     setIsAdding(true);
     try {
       await addToCartMutation({
-        variables: {
-          productVariantId: selectedVariant.id, // <-- real Vendure variant id
-          quantity, // <-- your current quantity state
-        },
+        productVariantId: selectedVariant.id,
+        quantity,
       });
+
       // optional: show toast / open mini-cart
       // toast.success("Added to cart");
     } catch (e) {
