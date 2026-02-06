@@ -191,26 +191,61 @@ const PackageList: React.FC = () => {
             className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded-full px-12 py-2 text-sm focus:outline-none"
           />
         </div>
-
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setSelectedSlug(cat.slug)}
-            className={`
-              w-full flex items-center justify-between border-b border-[#f5f5f5]
-              px-4 py-2 text-left text-sm
-              transition
-              ${
-                selectedSlug === cat.slug
-                  ? " text-red-600 font-semibold"
-                  : "hover:bg-gray-100 text-gray-700"
-              }
-            `}
+        <h1>Select Package</h1>
+        {/* ✅ Mobile Dropdown */}
+        <div className="block w-50 md:hidden mb-4">
+          <select
+            value={selectedSlug ?? ""}
+            onChange={(e) => setSelectedSlug(e.target.value)}
+            className="
+      w-full
+      border
+      border-gray-300
+      rounded-md
+      px-3
+      py-2
+      text-sm
+      bg-white
+      focus:outline-none
+      focus:ring-2
+      focus:ring-red-500
+    "
           >
-            <span>{cat.name}</span>
-            <ChevronRight size={20} />
-          </button>
-        ))}
+            <option value="" disabled className="text-xs">
+              Select Package
+            </option>
+
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.slug} className="text-xs">
+                {cat.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* ✅ Desktop Buttons */}
+        <div className="hidden md:block">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedSlug(cat.slug)}
+              className={`
+        w-full flex items-center justify-between
+        border-b border-[#f5f5f5]
+        px-4 py-2 text-left text-sm
+        transition
+        ${selectedSlug === cat.slug
+                  ? "text-red-600 font-semibold"
+                  : "hover:bg-gray-100 text-gray-700"
+                }
+      `}
+            >
+              <span>{cat.name}</span>
+              <ChevronRight size={20} />
+            </button>
+          ))}
+        </div>
+
       </div>
 
       {/* Products (tiers) */}

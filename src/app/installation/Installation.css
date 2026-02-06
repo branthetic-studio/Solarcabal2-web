@@ -443,7 +443,7 @@
   }
   .package-sidebar {
     width: 100%;
-    flex-direction: row;
+    flex-direction: column;
     gap: 16px;
     overflow-x: auto; /* preserve buttons without reflow */
     padding-bottom: 6px;
