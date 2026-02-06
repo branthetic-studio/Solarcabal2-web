@@ -1,168 +1,272 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@apollo/client/react";
-import { Search, ChevronRight } from "lucide-react";
-
-import {
-  GET_TOP_LEVEL_COLLECTIONS,
-  GET_COLLECTION_PRODUCTS,
-} from "@/graphql/queries";
-
-import {
-  GetTopLevelCollectionsResponse,
-  GetCollectionProductsResponse,
-} from "@/types/catalog";
-
 import PackageCard from "./PackageCard";
+import { Search, ChevronRight } from "lucide-react";
 import CartItems from "@/Components/CartItems";
 
-// ================= COMPONENT =================
+import { GET_CATEGORIES_BY_FACET, SEARCH_PACKAGES } from "@/graphql/queries";
+import { useFacet } from "@/context/useFacet";
+
+/* ---------------- Types (minimal, local) ---------------- */
+type FlatFacet = { id: string; name: string };
+
+type FacetCollectionsData = {
+  search: {
+    collections: Array<{
+      collection: {
+        id: string;
+        name: string;
+        slug: string;
+        featuredAsset?: { id: string; preview?: string | null } | null;
+      };
+    }>;
+  };
+};
+
+type FacetCollectionsVars = {
+  facetValues: {
+    and?: string;
+  };
+};
+
+type SearchPackagesData = {
+  search: {
+    collections: Array<{
+      collection: {
+        id: string;
+        name: string;
+        slug: string;
+        productVariants: {
+          items: Array<{
+            id: string;
+            name: string;
+            priceWithTax?: number | null;
+            product?: { slug?: string | null } | null;
+            featuredAsset?: { id: string; preview?: string | null } | null;
+            customFields?: {
+              packageCapacity?: string | null;
+              packageComponents?: Array<{
+                id: string;
+                name: string;
+                slug: string;
+                featuredAsset?: { id: string; preview?: string | null } | null;
+              }> | null;
+            } | null;
+          }>;
+        };
+      };
+    }>;
+    facetValues?: Array<{
+      count: number;
+      facetValue: {
+        id: string;
+        name: string;
+        facet: { id: string; name: string };
+      };
+    }>;
+  };
+};
+
+type SearchPackagesVars = {
+  input: {
+    collectionSlug: string;
+  };
+};
+
+/* ---------------- ✅ CHANGED: Helpers for correct KVA ordering ---------------- */
+const extractKva = (text: string) => {
+  const s = (text || "").toLowerCase().replace(/\s+/g, "");
+  const m = s.match(/(\d+(\.\d+)?)kva/);
+  if (!m) return Number.POSITIVE_INFINITY;
+  return parseFloat(m[1]);
+};
 
 const PackageList: React.FC = () => {
-  const [selectedSlug, setSelectedSlug] = useState<string>("panels");
+  const { storeFacets } = useFacet();
 
-  /* ---------------- Categories ---------------- */
+  const [installationFacet, setInstallationFacet] = useState<
+    FlatFacet | undefined
+  >(undefined);
 
+  const [selectedSlug, setSelectedSlug] = useState<string | undefined>(
+    undefined
+  );
+
+  /* ---------------- Find "installation" facet ---------------- */
+  useEffect(() => {
+    const installation = storeFacets.find(
+      (f: FlatFacet) => f.name?.toLowerCase() === "installation"
+    );
+    if (installation) setInstallationFacet(installation);
+  }, [storeFacets]);
+
+  /* ---------------- Sidebar: get installation package collections ---------------- */
   const {
-    data: categoriesData,
-    loading: categoriesLoading,
-    error: categoriesError,
-  } = useQuery<GetTopLevelCollectionsResponse>(GET_TOP_LEVEL_COLLECTIONS);
+    data: packagesData,
+    loading: packagesLoading,
+    error: packagesError,
+  } = useQuery<FacetCollectionsData, FacetCollectionsVars>(
+    GET_CATEGORIES_BY_FACET,
+    {
+      variables: {
+        facetValues: {
+          and: installationFacet?.id,
+        },
+      },
+      skip: !installationFacet?.id,
+    }
+  );
 
-  /* ---------------- Products ---------------- */
+  /* ---------------- ✅ CHANGED: Build, DEDUPE and SORT categories by KVA ---------------- */
+  const categories = useMemo(() => {
+    const raw =
+      packagesData?.search?.collections?.map((x) => x.collection) ?? [];
 
+    // De-dupe by slug (your UI screenshot shows repeated package rows)
+    const uniq = Array.from(new Map(raw.map((c) => [c.slug, c])).values());
+
+    // Sort low -> high by KVA (use name first, fallback to slug)
+    return uniq.sort((a, b) => {
+      const aKva = extractKva(a.name || a.slug);
+      const bKva = extractKva(b.name || b.slug);
+      if (aKva !== bKva) return aKva - bKva;
+      return (a.name || a.slug).localeCompare(b.name || b.slug);
+    });
+  }, [packagesData]);
+
+  /* ---------------- ✅ CHANGED: Auto-select LOWEST KVA on first load ---------------- */
+  useEffect(() => {
+    if (!selectedSlug && categories.length > 0) {
+      setSelectedSlug(categories[0].slug); // categories is sorted => lowest KVA
+    }
+  }, [categories, selectedSlug]);
+
+  /* ---------------- Grid: get tiers/variants for selected package ---------------- */
   const {
-    data: productsData,
-    loading: productsLoading,
-    error: productsError,
-  } = useQuery<GetCollectionProductsResponse>(GET_COLLECTION_PRODUCTS, {
+    data: tiersData,
+    loading: tiersLoading,
+    error: tiersError,
+  } = useQuery<SearchPackagesData, SearchPackagesVars>(SEARCH_PACKAGES, {
     variables: {
-      collectionSlug: selectedSlug,
-      take: 12,
-      skip: 0,
+      input: {
+        collectionSlug: selectedSlug ?? "",
+      },
     },
     skip: !selectedSlug,
   });
 
-  /* ---------------- States ---------------- */
+  /* ---------------- Selected package collection + tiers ---------------- */
+  const selectedCollection = useMemo(() => {
+    const list = tiersData?.search?.collections ?? [];
+    return list.find((x) => x.collection.slug === selectedSlug)?.collection;
+  }, [tiersData, selectedSlug]);
 
-  if (categoriesLoading) return <p>Loading categories…</p>;
-  if (categoriesError) return <p>Failed to load categories</p>;
+  const tiers = selectedCollection?.productVariants?.items ?? [];
 
-  const categories = categoriesData?.collections.items ?? [];
-  const products = productsData?.search.items ?? [];
+  /* ---------------- ✅ CHANGED: Find selected category object for header ---------------- */
+  const selectedCategory = useMemo(() => {
+    return categories.find((c) => c.slug === selectedSlug);
+  }, [categories, selectedSlug]);
 
-  /* ================= RENDER ================= */
+  // Sidebar loading/errors
+  if (packagesLoading) return <p>Loading categories...</p>;
+  if (packagesError) return <p>Error loading categories.</p>;
 
   return (
-    <div className="package-container flex gap-6">
+    <div className="package-container flex">
+      {/* Sidebar Categories */}
+      <div className="package-sidebar">
+        <h1 className="text-lg font-semibold">Installation Package</h1>
 
-      {/* ========== SIDEBAR ========== */}
-
-      <aside className="package-sidebar w-64 border-r">
-
-        <h1 className="text-lg font-semibold mb-4">
-          Installation Packages
-        </h1>
-
-        {/* Search (UI only for now) */}
+        {/* Search (UI unchanged; not wired) */}
         <div className="relative mb-4">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            size={18}
-          />
-
+          <div className="absolute top-[50%] left-3 transform -translate-y-1/2">
+            <Search className="text-[#e0e0e0]" />
+          </div>
           <input
             type="text"
-            placeholder="Search categories"
-            className="w-full rounded-full border px-10 py-2 text-sm"
+            placeholder="Search for categories"
+            className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded-full px-12 py-2 text-sm focus:outline-none"
           />
         </div>
-
-        {/* Categories */}
 
         {categories.map((cat) => (
           <button
             key={cat.id}
             onClick={() => setSelectedSlug(cat.slug)}
-            className={`w-full flex items-center justify-between
-              border-b px-3 py-2 text-sm transition
+            className={`
+              w-full flex items-center justify-between border-b border-[#f5f5f5]
+              px-4 py-2 text-left text-sm
+              transition
               ${
                 selectedSlug === cat.slug
-                  ? "text-red-600 font-semibold"
-                  : "text-gray-700 hover:bg-gray-100"
+                  ? " text-red-600 font-semibold"
+                  : "hover:bg-gray-100 text-gray-700"
               }
             `}
           >
             <span>{cat.name}</span>
-            <ChevronRight size={18} />
+            <ChevronRight size={20} />
           </button>
         ))}
-      </aside>
+      </div>
 
-      {/* ========== MAIN ========== */}
-
-      <main className="package-main flex-1">
-
-        {/* Header */}
-
+      {/* Products (tiers) */}
+      <div className="package-main">
+        {/* Header (UI unchanged; now uses selected package NAME to match UI) */}
         {selectedSlug && (
-          <h2 className="mb-6 border-b pb-2 text-md font-semibold text-red-600">
-            {selectedSlug.replace(/-/g, " ")} packages
+          <h2 className="text-md font-semibold mb-6 text-red-600 border-b pb-2 border-[#e0e0e0]">
+            {selectedCategory?.name ?? selectedSlug.replace("-", " ")} package
           </h2>
         )}
 
-        {/* Loading / Error */}
+        {!selectedSlug && (
+          <p className="text-gray-500">
+            Select a category to view available products.
+          </p>
+        )}
 
-        {productsLoading && <p>Loading packages…</p>}
-        {productsError && <p>Failed to load packages</p>}
+        {tiersLoading && <p>Loading products...</p>}
+        {tiersError && <p>Error loading products.</p>}
 
-        {/* Grid */}
-
+        {/* Grid (UI unchanged) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-
-          {products.map((item) => {
-            const price =
-              item.priceWithTax.__typename === "SinglePrice"
-                ? item.priceWithTax.value
-                : item.priceWithTax.min;
+          {tiers.map((variant, idx) => {
+            const price = variant.priceWithTax
+              ? `${variant.priceWithTax}`
+              : "0";
 
             return (
               <PackageCard
-                key={item.productVariantId}
-
+                key={variant.id ?? idx}
                 option={{
-                  title: `${item.productName} (${item.productVariantName})`,
-
+                  title: variant.name, // tier name e.g. Gold / Silver / Normal
                   price,
-
-                  features: [item.currencyCode],
-
+                  features: [
+                    variant.customFields?.packageCapacity
+                      ? `Capacity: ${variant.customFields.packageCapacity}`
+                      : "Installation tier",
+                  ],
                   items: [
                     {
-                      name: item.productName,
-                      desc: item.slug,
-                      img: item.productAsset?.preview ?? "",
+                      name: variant.name,
+                      desc: variant.product?.slug ?? "",
+                      img: variant.featuredAsset?.preview ?? "",
                     },
                   ],
                 }}
-
-                productSlug={item.slug}
-                variantId={item.productVariantId!}
+                collectionSlug={selectedSlug ?? undefined}
               />
             );
           })}
-
         </div>
-      </main>
+      </div>
 
-      {/* ========== CART ========== */}
-
-      <aside className="w-80">
+      <div className="flex-2 package-cart">
         <CartItems />
-      </aside>
-
+      </div>
     </div>
   );
 };

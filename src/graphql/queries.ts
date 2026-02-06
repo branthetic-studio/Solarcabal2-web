@@ -686,3 +686,79 @@ export const GET_CUSTOMER_ADDRESSES = gql`
     }
   }
 `;
+
+export const GET_CATEGORIES_BY_FACET = gql`
+  query GetCategoriesByFacet($facetValues: FacetValueFilterInput!) {
+    search(
+      input: {
+        facetValueFilters: [$facetValues]
+        groupByProduct: true
+        take: 0
+      }
+    ) {
+      collections {
+        collection {
+          id
+          name
+          slug
+          featuredAsset {
+            id
+            preview
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const SEARCH_PACKAGES = gql`
+  query SearchPackages($input: SearchInput!) {
+    search(input: $input) {
+      totalItems
+      facetValues {
+        count
+        facetValue {
+          id
+          name
+          facet {
+            id
+            name
+          }
+        }
+      }
+      collections {
+        collection {
+          id
+          name
+          slug
+          productVariants {
+            items {
+              id
+              name
+              priceWithTax
+              product {
+                slug
+              }
+              featuredAsset {
+                id
+                preview
+              }
+              customFields {
+                packageCapacity
+                packageComponents {
+                  id
+                  name
+                  slug
+                  featuredAsset {
+                    id
+                    preview
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;

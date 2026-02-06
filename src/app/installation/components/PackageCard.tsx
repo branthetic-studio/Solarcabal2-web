@@ -32,10 +32,10 @@ const PackageCard: React.FC<Props> = ({ option, collectionSlug }) => {
   return (
     <div className="bg-white p-6">
       <div className="package-header">
-        <div className="">
+        {/* <div className="">
           <h3 className="text-sm">{option.title}</h3>
           <p className="bg-[#ff0000] text-white px-4 py-1 rounded-md text-sm w-full"><span className="text-xs">{option.features.join(", ")}</span> {option.price}</p>
-        </div>
+        </div> */}
 
         {/* ✅ Use collection slug, not product/title slug */}
 
@@ -48,7 +48,7 @@ const PackageCard: React.FC<Props> = ({ option, collectionSlug }) => {
           <ItemCard key={i} item={item} />
         ))}
       </div>
-      <button className="text-sm bg-[#ff0000] text-white py-3 rounded-full w-full mt-6">
+      <button className="text-sm bg-[#000000] text-white py-3 rounded-lg w-full mt-6">
         <Link href={href} >
           View
         </Link>
