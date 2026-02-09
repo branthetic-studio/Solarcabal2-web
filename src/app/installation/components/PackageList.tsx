@@ -91,13 +91,13 @@ const PackageList: React.FC = () => {
   >(undefined);
 
   const [selectedSlug, setSelectedSlug] = useState<string | undefined>(
-    undefined
+    undefined,
   );
 
   /* ---------------- Find "installation" facet ---------------- */
   useEffect(() => {
     const installation = storeFacets.find(
-      (f: FlatFacet) => f.name?.toLowerCase() === "installation"
+      (f: FlatFacet) => f.name?.toLowerCase() === "installation",
     );
     if (installation) setInstallationFacet(installation);
   }, [storeFacets]);
@@ -116,7 +116,7 @@ const PackageList: React.FC = () => {
         },
       },
       skip: !installationFacet?.id,
-    }
+    },
   );
 
   /* ---------------- ✅ CHANGED: Build, DEDUPE and SORT categories by KVA ---------------- */
@@ -234,10 +234,11 @@ const PackageList: React.FC = () => {
         border-b border-[#f5f5f5]
         px-4 py-2 text-left text-sm
         transition
-        ${selectedSlug === cat.slug
-                  ? "text-red-600 font-semibold"
-                  : "hover:bg-gray-100 text-gray-700"
-                }
+        ${
+          selectedSlug === cat.slug
+            ? "text-red-600 font-semibold"
+            : "hover:bg-gray-100 text-gray-700"
+        }
       `}
             >
               <span>{cat.name}</span>
@@ -245,7 +246,6 @@ const PackageList: React.FC = () => {
             </button>
           ))}
         </div>
-
       </div>
 
       {/* Products (tiers) */}

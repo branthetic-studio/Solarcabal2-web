@@ -18,8 +18,8 @@ import { signIn } from "next-auth/react";
 const REGISTER_MUTATION: TypedDocumentNode<
   {
     registerCustomerAccount:
-      | { __typename: "Success"; success: boolean }
-      | { __typename: "ErrorResult"; errorCode: string; message: string };
+    | { __typename: "Success"; success: boolean }
+    | { __typename: "ErrorResult"; errorCode: string; message: string };
   },
   {
     input: {
@@ -27,6 +27,7 @@ const REGISTER_MUTATION: TypedDocumentNode<
       firstName: string;
       lastName: string;
       password: string;
+      referCode?: string;
     };
   }
 > = gql`
@@ -63,6 +64,7 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
     email: "",
     password: "",
     agree: false,
+    referCode: "",
   });
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [
@@ -156,21 +158,19 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
           <div className="flex mb-6 border-b">
             <button
               onClick={() => setActiveTab("login")}
-              className={`flex-1 py-2 text-center ${
-                activeTab === "login"
-                  ? "border-b border-[#3C3C3C] font-semibold"
-                  : "text-gray-500"
-              }`}
+              className={`flex-1 py-2 text-center ${activeTab === "login"
+                ? "border-b border-[#3C3C3C] font-semibold"
+                : "text-gray-500"
+                }`}
             >
               Log in
             </button>
             <button
               onClick={() => setActiveTab("register")}
-              className={`flex-1 py-2 text-center ${
-                activeTab === "register"
-                  ? "border-b border-black font-light"
-                  : "text-gray-500"
-              }`}
+              className={`flex-1 py-2 text-center ${activeTab === "register"
+                ? "border-b border-black font-light"
+                : "text-gray-500"
+                }`}
             >
               Create Account
             </button>
@@ -244,28 +244,35 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
 
           {/* Register Form */}
           {activeTab === "register" && (
-            <form onSubmit={handleRegister} className="flex flex-col gap-4">
-              <input
-                type="text"
-                placeholder="Enter Full Name"
-                value={registerForm.fullName}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, fullName: e.target.value })
-                }
-                className="w-full rounded-full border px-4 py-3 focus:outline-none"
-                required
-              />
-              <input
-                type="email"
-                placeholder="Enter Email"
-                value={registerForm.email}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, email: e.target.value })
-                }
-                className="w-full rounded-full border px-4 py-3 focus:outline-none"
-                required
-              />
+            <form onSubmit={handleRegister} className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-[#1C1C1C]">Full Name</label>
+                <input
+                  type="text"
+                  placeholder="Enter Full Name"
+                  value={registerForm.fullName}
+                  onChange={(e) =>
+                    setRegisterForm({ ...registerForm, fullName: e.target.value })
+                  }
+                  className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-[#1C1C1C]">Email</label>
+                <input
+                  type="email"
+                  placeholder="Enter Email"
+                  value={registerForm.email}
+                  onChange={(e) =>
+                    setRegisterForm({ ...registerForm, email: e.target.value })
+                  }
+                  className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
+                  required
+                />
+              </div>
               <div className="relative">
+                <label className="text-xs font-semibold text-[#1C1C1C]">Password</label>
                 <input
                   type={showRegisterPassword ? "text" : "password"}
                   placeholder="Password"
@@ -276,7 +283,7 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                       password: e.target.value,
                     })
                   }
-                  className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none"
+                  className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none"
                   required
                 />
                 <button
@@ -285,11 +292,25 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                   className="absolute right-3 top-3 text-gray-500"
                 >
                   {showRegisterPassword ? (
-                    <EyeOff className="h-5 w-5" />
+                    <EyeOff className="h-4 w-4" />
                   ) : (
-                    <Eye className="h-5 w-5" />
+                    <Eye className="h-4 w-4" />
                   )}
                 </button>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-[#1C1C1C]">Email</label>
+                <input
+                  type="text"
+                  placeholder="Enter Referral Code (Optional)"
+                  value={registerForm.referCode}
+                  onChange={(e) =>
+                    setRegisterForm({ ...registerForm, referCode: e.target.value })
+                  }
+                  className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
+                  required
+                />
               </div>
 
               {/* Terms checkbox */}
@@ -303,10 +324,10 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
                       agree: e.target.checked,
                     })
                   }
-                  className="mr-2"
+                  className="mr-2 text-xs"
                 />
-                I agree to all{" "}
-                <a href="#" className="underline font-medium ml-1">
+                <p className="text-xs">I agree to all{" "}</p>
+                <a href="#" className="underline font-medium ml-1 text-xs">
                   Terms & Conditions
                 </a>
               </label>
@@ -314,7 +335,7 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
               <button
                 type="submit"
                 disabled={registerLoading || !registerForm.agree}
-                className="w-full rounded-full bg-red-600 py-3 text-white font-semibold disabled:opacity-60"
+                className="w-full rounded-full bg-red-600 py-2 text-white text-sm font-semibold disabled:opacity-60"
               >
                 {registerLoading ? "Creating..." : "Create an Account"}
               </button>
@@ -323,10 +344,10 @@ export default function AuthModal({ trigger }: { trigger: React.ReactNode }) {
               )}
               {registerData?.registerCustomerAccount?.__typename ===
                 "Success" && (
-                <p className="text-green-600">
-                  ✅ Registered! Please check your email to verify your account.
-                </p>
-              )}
+                  <p className="text-green-600">
+                    Registered! Please check your email to verify your account.
+                  </p>
+                )}
 
               {/* Social login */}
               <div className="flex items-center my-2">

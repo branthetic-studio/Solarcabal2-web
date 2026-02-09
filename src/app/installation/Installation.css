@@ -17,10 +17,8 @@
   position: absolute;
   top: 10%;
   left: 5%;
-  
-  
+
   padding: 30px;
-  
 }
 
 .installation-banner-content {
@@ -93,7 +91,7 @@
   padding: 40px 35px;
 }
 
-.installation-info h3{
+.installation-info h3 {
   font-size: 32px;
   font-weight: 600;
 }
@@ -235,13 +233,12 @@
   gap: 20px;
   background-color: #fafafa;
   border: 1px solid #e0e0e0;
-  border-top:0 ;
-  border-bottom:0 ;
+  border-top: 0;
+  border-bottom: 0;
   padding: 30px 20px;
-  
 }
 
-.package-cart{
+.package-cart {
   flex: 1.4;
 }
 
@@ -514,12 +511,9 @@
   }
   .consult-btn,
   .request-btn {
-
     font-size: 16px;
     padding: 12px 22px;
   }
-
-  
 
   /* Package header spacing */
   .package-header {
@@ -582,6 +576,10 @@
   }
   .package-card p {
     font-size: 15px;
+  }
+
+  .package-cart {
+    display: none;
   }
 }
 
