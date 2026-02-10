@@ -101,7 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         `}
       >
         {/* CATEGORY Header */}
-        <h3 className="text-md font-bold text-neutral-800 tracking-wide">
+        <h3 className="text-md font-bold hidden md:block text-neutral-800 tracking-wide">
           CATEGORY
         </h3>
 
