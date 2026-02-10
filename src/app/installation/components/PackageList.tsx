@@ -5,9 +5,13 @@ import { useQuery } from "@apollo/client/react";
 import PackageCard from "./PackageCard";
 import { Search, ChevronRight } from "lucide-react";
 import CartItems from "@/Components/CartItems";
-
+import Image from "next/image";
 import { GET_CATEGORIES_BY_FACET, SEARCH_PACKAGES } from "@/graphql/queries";
 import { useFacet } from "@/context/useFacet";
+import { useUser } from "@/context/UserContext";
+import { useCart } from "@/context/CartContext";
+import { useLocalCart } from "@/context/LocalCartContext";
+import Link from "next/link";
 
 /* ---------------- Types (minimal, local) ---------------- */
 type FlatFacet = { id: string; name: string };
@@ -85,6 +89,13 @@ const extractKva = (text: string) => {
 
 const PackageList: React.FC = () => {
   const { storeFacets } = useFacet();
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
 
   const [installationFacet, setInstallationFacet] = useState<
     FlatFacet | undefined
@@ -174,11 +185,43 @@ const PackageList: React.FC = () => {
   if (packagesLoading) return <p>Loading categories...</p>;
   if (packagesError) return <p>Error loading categories.</p>;
 
+  const { cart } = useCart();
+  const { items: localItems } = useLocalCart();
+  const { customer, logout, loading } = useUser();
+
+  const getCartCount = () => {
+    if (customer) {
+      const lines = cart?.activeOrder?.lines ?? [];
+      return lines.length;
+    } else {
+      return localItems.length;
+    }
+  };
+
+  const cartCount = mounted ? getCartCount() : 0;
+
   return (
     <div className="package-container flex">
       {/* Sidebar Categories */}
       <div className="package-sidebar">
-        <h1 className="text-lg font-semibold">Installation Package</h1>
+        <div className="flex justify-between">
+          <h1 className="text-lg font-semibold">Installation Package</h1>
+          <Link
+            href="/cart"
+            aria-label="Cart"
+            className="flex gap-2 border border-[#E4E9EE] text-sm relative px-5 py-3 md:hidden sm:block hover:bg-gray-100 rounded-lg transition-colors items-center"
+          >
+            Cart
+            <Image src="/shop-cart.png" alt="Cart" width={20} height={20} />
+
+            {mounted && cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
+          </Link>
+
+        </div>
 
         {/* Search (UI unchanged; not wired) */}
         <div className="relative mb-4">
@@ -198,7 +241,7 @@ const PackageList: React.FC = () => {
             value={selectedSlug ?? ""}
             onChange={(e) => setSelectedSlug(e.target.value)}
             className="
-      w-full
+      w-75
       border
       border-gray-300
       rounded-md
@@ -211,12 +254,12 @@ const PackageList: React.FC = () => {
       focus:ring-red-500
     "
           >
-            <option value="" disabled className="text-xs">
+            <option value="" disabled className="text-xs w-full">
               Select Package
             </option>
 
             {categories.map((cat) => (
-              <option key={cat.id} value={cat.slug} className="text-xs">
+              <option key={cat.id} value={cat.slug} className="text-xs w-50">
                 {cat.name}
               </option>
             ))}
@@ -234,11 +277,10 @@ const PackageList: React.FC = () => {
         border-b border-[#f5f5f5]
         px-4 py-2 text-left text-sm
         transition
-        ${
-          selectedSlug === cat.slug
-            ? "text-red-600 font-semibold"
-            : "hover:bg-gray-100 text-gray-700"
-        }
+        ${selectedSlug === cat.slug
+                  ? "text-red-600 font-semibold"
+                  : "hover:bg-gray-100 text-gray-700"
+                }
       `}
             >
               <span>{cat.name}</span>

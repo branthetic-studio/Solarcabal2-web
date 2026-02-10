@@ -216,7 +216,7 @@ const Navbar = () => {
               aria-label="Cart"
               className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
             >
-              <Image src="/shop cart.png" alt="Cart" width={20} height={20} />
+              <Image src="/shop-cart.png" alt="Cart" width={20} height={20} />
               {cartCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">
                   {cartCount > 99 ? "99+" : cartCount}
@@ -436,7 +436,7 @@ const Navbar = () => {
                 className="relative p-3 hover:bg-gray-100 rounded-lg transition-colors"
                 onClick={() => setOpen(false)}
               >
-                <Image src="/shop cart.png" alt="Cart" width={20} height={20} />
+                <Image src="/shop-cart.png" alt="Cart" width={20} height={20} />
                 {cartCount > 0 && (
                   <span className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">
                     {cartCount > 99 ? "99+" : cartCount}
