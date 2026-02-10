@@ -86,7 +86,7 @@ const Page = () => {
             priceRange={priceRange}
           />
         </div>
-        <div className="product-cart">
+        <div className="product-cart hidden md:block">
           <CartItems />
         </div>
       </div>

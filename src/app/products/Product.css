@@ -466,6 +466,10 @@
     max-height: 280px;
     overflow-y: auto;
   }
+
+  .product-cart{
+    display: none;
+  }
 }
 
 /* ============================
@@ -490,6 +494,8 @@
   .products-page > :last-child {
     width: 100%;
   }
+
+  
 }
 
 /* ----------------------------- */

@@ -1,6 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useFacet } from "@/context/useFacet";
+import { useUser } from "@/context/UserContext";
+import { useCart } from "@/context/CartContext";
+import { useLocalCart } from "@/context/LocalCartContext";
 
 type Props = {
   selectedBrand: string[];
@@ -17,6 +23,13 @@ const Topbar: React.FC<Props> = ({
 }) => {
   const brands = ["All", "Jinko", "JA", "Longi", "Exulted"];
 
+  const [mounted, setMounted] = useState(false);
+  
+    useEffect(() => {
+      setMounted(true);
+    }, []);
+  
+
   const handleBrandClick = (brand: string) => {
     if (brand === "All") {
       onBrandChange([]);
@@ -28,6 +41,21 @@ const Topbar: React.FC<Props> = ({
       }
     }
   };
+
+  const { cart } = useCart();
+  const { items: localItems } = useLocalCart();
+  const { customer, logout, loading } = useUser();
+
+  const getCartCount = () => {
+    if (customer) {
+      const lines = cart?.activeOrder?.lines ?? [];
+      return lines.length;
+    } else {
+      return localItems.length;
+    }
+  };
+
+  const cartCount = mounted ? getCartCount() : 0;
 
   return (
     <div className="w-full bg-[#f5f5f5] px-4 sm:px-8 lg:px-16">
@@ -41,9 +69,26 @@ const Topbar: React.FC<Props> = ({
         "
       >
         {/* Title */}
-        <h1 className="text-xl sm:text-2xl font-bold text-black">
-          Solar Panel
-        </h1>
+        <div className="flex justify-between">
+          <h1 className="text-xl sm:text-2xl font-bold text-black">
+            Solar Panel
+          </h1>
+
+          <Link
+            href="/cart"
+            aria-label="Cart"
+            className="flex gap-2 border border-[#E4E9EE] text-sm relative px-5 py-3 md:hidden sm:block hover:bg-gray-100 rounded-lg transition-colors items-center"
+          >
+            Cart
+            <Image src="/shop-cart.png" alt="Cart" width={20} height={20} />
+
+            {mounted && cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
+          </Link>
+        </div>
 
         {/* Brand Filter (Scrollable on Mobile) */}
         <div
@@ -75,10 +120,9 @@ const Topbar: React.FC<Props> = ({
                   font-medium
                   border
                   transition-colors
-                  ${
-                    isSelected
-                      ? " text-[#ff0000] border-0"
-                      : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                  ${isSelected
+                    ? " text-[#ff0000] border-0"
+                    : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
                   }
                 `}
               >
