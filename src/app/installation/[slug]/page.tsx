@@ -224,7 +224,7 @@ export default function InstallationListingPage() {
     <>
       <Navbar />
 
-      <main className="min-h-screen bg-white px-6 py-4.5">
+      <main className="min-h-screen bg-white px-6 py-4.5 mb-14">
         {/* Breadcrumb */}
         <div className="mx-auto max-w-6xl">
           <p className="text-base font-medium leading-[160%] text-[#242425]">
@@ -237,10 +237,9 @@ export default function InstallationListingPage() {
           <div className="flex flex-row items-center justify-between">
             {/* LEFT: Gallery */}
             <div className="w-1/2 ">
-              <div className="flex flex-col gap-3.5 h-137">
-                <div className="relative w-full h-full flex items-center justify-center">
-                  {/* ✅ UI unchanged: still shows selected item image first.
-                      ✅ But if selected has no image, fallback to collection hero. */}
+              <div className="flex flex-col gap-3.5 h-137 mt-6">
+                <div className="relative w-full h-full flex items-center justify-center bg-[#EBEEF7] rounded-md">
+
                   {selectedImg || heroImg ? (
                     <Image
                       src={selectedImg ?? heroImg!}
@@ -266,11 +265,10 @@ export default function InstallationListingPage() {
                       <button
                         key={it.productId}
                         onClick={() => setSelectedIndex(idx)}
-                        className={`shrink-0 rounded-lg border-2 ${
-                          isActive
-                            ? "border-[#00AAFF]"
-                            : "border-neutral-200 hover:border-neutral-300"
-                        } bg-white transition-all`}
+                        className={`shrink-0 rounded-lg border-2 ${isActive
+                          ? "border-[#00AAFF]"
+                          : "border-neutral-200 hover:border-neutral-300"
+                          } bg-white transition-all`}
                         title={it.productName}
                       >
                         <div className="relative w-19.5 h-19.5">
@@ -304,9 +302,8 @@ export default function InstallationListingPage() {
                       {[...Array(5)].map((_, i) => (
                         <svg
                           key={i}
-                          className={`w-4 h-4 ${
-                            i < 4 ? "text-yellow-400" : "text-neutral-300"
-                          }`}
+                          className={`w-4 h-4 ${i < 4 ? "text-yellow-400" : "text-neutral-300"
+                            }`}
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
@@ -345,52 +342,7 @@ export default function InstallationListingPage() {
                   </button>
                 </div>
 
-                <div className="mt-6 pt-6 border-t flex flex-row items-center justify-center space-y-3 text-sm">
-                  <div className="flex items-center gap-3">
-                    <svg
-                      className="w-5 h-5 text-green-600 mt-0.5 shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                    <div>
-                      <p className="font-medium text-neutral-900">
-                        Free Delivery
-                      </p>
-                      <p className="text-neutral-600">
-                        On orders above ₦500,000
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <svg
-                      className="w-5 h-5 text-green-600 mt-0.5 shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <div>
-                      <p className="font-medium text-neutral-900">Warranty</p>
-                      <p className="text-neutral-600">
-                        2 year manufacturer warranty
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                
               </div>
             </div>
           </div>
@@ -400,31 +352,28 @@ export default function InstallationListingPage() {
             <div className="flex gap-8">
               <button
                 onClick={() => setActiveTab("details")}
-                className={`pb-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === "details"
-                    ? "border-red-600 text-neutral-900"
-                    : "border-transparent text-neutral-600 hover:text-neutral-900"
-                }`}
+                className={`pb-4 text-sm font-medium border-b-2 transition-colors ${activeTab === "details"
+                  ? "border-red-600 text-neutral-900"
+                  : "border-transparent text-neutral-600 hover:text-neutral-900"
+                  }`}
               >
                 Product Detail
               </button>
               <button
                 onClick={() => setActiveTab("reviews")}
-                className={`pb-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === "reviews"
-                    ? "border-red-600 text-neutral-900"
-                    : "border-transparent text-neutral-600 hover:text-neutral-900"
-                }`}
+                className={`pb-4 text-sm font-medium border-b-2 transition-colors ${activeTab === "reviews"
+                  ? "border-red-600 text-neutral-900"
+                  : "border-transparent text-neutral-600 hover:text-neutral-900"
+                  }`}
               >
                 Reviews
               </button>
               <button
                 onClick={() => setActiveTab("related")}
-                className={`pb-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === "related"
-                    ? "border-red-600 text-neutral-900"
-                    : "border-transparent text-neutral-600 hover:text-neutral-900"
-                }`}
+                className={`pb-4 text-sm font-medium border-b-2 transition-colors ${activeTab === "related"
+                  ? "border-red-600 text-neutral-900"
+                  : "border-transparent text-neutral-600 hover:text-neutral-900"
+                  }`}
               >
                 Related Product
               </button>
@@ -481,32 +430,32 @@ export default function InstallationListingPage() {
                   </h3>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white border border-neutral-200 rounded-lg p-6 text-center hover:border-red-500 transition-colors">
-                      <div className="w-12 h-12 mx-auto mb-3">
+                    <div className="bg-[#EBEEF7] rounded-md p-6">
+                      <div className="w-16 h-16 mb-1">
                         <Image src={solarPanelImage} alt="Solar Panels" />
                       </div>
-                      <p className="text-sm font-medium text-neutral-900">
+                      <p className="text-md font-semibold text-neutral-900">
                         Solar Panels
                       </p>
                     </div>
-                    <div className="bg-white border border-neutral-200 rounded-lg p-6 text-center hover:border-red-500 transition-colors">
-                      <div className="w-12 h-12 mx-auto mb-3">
+                    <div className="bg-[#EBEEF7] rounded-md p-6">
+                      <div className="w-12 h-12 mb-3">
                         <Image src={hardwarelImage} alt="Mounting Hardware" />
                       </div>
                       <p className="text-sm font-medium text-neutral-900">
                         Mounting Hardware
                       </p>
                     </div>
-                    <div className="bg-white border border-neutral-200 rounded-lg p-6 text-center hover:border-red-500 transition-colors">
-                      <div className="w-12 h-12 mx-auto mb-3">
+                    <div className="bg-[#EBEEF7] rounded-md p-6">
+                      <div className="w-12 h-12 mb-3">
                         <Image src={systemImage} alt="System Testing" />
                       </div>
                       <p className="text-sm font-medium text-neutral-900">
                         System Testing
                       </p>
                     </div>
-                    <div className="bg-white border border-neutral-200 rounded-lg p-6 text-center hover:border-red-500 transition-colors">
-                      <div className="w-12 h-12 mx-auto mb-3">
+                    <div className="bg-[#EBEEF7] rounded-md p-6">
+                      <div className="w-12 h-12 mb-3">
                         <Image src={safetyImage} alt="Safety Inspections" />
                       </div>
                       <p className="text-sm font-medium text-neutral-900">
@@ -549,12 +498,12 @@ export default function InstallationListingPage() {
                           {stars === 5
                             ? "320"
                             : stars === 4
-                            ? "180"
-                            : stars === 3
-                            ? "45"
-                            : stars === 2
-                            ? "12"
-                            : "5"}
+                              ? "180"
+                              : stars === 3
+                                ? "45"
+                                : stars === 2
+                                  ? "12"
+                                  : "5"}
                         </span>
                       </button>
                     ))}
@@ -631,8 +580,8 @@ export default function InstallationListingPage() {
                           {i === 0
                             ? "2 days ago"
                             : i === 1
-                            ? "1 week ago"
-                            : "2 weeks ago"}
+                              ? "1 week ago"
+                              : "2 weeks ago"}
                         </span>
                       </div>
                     </div>
@@ -692,9 +641,8 @@ export default function InstallationListingPage() {
                           {[...Array(5)].map((_, i) => (
                             <svg
                               key={i}
-                              className={`w-3 h-3 ${
-                                i < 4 ? "text-yellow-400" : "text-neutral-300"
-                              }`}
+                              className={`w-3 h-3 ${i < 4 ? "text-yellow-400" : "text-neutral-300"
+                                }`}
                               fill="currentColor"
                               viewBox="0 0 20 20"
                             >
@@ -718,9 +666,8 @@ export default function InstallationListingPage() {
           </div>
         </section>
 
-        <Suscribe />
       </main>
-
+      <Suscribe />
       <Footer />
     </>
   );
