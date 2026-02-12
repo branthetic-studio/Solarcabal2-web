@@ -3,11 +3,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import PackageCard from "./PackageCard";
-import { Search, ChevronRight, ChevronUp } from "lucide-react";
+import { Search, ChevronRight } from "lucide-react";
 import CartItems from "@/Components/CartItems";
-
+import Image from "next/image";
 import { GET_CATEGORIES_BY_FACET, SEARCH_PACKAGES } from "@/graphql/queries";
 import { useFacet } from "@/context/useFacet";
+import { useUser } from "@/context/UserContext";
+import { useCart } from "@/context/CartContext";
+import { useLocalCart } from "@/context/LocalCartContext";
+import Link from "next/link";
 
 /* ---------------- Types (minimal, local) ---------------- */
 type FlatFacet = { id: string; name: string };
@@ -86,18 +90,25 @@ const extractKva = (text: string) => {
 const PackageList: React.FC = () => {
   const { storeFacets } = useFacet();
 
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+
   const [installationFacet, setInstallationFacet] = useState<
     FlatFacet | undefined
   >(undefined);
 
   const [selectedSlug, setSelectedSlug] = useState<string | undefined>(
-    undefined
+    undefined,
   );
 
   /* ---------------- Find "installation" facet ---------------- */
   useEffect(() => {
     const installation = storeFacets.find(
-      (f: FlatFacet) => f.name?.toLowerCase() === "installation"
+      (f: FlatFacet) => f.name?.toLowerCase() === "installation",
     );
     if (installation) setInstallationFacet(installation);
   }, [storeFacets]);
@@ -116,7 +127,7 @@ const PackageList: React.FC = () => {
         },
       },
       skip: !installationFacet?.id,
-    }
+    },
   );
 
   /* ---------------- ✅ CHANGED: Build, DEDUPE and SORT categories by KVA ---------------- */
@@ -174,55 +185,116 @@ const PackageList: React.FC = () => {
   if (packagesLoading) return <p>Loading categories...</p>;
   if (packagesError) return <p>Error loading categories.</p>;
 
+  const { cart } = useCart();
+  const { items: localItems } = useLocalCart();
+  const { customer, logout, loading } = useUser();
+
+  const getCartCount = () => {
+    if (customer) {
+      const lines = cart?.activeOrder?.lines ?? [];
+      return lines.length;
+    } else {
+      return localItems.length;
+    }
+  };
+
+  const cartCount = mounted ? getCartCount() : 0;
+
   return (
     <div className="package-container flex">
       {/* Sidebar Categories */}
-      <div className="max-w-58.25 w-full flex flex-col gap-4.5 bg-white border-r-[0.44px] border-[EBEEF7] p-[21.08px]">
-        <div className="flex flex-row justify-between items-center">
-          <h1 className="text-sm font-semibold leading-5 text-[#191F33]">
-            Installation Package
-          </h1>
-          <ChevronUp size={20} color="#636A80" />
+      <div className="package-sidebar">
+        <div className="flex justify-between">
+          <h1 className="text-lg font-semibold">Installation Package</h1>
+          <Link
+            href="/cart"
+            aria-label="Cart"
+            className="flex gap-2 border border-[#E4E9EE] text-sm relative px-5 py-3 md:hidden sm:block hover:bg-gray-100 rounded-lg transition-colors items-center"
+          >
+            Cart
+            <Image src="/shop-cart.png" alt="Cart" width={20} height={20} />
+
+            {mounted && cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
+          </Link>
+
         </div>
 
         {/* Search (UI unchanged; not wired) */}
-        <div className="relative w-full">
-          <div className="absolute top-[50%] left-1.5 transform -translate-y-1/2">
-            <Search size={17.57} className="text-[#e0e0e0]" />
+        <div className="relative mb-4">
+          <div className="absolute top-[50%] left-3 transform -translate-y-1/2">
+            <Search className="text-[#e0e0e0]" />
           </div>
           <input
             type="text"
             placeholder="Search for categories"
-            className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded-full px-7.5 py-2 text-xs focus:outline-none"
+            className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded-full px-12 py-2 text-sm focus:outline-none"
           />
         </div>
-
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setSelectedSlug(cat.slug)}
-            className={`
-              w-full flex items-center justify-between border-b-2 border-[#f5f5f5]
-              px-1.5 py-1 text-left text-sm
-              transition
-              ${
-                selectedSlug === cat.slug
-                  ? " text-[#FF0000] font-semibold"
-                  : "hover:bg-gray-100 text-[#464D61]"
-              }
-            `}
+        <h1>Select Package</h1>
+        {/* ✅ Mobile Dropdown */}
+        <div className="block w-50 md:hidden mb-4">
+          <select
+            value={selectedSlug ?? ""}
+            onChange={(e) => setSelectedSlug(e.target.value)}
+            className="
+      w-75
+      border
+      border-gray-300
+      rounded-md
+      px-3
+      py-2
+      text-sm
+      bg-white
+      focus:outline-none
+      focus:ring-2
+      focus:ring-red-500
+    "
           >
-            <span>{cat.name}</span>
-            <ChevronRight size={20} />
-          </button>
-        ))}
+            <option value="" disabled className="text-xs w-full">
+              Select Package
+            </option>
+
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.slug} className="text-xs w-50">
+                {cat.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* ✅ Desktop Buttons */}
+        <div className="hidden md:block">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedSlug(cat.slug)}
+              className={`
+        w-full flex items-center justify-between
+        border-b border-[#f5f5f5]
+        px-4 py-2 text-left text-sm
+        transition
+        ${selectedSlug === cat.slug
+                  ? "text-red-600 font-semibold"
+                  : "hover:bg-gray-100 text-gray-700"
+                }
+      `}
+            >
+              <span>{cat.name}</span>
+              <ChevronRight size={20} />
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Products (tiers) */}
-      <div className="max-w-172 w-full py-3 px-2 bg-[#FAFAFA] flex flex-col gap-5">
+      <div className="package-main">
         {/* Header (UI unchanged; now uses selected package NAME to match UI) */}
         {selectedSlug && (
-          <h2 className="text-xs font-semibold pl-2.5 text-[#FF0000] border-b pb-2 border-[#e0e0e0]">
+          <h2 className="text-md font-semibold mb-6 text-red-600 border-b pb-2 border-[#e0e0e0]">
             {selectedCategory?.name ?? selectedSlug.replace("-", " ")} package
           </h2>
         )}
@@ -237,7 +309,7 @@ const PackageList: React.FC = () => {
         {tiersError && <p>Error loading products.</p>}
 
         {/* Grid (UI unchanged) */}
-        <div className="w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {tiers.map((variant, idx) => {
             const price = variant.priceWithTax
               ? `${variant.priceWithTax}`

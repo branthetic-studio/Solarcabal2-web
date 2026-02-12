@@ -328,16 +328,16 @@ export default function InstallationListingPage() {
                   </p>
                 </div>
 
-                <div className="mt-6 flex items-center justify-between w-full gap-12">
-                  <button className="w-full rounded-lg border-2 border-neutral-900 bg-white text-neutral-900 py-3.5 text-sm font-semibold hover:bg-neutral-50 transition-colors">
+                <div className="mt-6 flex items-center justify-between w-100 gap-8">
+                  <button className="w-full rounded-lg border-2 border-neutral-900 bg-white text-neutral-900 py-2 px-2 text-sm font-semibold hover:bg-neutral-50 transition-colors">
                     Add to Cart
                   </button>
 
-                  <button className="w-full rounded-lg bg-neutral-900 text-white py-3.5 text-sm font-semibold hover:bg-neutral-800 transition-colors">
+                  <button className="w-full rounded-lg bg-neutral-900 text-white py-2 px-6 text-sm font-semibold hover:bg-neutral-800 transition-colors">
                     Buy Now
                   </button>
 
-                  <button className="w-full rounded-lg bg-red-600 text-white py-3.5 text-sm font-semibold hover:bg-red-700 transition-colors">
+                  <button className="w-full rounded-lg bg-red-600 text-white py-2 px-6 text-sm font-semibold hover:bg-red-700 transition-colors">
                     Pay Later
                   </button>
                 </div>
