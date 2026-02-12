@@ -12,7 +12,8 @@ import { TbBrandX } from "react-icons/tb";
 const Suscribe = () => {
   const [checked, setChecked] = useState(false);
   return (
-    <div className="bg-[#1C1C1C] w-full py-12 md:py-16 px-4 sm:px-6 md:px-12 lg:px-20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 text-center md:text-left">
+   <div className="bg-[#1C1C1C] w-full py-12 md:py-16 px-4 sm:px-6 md:px-12 lg:px-20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 text-left">
+
 
       <div className="">
         <Image src="/full logo.png" alt="Logo" className="object-contain" width={180} height={180} />
@@ -27,7 +28,7 @@ const Suscribe = () => {
           Subscribe to our newsletter to receive updates
         </p>
 
-        <form className="flex flex-col sm:flex-row items-center justify-start gap-4 max-w-xl">
+        <form className="flex flex-col sm:flex-row items-left md:items-center justify-start gap-4 max-w-xl">
           <input
             type="email"
             placeholder="Enter your email address"
@@ -37,7 +38,7 @@ const Suscribe = () => {
 
           <button
             type="submit"
-            className="px-8 py-3 bg-[#FF0000] text-white rounded-full text-xs hover:bg-gray-900 transition"
+            className="px-8 py-3 bg-[#FF0000] text-center text-white rounded-full text-xs hover:bg-gray-900 transition"
           >
             Subscribe
           </button>
@@ -77,7 +78,7 @@ const Suscribe = () => {
           <div className="mx-auto text-center md:text-left">
 
             {/* Header */}
-            <h2 className="text-lg md:text-lg font-semibold mb-10">
+            <h2 className="text-left md:text-center font-semibold mb-10">
               Download the SolarCabal App
             </h2>
 
@@ -106,7 +107,7 @@ const Suscribe = () => {
             </div>
 
             {/* App Store Buttons */}
-            <div className="flex flex-col sm:flex-row items-center gap-5 mb-6">
+            <div className="flex flex-col sm:flex-row items-start gap-5 mb-6">
 
               {/* Apple Store */}
               <a
@@ -146,8 +147,8 @@ const Suscribe = () => {
 
             {/* Social Media */}
             <div>
-              <h3 className="text-md font-semibold mb-4">Connect with us</h3>
-              <div className="flex items-center gap-6 text-2xl">
+              <h3 className="text-md text-left md:text-center font-semibold mb-4">Connect with us</h3>
+              <div className="flex items-start gap-6 text-2xl">
 
                 <a href="#" className="hover:text-red-500 transition">
                   <FaInstagram />
