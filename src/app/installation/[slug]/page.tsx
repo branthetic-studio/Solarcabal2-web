@@ -234,9 +234,9 @@ export default function InstallationListingPage() {
         </div>
 
         <section className="mx-auto max-w-6xl w-full">
-          <div className="flex flex-row items-center justify-between">
+          <div className="flex flex-col md:flex-row items-center justify-between">
             {/* LEFT: Gallery */}
-            <div className="w-1/2 ">
+            <div className="w-full md:w-1/2">
               <div className="flex flex-col gap-3.5 h-137 mt-6">
                 <div className="relative w-full h-full flex items-center justify-center bg-[#EBEEF7] rounded-md">
 
@@ -291,13 +291,13 @@ export default function InstallationListingPage() {
             </div>
 
             {/* RIGHT: Info panel */}
-            <div className="w-1/2 bg-white flex items-center justify-center">
+            <div className="w-1/2 bg-white flex items-center justify-center px-4">
               <div className="flex flex-col">
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 px-2">
                   <h1 className="text-4xl font-semibold w-42 text-black leading-snug">
                     {packageTitle}
                   </h1>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 px-2">
                     <div className="flex items-center gap-1">
                       {[...Array(5)].map((_, i) => (
                         <svg

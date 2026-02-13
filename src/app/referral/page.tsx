@@ -145,7 +145,7 @@ const ReferralPage = () => {
           </div>
         </div>
       </div>
-      <h3 className="pl-46 mt-8 py-3">Earnings Overview</h3>
+      <h3 className="text-center mt-8 py-3">Earnings Overview</h3>
 
       {/* PREMIUM DATA */}
       <section className="premium-data relative bg-[#181818]">
@@ -164,7 +164,7 @@ const ReferralPage = () => {
               <p className="data-price">{data.price}</p>
             </div>
             <hr />
-            <div>
+            <div className="flex flex-col justify-center align-middle">
               <span className="text">{data.text}</span>
               <p className="num">{data.num}</p>
             </div>

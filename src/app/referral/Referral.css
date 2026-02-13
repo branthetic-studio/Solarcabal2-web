@@ -16,7 +16,7 @@
   gap: 5rem;
   color: #fff;
   border-radius: 10px;
-  
+  text-align: center;
 }
 .premium-data .data1 {
   display: flex;
@@ -26,6 +26,7 @@
   gap: 5rem;
   color: #fff;
   border-radius: 10px;
+  text-align: center;
 }
 
 .premium-data span {
@@ -58,7 +59,6 @@ hr {
   align-items: center;
   padding: 10px;
   font-weight: 500;
-  
 }
 
 .button {
@@ -89,7 +89,6 @@ table {
   width: 50rem;
   margin-block: 10px 40px;
   margin-inline: auto;
-  
 }
 
 thead {
@@ -170,6 +169,7 @@ td {
 /* ---------- Tablets & small laptops (≤ 1024px) ---------- */
 @media (max-width: 1024px) {
   .premium-data {
+    width: inherit;
     flex-wrap: wrap;
     justify-content: center;
   }
@@ -233,6 +233,11 @@ td {
   .premium-data {
     padding: 16px;
     gap: 12px;
+  }
+
+  .premium-data .num {
+    text-align: center;
+    font-size: 25px;
   }
 
   .premium-data .data,
