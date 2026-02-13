@@ -339,7 +339,12 @@ export default function AccountPage() {
     }
   };
 
-  if (userLoading) return <div className="p-6">Loading…</div>;
+  if (userLoading) return <div className="">
+    <Navbar />
+    <div className="min-h-50 flex items-center justify-center">Loading user details…</div>
+    <Suscribe />
+    <Footer />
+  </div>;
 
   if (!customer?.id) {
     return (
@@ -352,7 +357,12 @@ export default function AccountPage() {
     );
   }
 
-  if (accountLoading) return <div className="p-6">Loading account…</div>;
+  if (accountLoading) return <div className="flex flex-col items-center justify-center">
+    <Navbar />
+    <div className="p-6 min-h-50">Loading account details…</div>
+    <Suscribe />
+    <Footer />
+  </div>;
 
   if (!activeCustomer) {
     return (
@@ -479,7 +489,7 @@ export default function AccountPage() {
                       ) : null}
                     </div>
 
-                    <div className="flex flex-col gap-2 shrink-0 text-xs">
+                    <div className="flex flex-col items-end gap-2 shrink-0 text-xs">
                       <button
                         className="underline"
                         onClick={() => openEditAddress(a)}

@@ -12,6 +12,12 @@ import Footer from "@/Components/Footer/Footer";
 import Navbar from "@/Components/Navbar/Navbar";
 import { toast } from "sonner";
 import Suscribe from "@/Components/Suscribe/Suscribe";
+import { useQuery } from "@apollo/client/react";
+import { GET_ACCOUNT_DETAILS } from "@/graphql/queries";
+
+
+
+
 
 /** NGN with no decimals (adjust if you need decimals) */
 const money = (amount: number, currency = "NGN") =>
@@ -39,6 +45,8 @@ export default function CartPage() {
   const order = cart?.activeOrder;
   const lines = (isLoggedIn ? order?.lines : []) ?? [];
 
+
+
   const serverSubtotal = order?.subTotalWithTax ?? 0;
   const serverShipping = (order?.shippingLines ?? []).reduce(
     (s: number, x: any) => s + (x?.priceWithTax ?? 0),
@@ -58,6 +66,22 @@ export default function CartPage() {
     0
   );
   const localCurrency = localItems[0]?.currencyCode ?? "NGN";
+
+  const { data: accountData, loading: accountLoading } = useQuery(
+    GET_ACCOUNT_DETAILS,
+    {
+      skip: !isLoggedIn,
+      fetchPolicy: "network-only",
+    }
+  );
+
+
+  const activeCustomer = (accountData as any)?.activeCustomer ?? null;
+  const addresses = activeCustomer?.addresses ?? [];
+
+  const defaultShippingAddress =
+    addresses.find((a: any) => a.defaultShippingAddress) ?? null;
+
 
   // Empty states
   if (!isLoggedIn && localItems.length === 0) {
@@ -114,135 +138,30 @@ export default function CartPage() {
             <ul className="space-y-4">
               {isLoggedIn
                 ? lines.map((line: any) => {
-                    const asset =
-                      line?.featuredAsset?.preview ??
-                      line?.productVariant?.product?.featuredAsset?.preview ??
-                      line?.productVariant?.product?.assets?.[0]?.preview ??
-                      null;
-                    const brand =
-                      line?.productVariant?.product?.facetValues?.find?.(
-                        (fv: any) => /brand/i.test(fv?.facet?.name ?? "")
-                      )?.name;
-                    return (
-                      <li
-                        key={line.id}
-                        className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5"
-                      >
-                        <div className="flex items-start gap-4">
-                          {/* Image */}
-                          <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
-                            {asset ? (
-                              <Image
-                                src={asset}
-                                alt={
-                                  line.productVariant?.featuredAsset?.preview ?? // ✅ Added ? after featuredAsset
-                                  "Product image"
-                                }
-                                width={80}
-                                height={80}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
-                                No Image
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Middle */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
-                                  {line.productVariant?.product?.name ??
-                                    line.productVariant?.name}
-                                </p>
-                                <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
-                                  {brand ?? line.productVariant?.name ?? "—"}
-                                </p>
-                                <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
-                                  {money(
-                                    line.unitPriceWithTax ?? 0,
-                                    serverCurrency
-                                  )}{" "}
-                                  <span className="text-[11px] font-normal text-neutral-500">
-                                    / pcssss
-                                  </span>
-                                </p>
-                              </div>
-
-                              {/* Right: price + Remove */}
-                              <div className="text-right">
-                                <button
-                                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
-                                  onClick={() =>
-                                    handleAdjustQuantity(line.id, 0)
-                                  }
-                                  aria-label="Remove"
-                                >
-                                  Remove <Trash2 className="h-4 w-4" />
-                                </button>
-                                <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
-                                  <span className="mr-1">Total</span>
-                                  <span className="font-semibold text-neutral-900">
-                                    {money(
-                                      line.linePriceWithTax ?? 0,
-                                      serverCurrency
-                                    )}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Qty control */}
-                            <div className="mt-3 sm:mt-4 flex items-center gap-3">
-                              <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
-                                <button
-                                  onClick={() =>
-                                    handleAdjustQuantity(
-                                      line.id,
-                                      Math.max(0, (line.quantity ?? 1) - 1)
-                                    )
-                                  }
-                                  className="h-8 w-8 flex items-center justify-center"
-                                  aria-label="Decrease"
-                                >
-                                  −
-                                </button>
-                                <span className="w-8 text-center text-[13px] font-medium">
-                                  {line.quantity}
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    handleAdjustQuantity(
-                                      line.id,
-                                      (line.quantity ?? 1) + 1
-                                    )
-                                  }
-                                  className="h-8 w-8 flex items-center justify-center"
-                                  aria-label="Increase"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })
-                : localItems.map((line) => (
+                  const asset =
+                    line?.featuredAsset?.preview ??
+                    line?.productVariant?.product?.featuredAsset?.preview ??
+                    line?.productVariant?.product?.assets?.[0]?.preview ??
+                    null;
+                  const brand =
+                    line?.productVariant?.product?.facetValues?.find?.(
+                      (fv: any) => /brand/i.test(fv?.facet?.name ?? "")
+                    )?.name;
+                  return (
                     <li
                       key={line.id}
-                      className="border-b border-neutral-200 bg-white p-4 sm:p-5"
+                      className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5"
                     >
                       <div className="flex items-start gap-4">
                         {/* Image */}
-                        <div className="h-20 w-20 p-2 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
-                          {line.image ? (
+                        <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
+                          {asset ? (
                             <Image
-                              src={line.image}
-                              alt={line.name}
+                              src={asset}
+                              alt={
+                                line.productVariant?.featuredAsset?.preview ?? // ✅ Added ? after featuredAsset
+                                "Product image"
+                              }
                               width={80}
                               height={80}
                               className="h-full w-full object-cover"
@@ -259,15 +178,19 @@ export default function CartPage() {
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
-                                {line.name}
+                                {line.productVariant?.product?.name ??
+                                  line.productVariant?.name}
                               </p>
                               <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
-                                {line.brand ?? "—"}
+                                {brand ?? line.productVariant?.name ?? "—"}
                               </p>
                               <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
-                                {money(line.priceWithTax ?? 0, localCurrency)}{" "}
+                                {money(
+                                  line.unitPriceWithTax ?? 0,
+                                  serverCurrency
+                                )}{" "}
                                 <span className="text-[11px] font-normal text-neutral-500">
-                                  / pcs
+                                  / pcssss
                                 </span>
                               </p>
                             </div>
@@ -276,49 +199,19 @@ export default function CartPage() {
                             <div className="text-right">
                               <button
                                 className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
-                                onClick={() => removeItem(line.id)}
+                                onClick={() =>
+                                  handleAdjustQuantity(line.id, 0)
+                                }
                                 aria-label="Remove"
                               >
                                 Remove <Trash2 className="h-4 w-4" />
                               </button>
-                              <div className="mt-3 sm:mt-4 flex items-center gap-3">
-                                <div className="flex items-center overflow-hidden">
-                                  <button
-                                    onClick={() =>
-                                      updateQuantity(
-                                        line.id,
-                                        Math.max(0, (line.quantity ?? 1) - 1)
-                                      )
-                                    }
-                                    className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
-                                    aria-label="Decrease"
-                                  >
-                                    −
-                                  </button>
-                                  <span className="w-8 text-center text-[13px] font-medium">
-                                    {line.quantity}
-                                  </span>
-                                  <button
-                                    onClick={() =>
-                                      updateQuantity(
-                                        line.id,
-                                        (line.quantity ?? 1) + 1
-                                      )
-                                    }
-                                    className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
-                                    aria-label="Increase"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
                               <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
-                                <span className="mr-1 text-xs">Total</span>
+                                <span className="mr-1">Total</span>
                                 <span className="font-semibold text-neutral-900">
                                   {money(
-                                    (line.priceWithTax ?? 0) *
-                                      (line.quantity ?? 1),
-                                    localCurrency
+                                    line.linePriceWithTax ?? 0,
+                                    serverCurrency
                                   )}
                                 </span>
                               </div>
@@ -326,10 +219,141 @@ export default function CartPage() {
                           </div>
 
                           {/* Qty control */}
+                          <div className="mt-3 sm:mt-4 flex items-center gap-3">
+                            <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
+                              <button
+                                onClick={() =>
+                                  handleAdjustQuantity(
+                                    line.id,
+                                    Math.max(0, (line.quantity ?? 1) - 1)
+                                  )
+                                }
+                                className="h-8 w-8 flex items-center justify-center"
+                                aria-label="Decrease"
+                              >
+                                −
+                              </button>
+                              <span className="w-8 text-center text-[13px] font-medium">
+                                {line.quantity}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  handleAdjustQuantity(
+                                    line.id,
+                                    (line.quantity ?? 1) + 1
+                                  )
+                                }
+                                className="h-8 w-8 flex items-center justify-center"
+                                aria-label="Increase"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </li>
-                  ))}
+                  );
+                })
+                : localItems.map((line) => (
+                  <li
+                    key={line.id}
+                    className="border-b border-neutral-200 bg-white p-4 sm:p-5"
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* Image */}
+                      <div className="h-20 w-20 p-2 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
+                        {line.image ? (
+                          <Image
+                            src={line.image}
+                            alt={line.name}
+                            width={80}
+                            height={80}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
+                            No Image
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Middle */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
+                              {line.name}
+                            </p>
+                            <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
+                              {line.brand ?? "—"}
+                            </p>
+                            <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
+                              {money(line.priceWithTax ?? 0, localCurrency)}{" "}
+                              <span className="text-[11px] font-normal text-neutral-500">
+                                / pcs
+                              </span>
+                            </p>
+                          </div>
+
+                          {/* Right: price + Remove */}
+                          <div className="text-right">
+                            <button
+                              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
+                              onClick={() => removeItem(line.id)}
+                              aria-label="Remove"
+                            >
+                              Remove <Trash2 className="h-4 w-4" />
+                            </button>
+                            <div className="mt-3 sm:mt-4 flex items-center gap-3">
+                              <div className="flex items-center overflow-hidden">
+                                <button
+                                  onClick={() =>
+                                    updateQuantity(
+                                      line.id,
+                                      Math.max(0, (line.quantity ?? 1) - 1)
+                                    )
+                                  }
+                                  className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
+                                  aria-label="Decrease"
+                                >
+                                  −
+                                </button>
+                                <span className="w-8 text-center text-[13px] font-medium">
+                                  {line.quantity}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    updateQuantity(
+                                      line.id,
+                                      (line.quantity ?? 1) + 1
+                                    )
+                                  }
+                                  className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
+                                  aria-label="Increase"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                            <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
+                              <span className="mr-1 text-xs">Total</span>
+                              <span className="font-semibold text-neutral-900">
+                                {money(
+                                  (line.priceWithTax ?? 0) *
+                                  (line.quantity ?? 1),
+                                  localCurrency
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Qty control */}
+                      </div>
+                    </div>
+                  </li>
+                ))}
             </ul>
 
             {/* Continue shopping */}
@@ -413,7 +437,7 @@ export default function CartPage() {
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold">Customer Details</p>
                 <button
-                  onClick={() => router.push("/account")}
+                  onClick={() => router.push("/Accounts")}
                   className="inline-flex items-center gap-1 text-xs hover:text-red-700"
                 >
                   Change{" "}
@@ -427,11 +451,25 @@ export default function CartPage() {
                 </button>
               </div>
               <div className="mt-3 text-xs text-neutral-700">
-                {/* Replace with real user values if available */}
-                <p className="font-medium">—</p>
-                <p className="mt-1 text-neutral-500">—</p>
-                <p className="mt-1 text-neutral-500">—</p>
+                {accountLoading ? (
+                  <p className="text-neutral-500">Loading...</p>
+                ) : activeCustomer ? (
+                  <>
+                    <p className="font-medium">
+                      {activeCustomer.firstName} {activeCustomer.lastName}
+                    </p>
+                    <p className="mt-1 text-neutral-500">
+                      {activeCustomer.emailAddress}
+                    </p>
+                    <p className="mt-1 text-neutral-500">
+                      {defaultShippingAddress?.phoneNumber ?? "No phone number"}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-neutral-500">No customer details found</p>
+                )}
               </div>
+
             </div>
 
             {/* Delivery details (placeholder – match your screenshot) */}
@@ -453,8 +491,28 @@ export default function CartPage() {
                 </button>
               </div>
               <div className="mt-3 text-xs text-neutral-700">
-                <p>Door Delivery</p>
-                <p className="mt-1 text-neutral-500">Delivery between —</p>
+                {defaultShippingAddress ? (
+                  <>
+                    <p>Door Delivery</p>
+                    <p className="mt-1 text-neutral-500">
+                      {defaultShippingAddress.streetLine1}
+                      {defaultShippingAddress.city
+                        ? `, ${defaultShippingAddress.city}`
+                        : ""}
+                    </p>
+                    <p className="mt-1 text-neutral-500">
+                      {defaultShippingAddress.country?.name ?? "Nigeria"}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p>No delivery address</p>
+                    <p className="mt-1 text-neutral-500">
+                      Please add an address in your account
+                    </p>
+                  </>
+                )}
+
               </div>
             </div>
 
