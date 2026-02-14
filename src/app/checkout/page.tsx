@@ -11,6 +11,11 @@ import { toast } from "sonner";
 import { gql } from "@apollo/client";
 import Suscribe from "@/Components/Suscribe/Suscribe";
 import AddressModal from "@/Components/AddressModal";
+import { StaticImageData } from "next/image";
+
+
+
+
 
 import {
   GET_ACTIVE_ORDER,
@@ -59,28 +64,28 @@ type ShippingMethod = {
 
 type SetShippingAddressResponse = {
   setOrderShippingAddress:
-    | ActiveOrder
-    | {
-        errorCode: string;
-        message: string;
-      };
+  | ActiveOrder
+  | {
+    errorCode: string;
+    message: string;
+  };
 };
 
 type TransitionToStateResponse = {
   transitionOrderToState:
-    | ActiveOrder
-    | {
-        __typename: "OrderStateTransitionError";
-        errorCode: string;
-        message: string;
-        transitionError: string;
-        fromState: string;
-        toState: string;
-      };
+  | ActiveOrder
+  | {
+    __typename: "OrderStateTransitionError";
+    errorCode: string;
+    message: string;
+    transitionError: string;
+    fromState: string;
+    toState: string;
+  };
 };
 
 interface InfoRowProps {
-  icon: React.ReactNode; // <- allow image, emoji, or anything
+  icon: string | StaticImageData; // <- allow image, emoji, or anything
   title: string;
   text: string;
 }
@@ -178,18 +183,18 @@ const Page = () => {
       // Type-safe narrowing for build mode
       const payload = res.data as {
         adjustOrderLineQuantity:
-          | {
-              __typename: "Order";
-              id: string;
-              totalQuantity: number;
-              lines: ActiveOrderLine[];
-              totalWithTax: number;
-              subTotalWithTax?: number;
-            }
-          | {
-              __typename: "OrderModificationError";
-              message: string;
-            };
+        | {
+          __typename: "Order";
+          id: string;
+          totalQuantity: number;
+          lines: ActiveOrderLine[];
+          totalWithTax: number;
+          subTotalWithTax?: number;
+        }
+        | {
+          __typename: "OrderModificationError";
+          message: string;
+        };
       };
 
       if (payload.adjustOrderLineQuantity.__typename === "Order") {
@@ -484,38 +489,17 @@ const Page = () => {
 
               <div className="flex flex-col gap-5">
                 <InfoRow
-                  icon={
-                    <Image
-                      src="/truck.png"
-                      alt="Delivery"
-                      width={24}
-                      height={24}
-                    />
-                  }
+                  icon="/truck.png"
                   title="Delivery"
                   text="1–9 business days"
                 />
                 <InfoRow
-                  icon={
-                    <Image
-                      src="/repeat.png"
-                      alt="Delivery"
-                      width={24}
-                      height={24}
-                    />
-                  }
+                  icon="/repeat.png"
                   title="Returns"
                   text="7-day return policy"
                 />
                 <InfoRow
-                  icon={
-                    <Image
-                      src="/shield.png"
-                      alt="Delivery"
-                      width={24}
-                      height={24}
-                    />
-                  }
+                  icon="/shield.png"
                   title="Warranty"
                   text="Varies per item"
                 />
@@ -539,40 +523,44 @@ const Page = () => {
                       alt="preview"
                       width={55}
                       height={55}
-                      className="rounded border"
+                      className="rounded border bg-[#F3F5F7] p-4"
                     />
 
                     <div className="flex-1">
-                      <p className="text-sm font-medium">
+                      <p className="text-xs font-semibold">
                         {ln.productVariant?.name}
                       </p>
                       <p className="text-xs text-neutral-500">Category</p>
 
-                      <div className="flex items-center gap-2 mt-2">
-                        <button
-                          className="w-6 h-6 border rounded"
-                          onClick={() => updateQuantity(ln.id, ln.quantity - 1)}
-                        >
-                          –
-                        </button>
+                      <div className="flex justify-between">
+                        <div className="flex items-center gap-2 mt-2">
+                          <button
+                            className="w-4 h-4 border rounded-full text-xs"
+                            onClick={() => updateQuantity(ln.id, ln.quantity - 1)}
+                          >
+                            –
+                          </button>
 
-                        <span>{ln.quantity}</span>
+                          <span className="text-xs">{ln.quantity}</span>
 
-                        <button
-                          className="w-6 h-6 border rounded"
-                          onClick={() => updateQuantity(ln.id, ln.quantity + 1)}
-                        >
-                          +
-                        </button>
+                          <button
+                            className="w-4 h-4 border rounded-full text-xs"
+                            onClick={() => updateQuantity(ln.id, ln.quantity + 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-sm font-semibold">
+                            {NGN.format(ln.linePriceWithTax / 100)}
+                          </p>
+                          <button className="text-xs text-red-500 flex items-center gap-1">Remove <Image src="/trash.png" alt="Remove" width={12} height={12} /></button>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <p className="text-sm font-semibold">
-                        {NGN.format(ln.linePriceWithTax / 100)}
-                      </p>
-                      <button className="text-xs text-red-500">Remove</button>
-                    </div>
+
                   </div>
                 ))}
               </div>
@@ -599,9 +587,8 @@ const Page = () => {
               <button
                 onClick={handleCheckout}
                 disabled={isPaying}
-                className={`mt-4 w-full py-3 rounded-full text-white text-sm font-medium ${
-                  isPaying ? "bg-red-300" : "bg-red-500 hover:bg-red-600"
-                }`}
+                className={`mt-4 w-full py-3 rounded-full text-white text-sm font-medium ${isPaying ? "bg-red-300" : "bg-red-500 hover:bg-red-600"
+                  }`}
               >
                 {isPaying ? "Processing..." : "Checkout"}
               </button>
@@ -639,7 +626,7 @@ function RadioRow({ checked, onChange, label, right }: any) {
 function Row({ label, value, bold, big }: any) {
   return (
     <div className="flex justify-between text-[#717171] font-xs">
-      <span>{label}</span>
+      <span className="font-light">{label}</span>
       <span className={`${bold ? "font-bold" : ""} ${big ? "text-base" : ""}`}>
         {value}
       </span>
@@ -652,9 +639,13 @@ function BrandDot({ className }: any) {
 }
 
 function InfoRow({ icon, title, text }: InfoRowProps) {
+  type Props = {
+    icon: string | StaticImageData;
+  };
   return (
     <div className="flex items-center gap-3 border-b border-[#f0f0f0] pb-2">
-      <div className="w-6 h-6 flex-0">{icon}</div>
+      <Image className=" flex-shrink-0" src={icon} alt="Icon" width={24} height={24} />
+
       <div>
         <p className="font-medium">{title}</p>
         <p className="text-xs text-gray-500">{text}</p>
