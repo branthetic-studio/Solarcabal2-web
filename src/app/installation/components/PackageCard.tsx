@@ -30,7 +30,7 @@ const PackageCard: React.FC<Props> = ({ option, collectionSlug }) => {
   )}`;
 
   return (
-    <div className="bg-white p-6">
+    <div className="bg-white p-2 md:p-6">
       <div className="package-header">
         {/* <div className="">
           <h3 className="text-sm">{option.title}</h3>

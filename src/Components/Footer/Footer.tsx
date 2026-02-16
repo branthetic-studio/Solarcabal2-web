@@ -26,7 +26,7 @@ const Footer = () => {
             <h3 className="font-semibold text-lg mb-4">Need Help?</h3>
             <ul className="space-y-2 text-sm text-gray-300">
               <li><a href="/faq" className="hover:text-red-500">FAQs</a></li>
-              <li><a href="#" className="hover:text-red-500">Shipping & Returns</a></li>
+              <li><a href="/shipping" className="hover:text-red-500">Shipping & Returns</a></li>
               <li><a href="/products" className="hover:text-red-500">Products</a></li>
               <li><a href="/enquiries" className="hover:text-red-500">Contact Us</a></li>
             </ul>
@@ -50,11 +50,11 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold text-lg mb-4">Useful Links</h3>
             <ul className="space-y-2 text-sm text-gray-300">
-              <li><a href="#" className="hover:text-red-500">Shipping & Returns</a></li>
+              <li><a href="/shipping" className="hover:text-red-500">Shipping & Returns</a></li>
               <li><a href="/products" className="hover:text-red-500">Products</a></li>
-              <li><a href="#" className="hover:text-red-500">Warranty Information</a></li>
-              <li><a href="#" className="hover:text-red-500">Track Your Order</a></li>
-              <li><a href="#" className="hover:text-red-500">Gallery</a></li>
+              <li><a href="/warranty" className="hover:text-red-500">Warranty Information</a></li>
+              <li><a href="/track-order" className="hover:text-red-500">Track Your Order</a></li>
+              <li><a href="/gallery" className="hover:text-red-500">Gallery</a></li>
             </ul>
           </div>
 
