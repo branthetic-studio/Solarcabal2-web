@@ -390,7 +390,7 @@ const Page = () => {
               </div>
 
               {/* Billing address */}
-              <div className="mt-6">
+              <div className="my-6">
                 <p className="mb-2 text-sm font-semibold">Billing Address</p>
 
                 <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5">
@@ -431,7 +431,7 @@ const Page = () => {
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5">
+                <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5 mt-6">
                   <p className="mb-4 text-lg font-semibold">Shipping Method</p>
 
                   <div className="space-y-3">
