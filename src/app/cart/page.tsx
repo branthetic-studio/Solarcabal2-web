@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import Suscribe from "@/Components/Suscribe/Suscribe";
 import { useQuery } from "@apollo/client/react";
 import { GET_ACCOUNT_DETAILS } from "@/graphql/queries";
+import AuthModal from "@/Components/AuthModal";
 
 
 
@@ -29,6 +30,9 @@ const money = (amount: number, currency = "NGN") =>
 
 export default function CartPage() {
   const router = useRouter();
+
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+
 
   // Contexts
   const { cart, handleAdjustQuantity } = useCart();
@@ -523,11 +527,11 @@ export default function CartPage() {
                   toast.info("Please log in to checkout", {
                     action: {
                       label: "Log in",
-                      onClick: () => router.push("/login"), // or your auth route
+                      onClick: () => setIsAuthOpen(true),
                     },
                     duration: 4000,
                   });
-                  router.push("/"); // send them to homepage as you requested
+                  setIsAuthOpen(true);  // send them to homepage as you requested
                   return;
                 }
                 router.push("/checkout");
@@ -536,11 +540,14 @@ export default function CartPage() {
             >
               Checkout
             </button>
+            
+
           </aside>
         </div>
       </div>
       <Suscribe />
       <Footer />
+      <AuthModal open={isAuthOpen} onOpenChange={setIsAuthOpen} />
     </main>
   );
 }

@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { Copy, Check } from "lucide-react";
+import AuthModal from "@/Components/AuthModal";
+import { useUser } from "@/context/UserContext";
 
 const Reward = () => {
+  const { customer, loading: authLoading } = useUser();
   const [copied, setCopied] = useState(false);
   const referralCode = "Solarcabal/jhondea";
 
@@ -63,47 +66,43 @@ const Reward = () => {
         </p>
 
         {/* Referral Code Box */}
-        <div
-          className="
-            w-full max-w-md
-            bg-[#f43a3a]
-            rounded-xl
-            flex flex-col sm:flex-row
-            items-center justify-between
-            gap-3
-            px-4 sm:px-5
-            py-3 sm:py-4
-            mt-2
-          "
-        >
-          <span className="text-white text-sm sm:text-base md:text-lg font-medium break-all">
-            {referralCode}
-          </span>
+        {customer ? (
+          <div className="w-full max-w-md bg-[#cc3a3a] rounded-xl flex items-center justify-between px-5 py-4 mt-2">
+            <span className="text-white text-base md:text-lg font-medium">
+              {referralCode}
+            </span>
 
-          <button
-            onClick={handleCopy}
-            className="
-              flex items-center gap-2
-              text-white
-              hover:text-gray-200
-              transition-colors
-              text-sm sm:text-base
-            "
-            aria-label="Copy referral code"
-          >
-            {copied ? (
-              <>
-                <Check className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="font-medium">Copied!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="font-medium">Copy</span>
-              </>
-            )}
-          </button>
-        </div>
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-2 text-white hover:text-gray-300 transition-colors"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-5 h-5" />
+                  <span className="text-sm font-medium">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-5 h-5" />
+                  <span className="text-sm font-medium">Copy</span>
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="w-full max-w-md rounded-xl px-5 py-4 text-white/90">
+
+            <div className="flex justify-center">
+              <AuthModal
+                trigger={
+                  <button className="bg-black text-white text-xs px-5 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors">
+                    Log in / Sign up Refer Friends & Earn Rewards
+                  </button>
+                }
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

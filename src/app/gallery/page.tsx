@@ -23,7 +23,9 @@ const page = () => {
         </div>
       </div>
 
-      <div className='min-h-200'></div>
+      <div className='min-h-200'>
+        
+      </div>
 
       <Suscribe />
       <Footer />

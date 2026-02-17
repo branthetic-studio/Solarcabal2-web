@@ -24,7 +24,20 @@ const page = () => {
         </div>
       </div>
 
-      <div className='min-h-200'></div>
+      <div className='min-h-50 py-20 flex items-center justify-center'>
+        <div className="text-center text-[#FF0000]">
+          <h3 className="text-2xl font-bold">Shipping Information</h3>
+          <p className="">
+            We offer a variety of shipping options to meet your needs. All orders are processed within 2-3 business days.
+          </p>
+          <p className="mt-2">
+            Standard shipping typically takes 5-7 business days, while expedited shipping options are available at checkout.
+          </p>
+          <p className="mt-2">
+            For any questions regarding your order, please contact our support team.
+          </p>
+        </div>
+      </div>
 
       <Suscribe />
       <Footer />
