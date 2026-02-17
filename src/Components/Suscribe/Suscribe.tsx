@@ -28,7 +28,7 @@ const Suscribe = () => {
           Subscribe to our newsletter to receive updates
         </p>
 
-        <form className="flex flex-col sm:flex-row items-left md:items-center justify-start gap-4 max-w-xl">
+        <form className="flex flex-col sm:flex-row items-left md:items:center justify-start gap-4 max-w-xl">
           <input
             type="email"
             placeholder="Enter your email address"
@@ -38,7 +38,7 @@ const Suscribe = () => {
 
           <button
             type="submit"
-            className="px-8 py-3 bg-[#FF0000] text-center text-white rounded-full text-xs hover:bg-gray-900 transition"
+            className="px-8 py-3 bg-[#FF0000] text-center md:text-left text-white rounded-full text-xs hover:bg-gray-900 transition"
           >
             Subscribe
           </button>
@@ -78,7 +78,7 @@ const Suscribe = () => {
           <div className="mx-auto text-center md:text-left">
 
             {/* Header */}
-            <h2 className="text-left md:text-center font-semibold mb-10">
+            <h2 className="text-left md:text-left font-semibold mb-10">
               Download the SolarCabal App
             </h2>
 
@@ -147,7 +147,7 @@ const Suscribe = () => {
 
             {/* Social Media */}
             <div>
-              <h3 className="text-md text-left md:text-center font-semibold mb-4">Connect with us</h3>
+              <h3 className="text-md text-left md:text-left font-semibold mb-4">Connect with us</h3>
               <div className="flex items-start gap-6 text-2xl">
 
                 <a href="#" className="hover:text-red-500 transition">
