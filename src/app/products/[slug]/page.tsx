@@ -247,7 +247,7 @@ const ProductDetailsPage = () => {
     selectedVariant?.currencyCode ?? variants[0]?.currencyCode ?? "NGN";
   const currencySymbol =
     currency === "NGN" ? "₦" : currency === "USD" ? "$" : currency;
-  const formattedPrice = (currentPrice / 100).toLocaleString();
+  const formattedPrice = (currentPrice).toLocaleString();
 
   /* ---------- Loading / Error states ---------- */
   if (loading) {
@@ -306,7 +306,7 @@ const ProductDetailsPage = () => {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <div className="mx-auto px-16 py-6">
+      <div className="mx-auto px-6 py-">
         {/* Product Section */}
         <div className="mb-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -397,7 +397,7 @@ const ProductDetailsPage = () => {
               )}
 
               <p>
-                Introducing the SKE 3.5KVA Inverter, a cutting-edge solution designed for maximum energy efficiency. With a robust 25-year warranty, this inverter is perfect for powering your home or office.
+               {product.description}
               </p>
 
               {/* Quantity and Add to Cart */}
@@ -423,7 +423,7 @@ const ProductDetailsPage = () => {
                   </div>
                 </div> */}
 
-                <div className="flex gap-4">
+                <div className="flex flex-col md:flex-row gap-2 md:gap-4">
 
                   <button
                     onClick={handleAddToCart}
@@ -472,7 +472,7 @@ const ProductDetailsPage = () => {
             </nav>
           </div>
 
-          <div className="p-6 pb-12">
+          <div className="w-full p-4 text-justify pb-12">
             {activeTab === "Related Product" ? (
               <div>
                 <h3 className="text-xl font-bold mb-6">Related Products</h3>
@@ -590,7 +590,7 @@ function LocalProductCard({
 
           {/* Rating Breakdown */}
           <div className="flex-1 space-y-2">
-            const [isOpen, setIsOpen] = useState(false);
+            {/* const [isOpen, setIsOpen] = useState(false); */}
             {ratingData.map((r) => (
               <div key={r.stars} className="flex items-center gap-3">
                 <span className="flex gap-1 w-8 text-sm">{r.stars}.0<Star className="w-5 h-5 fill-[#FFA133] text-[#FFA133]" /></span>
@@ -754,15 +754,15 @@ function LocalProductCard({
 
       {/* Specs */}
       {specs.length > 0 && (
-        <div>
+        <div className="w-full">
           <h3 className="text-lg font-semibold text-gray-900 mb-3">
             Specifications
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 pr-60">
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 pr-60">
             {specs.map((s, idx) => (
               <div
                 key={idx}
-                className="flex flex-2 items-center mr-8 justify-between"
+                className="w-80 flex flex-2 items-center mr-8 justify-between"
               >
                 <span className="text-[#818B9C]">{s.label}</span>
                 <span className="font-medium text-[#141718]">{s.value}</span>
