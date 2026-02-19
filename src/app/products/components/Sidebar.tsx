@@ -3,14 +3,6 @@
 import React, { useState, Dispatch, SetStateAction } from "react";
 import {
   Search,
-  PanelsTopLeft,
-  Battery,
-  Gauge,
-  Cable,
-  Wrench,
-  Bolt,
-  Fan,
-  CableCar,
   PackageSearch,
   Circle,
   Minus,
@@ -74,6 +66,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       setBrand([...brand, b]);
     }
   };
+
+
+  
 
   return (
     <aside className="w-full md:w-64 border-r border-neutral-200 bg-white">

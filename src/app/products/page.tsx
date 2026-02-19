@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, Dispatch, SetStateAction } from "react";
+import { useBrandFacetIds } from "@/data/useBrandFacetsIds";
 
 import Navbar from "../../Components/Navbar/Navbar";
 import Footer from "../../Components/Footer/Footer";
@@ -17,7 +18,7 @@ const Page = () => {
     useState<string>("panels");
   const [selectedBrand, setSelectedBrand] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<string>("relevance");
-
+  const facetValueIds = useBrandFacetIds(selectedBrand);
   // New filters
   const [condition, setCondition] = useState<string>("ANY"); // ANY | NEW | USED
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]); // min, max
@@ -52,9 +53,9 @@ const Page = () => {
         sortOrder={sortOrder}
         onSortChange={setSortOrder}
       />
-      <div className="flex flex-col md:flex-row bg-[#f5f5f5] px-3 sm:px-6 md:px-10 lg:px-12 pb-10">
+      <div className="flex flex-col md:flex-row bg-[#f5f5f5] px-3 sm:px-6 md:px-10 lg:px-8 pb-10">
         {/* Sidebar */}
-        <div className="flex-1">
+        <div className="w-full md:w-1/4 h-full mb-6 md:mb-0">
           <Sidebar
             selectedCategorySlug={selectedCategorySlug}
             onCategorySelect={(slug: string, brand?: string) => {
@@ -77,16 +78,17 @@ const Page = () => {
         </div>
 
         {/* Main content */}
-        <div className="flex gap-8 p-6">
+        <div className="flex w-full h-full items-center gap-8 p-4">
           <ProductGrid
             categorySlug={selectedCategorySlug}
             brand={selectedBrand.length === 0 ? null : selectedBrand}
+            facetValueIds={facetValueIds}
             sort={sortOrder}
             condition={condition}
             priceRange={priceRange}
           />
         </div>
-        <div className="product-cart hidden md:block">
+        <div className="w-2/5 product-cart hidden md:block">
           <CartItems />
         </div>
       </div>

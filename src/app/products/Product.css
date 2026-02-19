@@ -1,11 +1,11 @@
 .main {
-  flex: 3.6;
+  flex: 3.4;
   margin: 50px 0px;
   padding: 20px;
 }
 
 .product-cart {
-  flex: 1.6;
+  flex: 1.8;
 }
 
 /* .products-page {

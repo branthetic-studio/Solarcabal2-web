@@ -17,6 +17,7 @@ import {
 type Props = {
   categorySlug: string;
   brand: string[] | null;
+  facetValueIds?: string[];
   sort: string;
   condition: string;
   priceRange: [number, number];
@@ -89,6 +90,7 @@ type GridItem = {
 export default function ProductGrid({
   categorySlug,
   brand,
+  facetValueIds,
   sort,
   condition,
   priceRange,
@@ -111,7 +113,7 @@ export default function ProductGrid({
     Record<string, number | undefined>
   >({});
   const [variantIdMap, setVariantIdMap] = useState<Record<string, string>>({});
-  const [openBrand, setOpenBrand] = useState<string | null>(null);
+  const [openBrands, setOpenBrands] = useState<Record<string, boolean>>({});
 
 
   const autoAddedRef = useRef<Record<string, boolean>>({});
@@ -137,7 +139,7 @@ export default function ProductGrid({
         groupByProduct: true,
         skip: 0,
         take: 20,
-        facetValueIds: brand ?? undefined,
+        facetValueIds,
       },
     }
   );
@@ -216,11 +218,15 @@ export default function ProductGrid({
   }, [data, facetsData]);
 
   // Open the first brand by default once brandBuckets are loaded
-useEffect(() => {
-  if (openBrand === null && brandBuckets.length > 0) {
-    setOpenBrand(brandBuckets[0].brandId);
-  }
-}, [brandBuckets, openBrand]);
+  useEffect(() => {
+    if (brandBuckets.length > 0) {
+      const initialState: Record<string, boolean> = {};
+      brandBuckets.forEach((b) => {
+        initialState[b.brandId] = true; // all open by default
+      });
+      setOpenBrands(initialState);
+    }
+  }, [brandBuckets]);
 
 
 
@@ -372,13 +378,14 @@ useEffect(() => {
     updateLocalQuantity,
   ]);
 
-  if (loading) return <div>Loading products…</div>;
+  if (loading) return <div className="text-center mx-auto">Loading products…</div>;
   if (error) return <div>Failed to load products.</div>;
 
   return (
     <div className="w-full space-y-4">
       {brandBuckets.map((brandGroup) => {
-        const isOpen = openBrand === brandGroup.brandId;
+        const isOpen = openBrands[brandGroup.brandId] ?? true;
+
 
         return (
           <div
@@ -388,13 +395,15 @@ useEffect(() => {
             {/* Accordion Header */}
             <button
               onClick={() =>
-                setOpenBrand((prev) =>
-                  prev === brandGroup.brandId
-                    ? null
-                    : brandGroup.brandId
-                )
+                setOpenBrands((prev) => ({
+                  ...prev,
+                  [brandGroup.brandId]: !prev[brandGroup.brandId],
+                }))
               }
-              className="w-210 flex items-center justify-between px-4 py-4 text-left"
+
+
+
+              className="w-full flex items-center justify-between px-4 py-4 text-left"
             >
               <h2 className="text-sm font-semibold">
                 {brandGroup.brandName}
@@ -404,7 +413,7 @@ useEffect(() => {
                 className={`text-xl transition-transform duration-200 ${isOpen ? "rotate-180" : "rotate-0"
                   }`}
               >
-               <ChevronDown /> 
+                <ChevronDown />
               </span>
             </button>
 

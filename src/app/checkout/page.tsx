@@ -553,7 +553,7 @@ const Page = () => {
 
                         <div className="text-right">
                           <p className="text-sm font-semibold">
-                            {NGN.format(ln.linePriceWithTax / 100)}
+                            {NGN.format(ln.linePriceWithTax   )}
                           </p>
                           <button className="text-xs text-red-500 flex items-center gap-1">Remove <Image src="/trash.png" alt="Remove" width={12} height={12} /></button>
                         </div>
@@ -569,7 +569,7 @@ const Page = () => {
               <div className="mt-4 border-t pt-4 space-y-2 text-sm">
                 <Row
                   label="Subtotal"
-                  value={NGN.format((activeOrder?.subTotalWithTax ?? 0) / 100)}
+                  value={NGN.format((activeOrder?.subTotalWithTax ?? 0) )}
                 />
                 <Row label="Discount" value="- ₦1,011.87" />
                 <Row label="Shipping" value="₦252,000" />
@@ -580,7 +580,7 @@ const Page = () => {
                   big
                   bold
                   label="Grand Total"
-                  value={NGN.format((activeOrder?.totalWithTax ?? 0) / 100)}
+                  value={NGN.format((activeOrder?.totalWithTax ?? 0))}
                 />
               </div>
 
