@@ -7,9 +7,11 @@ import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { useLocalCart } from "@/context/LocalCartContext";
 import { useUser } from "@/context/UserContext";
+import { ChevronDown } from "lucide-react";
 import {
   GET_COLLECTION_PRODUCTS,
   GET_PRODUCT_DETAILS,
+  GET_ALL_FACETS,
 } from "@/graphql/queries";
 
 type Props = {
@@ -44,6 +46,7 @@ interface GetCollectionProductsResponse {
       slug: string;
       productVariantId: string;
       productVariantName: string;
+      facetValueIds: string[];
       productAsset?: { preview: string };
       priceWithTax: {
         __typename: string;
@@ -55,6 +58,33 @@ interface GetCollectionProductsResponse {
     }>;
   };
 }
+
+interface GetAllFacetsResponse {
+  facets: {
+    items: Array<{
+      id: string;
+      name: string;
+      values: Array<{
+        id: string;
+        name: string;
+        facet?: {
+          id: string;
+          name: string;
+        } | null;
+      }>;
+    }>;
+  };
+}
+
+type GridItem = {
+  id: string;
+  name: string;
+  slug: string;
+  image?: string;
+  brand: string;
+  priceRaw?: number;
+  currencyCode: string;
+};
 
 export default function ProductGrid({
   categorySlug,
@@ -80,10 +110,19 @@ export default function ProductGrid({
   const [quantityMap, setQuantityMap] = useState<
     Record<string, number | undefined>
   >({});
-
   const [variantIdMap, setVariantIdMap] = useState<Record<string, string>>({});
+  const [openBrand, setOpenBrand] = useState<string | null>(null);
+
+
   const autoAddedRef = useRef<Record<string, boolean>>({});
-  const processingRef = useRef<Record<string, boolean>>({}); // prevents double async runs
+  const processingRef = useRef<Record<string, boolean>>({});
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const [loadDetails] = useLazyQuery<GetProductDetailsResponse>(
     GET_PRODUCT_DETAILS,
@@ -98,170 +137,230 @@ export default function ProductGrid({
         groupByProduct: true,
         skip: 0,
         take: 20,
-        filter: {
-          price: { between: { start: priceRange[0], end: priceRange[1] } },
-        },
+        facetValueIds: brand ?? undefined,
       },
     }
   );
 
-  const items = useMemo(() => {
-    return (
-      data?.search.items.map((it: any) => ({
-        id: it.slug, // UI id (keep same as your UI)
+  const { data: facetsData } =
+    useQuery<GetAllFacetsResponse>(GET_ALL_FACETS);
+
+  const brandBuckets = useMemo(() => {
+    const items = data?.search?.items ?? [];
+    const facetItems = facetsData?.facets?.items ?? [];
+
+    if (!items.length || !facetItems.length) return [];
+
+    const facetValueMap: Record<
+      string,
+      { name: string; facetName: string }
+    > = {};
+
+    facetItems.forEach((facet) => {
+      facet.values.forEach((val) => {
+        facetValueMap[val.id] = {
+          name: val.name,
+          facetName: val.facet?.name ?? facet.name,
+        };
+      });
+    });
+
+    const buckets: Record<
+      string,
+      {
+        brandId: string;
+        brandName: string;
+        items: GridItem[];
+      }
+    > = {};
+
+    items.forEach((it) => {
+      let brandName = "Others";
+
+      if (it.facetValueIds?.length) {
+        for (const id of it.facetValueIds) {
+          const facetInfo = facetValueMap[id];
+          if (
+            facetInfo &&
+            facetInfo.facetName.toLowerCase().includes("brand")
+          ) {
+            brandName = facetInfo.name;
+            break;
+          }
+        }
+      }
+
+      if (!buckets[brandName]) {
+        buckets[brandName] = {
+          brandId: brandName,
+          brandName,
+          items: [],
+        };
+      }
+
+      buckets[brandName].items.push({
+        id: it.slug,
         name: it.productName,
         slug: it.slug,
-        image: it.productAsset?.preview ?? undefined,
-        brand: it.brand ?? null,
+        image: it.productAsset?.preview,
+        brand: brandName,
         priceRaw:
           it.priceWithTax.__typename === "SinglePrice"
             ? it.priceWithTax.value
             : it.priceWithTax.min,
         currencyCode: it.currencyCode,
-      })) ?? []
-    );
-  }, [data]);
+      });
+    });
 
-  const handleAddToCart = async (itemId: string) => {
+    return Object.values(buckets);
+  }, [data, facetsData]);
+
+  // Open the first brand by default once brandBuckets are loaded
+useEffect(() => {
+  if (openBrand === null && brandBuckets.length > 0) {
+    setOpenBrand(brandBuckets[0].brandId);
+  }
+}, [brandBuckets, openBrand]);
+
+
+
+  const handleAddToCart = (itemId: string) => {
     setQuantityMap((prev) => ({ ...prev, [itemId]: 1 }));
   };
 
-  // 🔥 FIX: start from 0 instead of 1 (prevents jumping to 2)
   const adjustQuantity = (itemId: string, change: number) => {
     setQuantityMap((prev) => {
       const current = prev[itemId] ?? 0;
       const newQty = current + change;
 
       if (newQty <= 0) {
-        return { ...prev, [itemId]: undefined };
+        const copy = { ...prev };
+        delete copy[itemId];
+        return copy;
       }
 
       return { ...prev, [itemId]: newQty };
     });
   };
 
-  // ✅ Fixed sync logic (no UI changes, just correct behavior)
   useEffect(() => {
-    if (!items.length) return;
+    if (!brandBuckets.length) return;
 
-    const syncItem = async (item: (typeof items)[number]) => {
-      const qty = quantityMap[item.id];
+    const flatItems = brandBuckets.flatMap((b) => b.items);
 
-      // Prevent concurrent duplicate runs per item
-      if (processingRef.current[item.id]) return;
-      processingRef.current[item.id] = true;
+    const runSync = async () => {
+      for (const item of flatItems) {
+        if (!isMountedRef.current) return;
 
-      try {
-        // 🔥 REMOVE FLOW
-        if (qty === undefined) {
-          const variantId = variantIdMap[item.id];
+        const qty = quantityMap[item.id];
+        if (processingRef.current[item.id]) continue;
 
-          // remove from local using VARIANT ID (not slug)
-          if (variantId) {
-            removeLocalItem(variantId);
+        processingRef.current[item.id] = true;
 
-            if (customer) {
-              const orderLineId =
-                getOrderLineIdByVariantId(variantId);
-              if (orderLineId) {
-                await removeFromCartMutation(orderLineId);
+        try {
+          if (qty === undefined) {
+            const existingVariantId = variantIdMap[item.id];
+
+            if (existingVariantId) {
+              removeLocalItem(existingVariantId);
+
+              if (customer) {
+                const orderLineId =
+                  getOrderLineIdByVariantId(existingVariantId);
+                if (orderLineId) {
+                  await removeFromCartMutation(orderLineId);
+                }
               }
+
+              setVariantIdMap((prev) => {
+                if (!prev[item.id]) return prev;
+                const copy = { ...prev };
+                delete copy[item.id];
+                return copy;
+              });
             }
+
+            autoAddedRef.current[item.id] = false;
+            continue;
           }
 
-          // cleanup maps
-          setVariantIdMap((prev) => {
-            const copy = { ...prev };
-            delete copy[item.id];
-            return copy;
-          });
+          let variantId = variantIdMap[item.id];
 
-          autoAddedRef.current[item.id] = false;
-          return;
-        }
+          if (!variantId) {
+            const { data: pd } = await loadDetails({
+              variables: { slug: item.slug },
+            });
 
-        // 🔥 Load variant once
-        let variantId = variantIdMap[item.id];
+            const variant = pd?.product?.variants?.[0];
+            if (!variant) continue;
 
-        if (!variantId) {
+            variantId = variant.id;
+
+            setVariantIdMap((prev) => {
+              if (prev[item.id] === variant!.id) return prev;
+              return { ...prev, [item.id]: variant!.id };
+            });
+          }
+
           const { data: pd } = await loadDetails({
             variables: { slug: item.slug },
           });
 
           const variant = pd?.product?.variants?.[0];
-          if (!variant) return;
+          if (!variant) continue;
 
-          variantId = variant.id;
+          const image =
+            item.image ??
+            pd?.product?.featuredAsset?.preview ??
+            pd?.product?.assets?.[0]?.preview ??
+            undefined;
 
-          setVariantIdMap((prev) => ({
-            ...prev,
-            [item.id]: variant.id,
-          }));
-        }
+          if (!autoAddedRef.current[item.id]) {
+            autoAddedRef.current[item.id] = true;
 
-        // 🔥 Get image fallback
-        const { data: pd } = await loadDetails({
-          variables: { slug: item.slug },
-        });
-
-        const variant = pd?.product?.variants?.[0];
-        if (!variant) return;
-
-        const image =
-          item.image ??
-          pd?.product?.featuredAsset?.preview ??
-          pd?.product?.assets?.[0]?.preview ??
-          undefined;
-
-        // 🔥 FIRST ADD
-        if (!autoAddedRef.current[item.id]) {
-          autoAddedRef.current[item.id] = true;
-
-          addLocalItem({
-            id: variantId,
-            name: item.name,
-            slug: item.slug,
-            priceWithTax: variant.priceWithTax,
-            currencyCode: variant.currencyCode,
-            brand: item.brand ?? undefined,
-            image,
-            quantity: qty,
-          });
-
-          if (customer) {
-            await addToCartMutation({
-              productVariantId: variantId,
+            addLocalItem({
+              id: variantId!,
+              name: item.name,
+              slug: item.slug,
+              priceWithTax: variant.priceWithTax,
+              currencyCode: variant.currencyCode,
+              brand: item.brand,
+              image,
               quantity: qty,
             });
+
+            if (customer) {
+              await addToCartMutation({
+                productVariantId: variantId!,
+                quantity: qty,
+              });
+            }
+
+            toast.success("Added to Cart");
+            continue;
           }
 
-          toast.success("Added to Cart");
-          return;
-        }
+          updateLocalQuantity(variantId!, qty);
 
-        // 🔥 UPDATE (no duplicate add)
-        updateLocalQuantity(variantId, qty);
-
-        if (customer) {
-          const orderLineId =
-            getOrderLineIdByVariantId(variantId);
-          if (orderLineId) {
-            await handleAdjustQuantity(orderLineId, qty);
+          if (customer) {
+            const orderLineId =
+              getOrderLineIdByVariantId(variantId!);
+            if (orderLineId) {
+              await handleAdjustQuantity(orderLineId, qty);
+            }
           }
+        } catch (e) {
+          console.error("Cart sync error:", e);
+        } finally {
+          processingRef.current[item.id] = false;
         }
-      } catch (e) {
-        console.error("Cart sync error:", e);
-      } finally {
-        processingRef.current[item.id] = false;
       }
     };
 
-    items.forEach((item) => {
-      void syncItem(item);
-    });
+    void runSync();
   }, [
     quantityMap,
-    items,
+    brandBuckets,
     customer,
     loadDetails,
     addToCartMutation,
@@ -271,66 +370,123 @@ export default function ProductGrid({
     removeLocalItem,
     addLocalItem,
     updateLocalQuantity,
-    variantIdMap,
   ]);
 
   if (loading) return <div>Loading products…</div>;
   if (error) return <div>Failed to load products.</div>;
 
   return (
-    <div className="w-full grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
-      {items.map((item) => {
-        const qty = quantityMap[item.id];
+    <div className="w-full space-y-4">
+      {brandBuckets.map((brandGroup) => {
+        const isOpen = openBrand === brandGroup.brandId;
 
         return (
-          <div key={item.id} className="rounded-xl p-1 shadow-sm bg-white">
-            <div className="bg-[#F3F5F7] p-3 pb-1 rounded-t-md">
-              <Link href={`/products/${item.slug}`}>
-                <img
-                  src={item.image || "/placeholder.png"}
-                  className="w-full h-40 object-contain rounded-md"
-                  alt={item.name}
-                />
-              </Link>
+          <div
+            key={brandGroup.brandId}
+            className="w-full bg-white"
+          >
+            {/* Accordion Header */}
+            <button
+              onClick={() =>
+                setOpenBrand((prev) =>
+                  prev === brandGroup.brandId
+                    ? null
+                    : brandGroup.brandId
+                )
+              }
+              className="w-210 flex items-center justify-between px-4 py-4 text-left"
+            >
+              <h2 className="text-sm font-semibold">
+                {brandGroup.brandName}
+              </h2>
 
-              {qty === undefined ? (
-                <button
-                  className="w-full bg-black text-white py-2 rounded-md mt-3"
-                  onClick={() => handleAddToCart(item.id)}
-                >
-                  Add to Cart
-                </button>
-              ) : (
-                <div className="flex items-center justify-between mt-3 bg-gray-100 rounded-md px-3 py-2">
-                  <button
-                    className="text-lg font-bold bg-black rounded-md text-white px-2"
-                    onClick={() => adjustQuantity(item.id, -1)}
-                  >
-                    –
-                  </button>
+              <span
+                className={`text-xl transition-transform duration-200 ${isOpen ? "rotate-180" : "rotate-0"
+                  }`}
+              >
+               <ChevronDown /> 
+              </span>
+            </button>
 
-                  <span className="font-semibold">{qty}</span>
+            {/* Accordion Content */}
+            {isOpen && (
+              <div className="px-4 pb-4">
+                <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
+                  {brandGroup.items.map((item) => {
+                    const qty = quantityMap[item.id];
 
-                  <button
-                    className="text-lg font-bold bg-black rounded-md text-white px-2"
-                    onClick={() => adjustQuantity(item.id, +1)}
-                  >
-                    +
-                  </button>
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-xl p-1 shadow-sm bg-white"
+                      >
+                        <div className="bg-[#F3F5F7] p-3 pb-1 rounded-t-md">
+                          <Link href={`/products/${item.slug}`}>
+                            <img
+                              src={item.image || "/placeholder.png"}
+                              className="w-full h-40 object-contain rounded-md"
+                              alt={item.name}
+                            />
+                          </Link>
+
+                          {qty === undefined ? (
+                            <button
+                              className="w-full bg-black text-white py-2 rounded-md mt-3"
+                              onClick={() =>
+                                handleAddToCart(item.id)
+                              }
+                            >
+                              Add to Cart
+                            </button>
+                          ) : (
+                            <div className="flex items-center justify-between mt-3 bg-gray-100 rounded-md px-3 py-2">
+                              <button
+                                className="text-lg font-bold bg-black rounded-md text-white px-2"
+                                onClick={() =>
+                                  adjustQuantity(item.id, -1)
+                                }
+                              >
+                                –
+                              </button>
+
+                              <span className="font-semibold">
+                                {qty}
+                              </span>
+
+                              <button
+                                className="text-lg font-bold bg-black rounded-md text-white px-2"
+                                onClick={() =>
+                                  adjustQuantity(item.id, +1)
+                                }
+                              >
+                                +
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="p-2">
+                          <p className="text-sm text-gray-500 mt-2">
+                            {item.brand}
+                          </p>
+                          <p className="font-semibold text-sm">
+                            {item.name}
+                          </p>
+                          <p className="text-md font-bold mt-4">
+                            {item.currencyCode}{" "}
+                            {item.priceRaw?.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-
-            <div className="p-2">
-              <p className="text-sm text-gray-500 mt-2">{item.brand}</p>
-              <p className="font-semibold text-sm">{item.name}</p>
-              <p className="text-md font-bold mt-4">
-                {item.currencyCode} {item.priceRaw.toLocaleString()}
-              </p>
-            </div>
+              </div>
+            )}
           </div>
         );
       })}
     </div>
   );
+
 }
