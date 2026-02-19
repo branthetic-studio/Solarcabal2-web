@@ -20,12 +20,6 @@ type Props = {
   priceRange: [number, number];
 };
 
-type UseCartContext = {
-  removeFromCartMutation: (options: {
-    variables: { productVariantId: string };
-  }) => Promise<void>;
-};
-
 type GetProductDetailsResponse = {
   product: {
     id: string;
@@ -74,15 +68,22 @@ export default function ProductGrid({
     addToCartMutation,
     handleAdjustQuantity,
     removeFromCartMutation,
-    getOrderLineIdByVariantId, // ✅ Get helper
+    getOrderLineIdByVariantId,
   } = useCart();
-  const { addItem: addLocalItem, removeItem: removeLocalItem } = useLocalCart();
+
+  const {
+    addItem: addLocalItem,
+    removeItem: removeLocalItem,
+    updateQuantity: updateLocalQuantity,
+  } = useLocalCart();
 
   const [quantityMap, setQuantityMap] = useState<
     Record<string, number | undefined>
   >({});
-  const [variantIdMap, setVariantIdMap] = useState<Record<string, string>>({}); // ✅ Track variantId by itemId
+
+  const [variantIdMap, setVariantIdMap] = useState<Record<string, string>>({});
   const autoAddedRef = useRef<Record<string, boolean>>({});
+  const processingRef = useRef<Record<string, boolean>>({}); // prevents double async runs
 
   const [loadDetails] = useLazyQuery<GetProductDetailsResponse>(
     GET_PRODUCT_DETAILS,
@@ -107,7 +108,7 @@ export default function ProductGrid({
   const items = useMemo(() => {
     return (
       data?.search.items.map((it: any) => ({
-        id: it.slug,
+        id: it.slug, // UI id (keep same as your UI)
         name: it.productName,
         slug: it.slug,
         image: it.productAsset?.preview ?? undefined,
@@ -125,107 +126,153 @@ export default function ProductGrid({
     setQuantityMap((prev) => ({ ...prev, [itemId]: 1 }));
   };
 
+  // 🔥 FIX: start from 0 instead of 1 (prevents jumping to 2)
   const adjustQuantity = (itemId: string, change: number) => {
     setQuantityMap((prev) => {
-      const newQty = (prev[itemId] || 1) + change;
+      const current = prev[itemId] ?? 0;
+      const newQty = current + change;
+
       if (newQty <= 0) {
         return { ...prev, [itemId]: undefined };
       }
+
       return { ...prev, [itemId]: newQty };
     });
   };
 
-  // ✅ FIXED: Auto sync with proper orderLineId tracking
+  // ✅ Fixed sync logic (no UI changes, just correct behavior)
   useEffect(() => {
-    items.forEach(async (item) => {
+    if (!items.length) return;
+
+    const syncItem = async (item: (typeof items)[number]) => {
       const qty = quantityMap[item.id];
 
-      if (qty === undefined) {
-        // ✅ Remove using orderLineId, not item.id
-        removeLocalItem(item.id);
+      // Prevent concurrent duplicate runs per item
+      if (processingRef.current[item.id]) return;
+      processingRef.current[item.id] = true;
 
-        if (customer) {
+      try {
+        // 🔥 REMOVE FLOW
+        if (qty === undefined) {
           const variantId = variantIdMap[item.id];
+
+          // remove from local using VARIANT ID (not slug)
           if (variantId) {
-            const orderLineId = getOrderLineIdByVariantId(variantId);
-            if (orderLineId) {
-              await removeFromCartMutation(orderLineId);
+            removeLocalItem(variantId);
+
+            if (customer) {
+              const orderLineId =
+                getOrderLineIdByVariantId(variantId);
+              if (orderLineId) {
+                await removeFromCartMutation(orderLineId);
+              }
             }
           }
+
+          // cleanup maps
+          setVariantIdMap((prev) => {
+            const copy = { ...prev };
+            delete copy[item.id];
+            return copy;
+          });
+
+          autoAddedRef.current[item.id] = false;
+          return;
         }
 
-        // Clean up tracking
-        setVariantIdMap((prev) => {
-          const newMap = { ...prev };
-          delete newMap[item.id];
-          return newMap;
-        });
-        autoAddedRef.current[item.id] = false;
-        return;
-      }
+        // 🔥 Load variant once
+        let variantId = variantIdMap[item.id];
 
-      // Fetch variant details
-      const { data: pd } = await loadDetails({
-        variables: { slug: item.slug },
-      });
-      const variant = pd?.product?.variants?.[0];
-      if (!variant) return;
+        if (!variantId) {
+          const { data: pd } = await loadDetails({
+            variables: { slug: item.slug },
+          });
 
-      const image =
-        item.image ??
-        pd?.product?.featuredAsset?.preview ??
-        pd?.product?.assets?.[0]?.preview ??
-        undefined;
+          const variant = pd?.product?.variants?.[0];
+          if (!variant) return;
 
-      // ✅ Track variantId for this item
-      setVariantIdMap((prev) => ({ ...prev, [item.id]: variant.id }));
+          variantId = variant.id;
 
-      // First-time add
-      if (!autoAddedRef.current[item.id]) {
-        autoAddedRef.current[item.id] = true;
+          setVariantIdMap((prev) => ({
+            ...prev,
+            [item.id]: variant.id,
+          }));
+        }
 
-        addLocalItem({
-          id: variant.id,
-          name: item.name,
-          slug: item.slug,
-          priceWithTax: variant.priceWithTax,
-          currencyCode: variant.currencyCode,
-          brand: item.brand ?? undefined,
-          image: image ?? undefined,
-          quantity: qty,
+        // 🔥 Get image fallback
+        const { data: pd } = await loadDetails({
+          variables: { slug: item.slug },
         });
 
-        if (customer) {
-          await addToCartMutation({
-            productVariantId: variant.id,
+        const variant = pd?.product?.variants?.[0];
+        if (!variant) return;
+
+        const image =
+          item.image ??
+          pd?.product?.featuredAsset?.preview ??
+          pd?.product?.assets?.[0]?.preview ??
+          undefined;
+
+        // 🔥 FIRST ADD
+        if (!autoAddedRef.current[item.id]) {
+          autoAddedRef.current[item.id] = true;
+
+          addLocalItem({
+            id: variantId,
+            name: item.name,
+            slug: item.slug,
+            priceWithTax: variant.priceWithTax,
+            currencyCode: variant.currencyCode,
+            brand: item.brand ?? undefined,
+            image,
             quantity: qty,
           });
+
+          if (customer) {
+            await addToCartMutation({
+              productVariantId: variantId,
+              quantity: qty,
+            });
+          }
+
+          toast.success("Added to Cart");
+          return;
         }
 
-        toast.success("Added to Cart");
-        return;
-      }
+        // 🔥 UPDATE (no duplicate add)
+        updateLocalQuantity(variantId, qty);
 
-      // ✅ Update using orderLineId, not variantId
-      addLocalItem({
-        id: variant.id,
-        name: item.name,
-        slug: item.slug,
-        priceWithTax: variant.priceWithTax,
-        currencyCode: variant.currencyCode,
-        brand: item.brand ?? undefined,
-        image: image ?? undefined,
-        quantity: qty,
-      });
-
-      if (customer) {
-        const orderLineId = getOrderLineIdByVariantId(variant.id);
-        if (orderLineId) {
-          await handleAdjustQuantity(orderLineId, qty);
+        if (customer) {
+          const orderLineId =
+            getOrderLineIdByVariantId(variantId);
+          if (orderLineId) {
+            await handleAdjustQuantity(orderLineId, qty);
+          }
         }
+      } catch (e) {
+        console.error("Cart sync error:", e);
+      } finally {
+        processingRef.current[item.id] = false;
       }
+    };
+
+    items.forEach((item) => {
+      void syncItem(item);
     });
-  }, [quantityMap, items]);
+  }, [
+    quantityMap,
+    items,
+    customer,
+    loadDetails,
+    addToCartMutation,
+    handleAdjustQuantity,
+    removeFromCartMutation,
+    getOrderLineIdByVariantId,
+    removeLocalItem,
+    addLocalItem,
+    updateLocalQuantity,
+    variantIdMap,
+  ]);
 
   if (loading) return <div>Loading products…</div>;
   if (error) return <div>Failed to load products.</div>;

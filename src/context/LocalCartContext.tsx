@@ -27,26 +27,29 @@ interface LocalCartContextType {
   addItem: (
     item: Omit<LocalCartItem, "quantity"> & { quantity?: number }
   ) => void;
+  incrementQuantity: (id: string, amount?: number) => void;
+  decrementQuantity: (id: string, amount?: number) => void;
   updateQuantity: (id: string, quantity: number) => void;
   removeItem: (id: string) => void;
   clearCart: () => void;
 }
+
+const STORAGE_KEY = "localCart:v1";
 
 const initialData: LocalCartContextType = {
   items: [],
   getCount: () => 0,
   getTotal: () => 0,
   addItem: () => {},
+  incrementQuantity: () => {},
+  decrementQuantity: () => {},
   updateQuantity: () => {},
   removeItem: () => {},
   clearCart: () => {},
 };
 
 const LocalCartContext = createContext<LocalCartContextType>(initialData);
-
 export const useLocalCart = () => useContext(LocalCartContext);
-
-const STORAGE_KEY = "localCart:v1";
 
 function isValidItems(payload: any): payload is LocalCartItem[] {
   return (
@@ -96,19 +99,15 @@ const LocalCartProvider = ({ children }: PropsWithChildren) => {
   }, []);
 
   // Derived helpers
-  const getCount = useMemo(() => {
-    return () => items.reduce((total, item) => total + item.quantity, 0);
-  }, [items]);
+  const getCount = useMemo(() => () => items.reduce((t, i) => t + i.quantity, 0), [items]);
+  const getTotal = useMemo(
+    () => () => items.reduce((t, i) => t + i.priceWithTax * i.quantity, 0),
+    [items]
+  );
 
-  const getTotal = useMemo(() => {
-    return () => items.reduce((t, it) => t + it.priceWithTax * it.quantity, 0);
-  }, [items]);
-
-  // Mutators (each one writes-through)
-  const addItem = (
-    newItem: Omit<LocalCartItem, "quantity"> & { quantity?: number }
-  ) => {
-    const quantity = newItem.quantity || 1;
+  // Add new item (or increment if exists)
+  const addItem = (newItem: Omit<LocalCartItem, "quantity"> & { quantity?: number }) => {
+    const quantity = newItem.quantity ?? 1;
     setItems((prev) => {
       const idx = prev.findIndex((it) => it.id === newItem.id);
       const next =
@@ -122,6 +121,35 @@ const LocalCartProvider = ({ children }: PropsWithChildren) => {
     });
   };
 
+  // Increment quantity by X (default 1)
+  const incrementQuantity = (id: string, amount = 1) => {
+    setItems((prev) => {
+      const idx = prev.findIndex((it) => it.id === id);
+      if (idx === -1) return prev;
+      const next = prev.map((it, i) =>
+        i === idx ? { ...it, quantity: it.quantity + amount } : it
+      );
+      save(next);
+      return next;
+    });
+  };
+
+  // Decrement quantity by X (default 1)
+  const decrementQuantity = (id: string, amount = 1) => {
+    setItems((prev) => {
+      const idx = prev.findIndex((it) => it.id === id);
+      if (idx === -1) return prev;
+      const next = prev
+        .map((it, i) =>
+          i === idx ? { ...it, quantity: it.quantity - amount } : it
+        )
+        .filter((it) => it.quantity > 0);
+      save(next);
+      return next;
+    });
+  };
+
+  // Update to an absolute quantity
   const updateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) return removeItem(id);
     setItems((prev) => {
@@ -131,6 +159,7 @@ const LocalCartProvider = ({ children }: PropsWithChildren) => {
     });
   };
 
+  // Remove completely
   const removeItem = (id: string) => {
     setItems((prev) => {
       const next = prev.filter((it) => it.id !== id);
@@ -153,6 +182,8 @@ const LocalCartProvider = ({ children }: PropsWithChildren) => {
       getCount,
       getTotal,
       addItem,
+      incrementQuantity,
+      decrementQuantity,
       updateQuantity,
       removeItem,
       clearCart,
