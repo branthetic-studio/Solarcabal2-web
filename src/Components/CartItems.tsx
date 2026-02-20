@@ -15,20 +15,31 @@ const money = (amount: number, currency = "NGN") =>
     maximumFractionDigits: 0,
   }).format(Math.max(0, amount || 0));
 
-export default function CartItems() {
-  const { cart, handleAdjustQuantity } = useCart();
+interface CartItemsProps {
+  onClose?: () => void;
+}
+
+export default function CartItems({ onClose }: CartItemsProps) {
+  const { cart, handleAdjustQuantity, removeFromCartMutation } = useCart();
   const { items: localItems, updateQuantity, removeItem } = useLocalCart();
   const user = useUser() as any;
   const isLoggedIn = !!(user?.me || user?.user || user?.activeCustomer);
 
-  const lines = isLoggedIn ? cart?.activeOrder?.lines ?? [] : localItems;
+  const order = cart?.activeOrder;
+  const serverCurrency = order?.currencyCode ?? "NGN";
+
+  // Mirror CartPage: logged-in → server lines, guest → local items
+  const lines = isLoggedIn ? order?.lines ?? [] : localItems;
 
   return (
     <div className="w-full min-w-2xs mx-auto py-6 bg-[#ffffff] px-4 border-[#e3e3e3] border-l mt-6">
 
       {/* TOP BUTTONS */}
       <div className="flex flex-col gap-3">
-        <Link href="/checkout" className="w-full bg-red-600 text-white py-3 text-center rounded-full font-semibold text-sm">
+        <Link
+          href="/checkout"
+          className="w-full bg-red-600 text-white py-3 text-center rounded-full font-semibold text-sm"
+        >
           Checkout now
         </Link>
 
@@ -45,99 +56,202 @@ export default function CartItems() {
         <h2 className="text-sm font-semibold">
           Cart Items <span className="text-red-600">({lines.length})</span>
         </h2>
-        <button className="text-xs">✕</button>
+        {onClose && (
+          <button className="text-xs" onClick={onClose} aria-label="Close cart">
+            ✕
+          </button>
+        )}
       </div>
 
       {/* CART LIST */}
       <div className="mt-4 space-y-5">
-        {lines.map((item: any) => (
-          <div
-            key={item.id}
-            className="w-full flex items-start gap-4 border-b-[#f3f5f7] pb-4"
-          >
-            {/* IMAGE */}
-            <div className="h-full bg-[#f3f5f7] rounded-lg overflow-hidden">
-              <Image
-                src={
-                  isLoggedIn
-                    ? item?.featuredAsset?.preview ??
-                    item?.productVariant?.product?.featuredAsset?.preview
-                    : item.image
-                }
-                alt={item.name}
-                width={70}
-                height={70}
-                className="h-full w-full object-cover"
-              />
-            </div>
+        {lines.length === 0 && (
+          <p className="text-xs text-neutral-500 text-center py-6">
+            Your cart is empty.
+          </p>
+        )}
 
-            {/* DETAILS */}
-            <div className="w-full">
-              <p className=" text-xs font-semibold">{item.name}</p>
-              <p className="text-neutral-500 text-xs mt-2">
-                {item.category ?? "Battery"}
-              </p>
+        {isLoggedIn
+          ? (lines as any[]).map((line: any) => {
+              // Mirror CartPage's asset resolution
+              const asset =
+                line?.featuredAsset?.preview ??
+                line?.productVariant?.product?.featuredAsset?.preview ??
+                line?.productVariant?.product?.assets?.[0]?.preview ??
+                null;
 
-              {/* PRICE */}
-              {/* <p className="mt-1 font-semibold text-sm">
-                {money(isLoggedIn ? item.unitPriceWithTax : item.priceWithTax)}
-              </p> */}
+              const name =
+                line?.productVariant?.product?.name ??
+                line?.productVariant?.name ??
+                "Product";
 
-              {/* QUANTITY */}
-              <div className="w-full flex justify-between items-center mt-2">
-                <div className="flex items-center rounded-full overflow-hidden">
-                  <button
-                    className="h-6 w-6 text-xs flex items-center border border-[#dbdcdd] rounded-full justify-center"
-                    onClick={() =>
-                      isLoggedIn
-                        ? handleAdjustQuantity(item.id, item.quantity - 1)
-                        : updateQuantity(item.id, item.quantity - 1)
-                    }
-                  >
-                    -
-                  </button>
-                  <span className="w-8 text-center text-sm">
-                    {item.quantity}
-                  </span>
-                  <button
-                    className="h-6 w-6 text-xs flex items-center justify-center border border-[#dbdcdd] rounded-full"
-                    onClick={() =>
-                      isLoggedIn
-                        ? handleAdjustQuantity(item.id, item.quantity + 1)
-                        : updateQuantity(item.id, item.quantity + 1)
-                    }
-                  >
-                    +
-                  </button>
-                </div>
+              const brand =
+                line?.productVariant?.product?.facetValues?.find?.(
+                  (fv: any) => /brand/i.test(fv?.facet?.name ?? "")
+                )?.name ?? "—";
 
-                {/* REMOVE */}
-                <button
-                  className="text-red-600 flex items-center gap-1 text-xs"
-                  onClick={() =>
-                    isLoggedIn
-                      ? handleAdjustQuantity(item.id, 0)
-                      : removeItem(item.id)
-                  }
+              const unitPrice = line?.unitPriceWithTax ?? 0;
+              const lineTotal = line?.linePriceWithTax ?? unitPrice * (line?.quantity ?? 1);
+
+              return (
+                <div
+                  key={line.id}
+                  className="w-full flex items-start gap-4 border-b border-[#f3f5f7] pb-4"
                 >
-                  Remove <Trash2 size={12} />
-                </button>
-              </div>
-            </div>
+                  {/* IMAGE */}
+                  <div className="h-[70px] w-[70px] shrink-0 bg-[#f3f5f7] rounded-lg overflow-hidden">
+                    {asset ? (
+                      <Image
+                        src={asset}
+                        alt={name}
+                        width={70}
+                        height={70}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
+                        No Image
+                      </span>
+                    )}
+                  </div>
 
-            {/* TOTAL ON RIGHT */}
-            <div className="text-right">
-              <p className="text-xs text-neutral-500">Total</p>
-              <p className="font-semibold text-xs">
-                {money(
-                  (isLoggedIn
-                    ? item.unitPriceWithTax
-                    : item.priceWithTax) * item.quantity
-                )}
-              </p>
-            </div>
-          </div>
-        ))}
+                  {/* DETAILS */}
+                  <div className="w-full min-w-0">
+                    <p className="text-xs font-semibold truncate">{name}</p>
+                    <p className="text-neutral-500 text-xs mt-1">{brand}</p>
+
+                    {/* QUANTITY */}
+                    <div className="w-full flex justify-between items-center mt-2">
+                      <div className="flex items-center rounded-full overflow-hidden">
+                        <button
+                          className="h-6 w-6 text-xs flex items-center border border-[#dbdcdd] rounded-full justify-center"
+                          onClick={() =>
+                            handleAdjustQuantity(
+                              line.id,
+                              Math.max(0, (line.quantity ?? 1) - 1)
+                            )
+                          }
+                          aria-label="Decrease quantity"
+                        >
+                          −
+                        </button>
+                        <span className="w-8 text-center text-sm">
+                          {line.quantity}
+                        </span>
+                        <button
+                          className="h-6 w-6 text-xs flex items-center justify-center border border-[#dbdcdd] rounded-full"
+                          onClick={() =>
+                            handleAdjustQuantity(line.id, (line.quantity ?? 1) + 1)
+                          }
+                          aria-label="Increase quantity"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {/* REMOVE */}
+                      <button
+                        className="text-red-600 flex items-center gap-1 text-xs"
+                        onClick={() => removeFromCartMutation(line.id)}
+                      >
+                        Remove <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* TOTAL ON RIGHT */}
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-neutral-500">Total</p>
+                    <p className="font-semibold text-xs">
+                      {money(lineTotal, serverCurrency)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          : localItems.map((item) => {
+              const localCurrency = item.currencyCode ?? "NGN";
+              return (
+                <div
+                  key={item.id}
+                  className="w-full flex items-start gap-4 border-b border-[#f3f5f7] pb-4"
+                >
+                  {/* IMAGE */}
+                  <div className="h-[70px] w-[70px] shrink-0 bg-[#f3f5f7] rounded-lg overflow-hidden">
+                    {item.image ? (
+                      <Image
+                        src={item.image}
+                        alt={item.name}
+                        width={70}
+                        height={70}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
+                        No Image
+                      </span>
+                    )}
+                  </div>
+
+                  {/* DETAILS */}
+                  <div className="w-full min-w-0">
+                    <p className="text-xs font-semibold truncate">{item.name}</p>
+                    <p className="text-neutral-500 text-xs mt-1">
+                      {item.brand ?? "—"}
+                    </p>
+
+                    {/* QUANTITY */}
+                    <div className="w-full flex justify-between items-center mt-2">
+                      <div className="flex items-center rounded-full overflow-hidden">
+                        <button
+                          className="h-6 w-6 text-xs flex items-center border border-[#dbdcdd] rounded-full justify-center"
+                          onClick={() =>
+                            updateQuantity(
+                              item.id,
+                              Math.max(0, (item.quantity ?? 1) - 1)
+                            )
+                          }
+                          aria-label="Decrease quantity"
+                        >
+                          −
+                        </button>
+                        <span className="w-8 text-center text-sm">
+                          {item.quantity}
+                        </span>
+                        <button
+                          className="h-6 w-6 text-xs flex items-center justify-center border border-[#dbdcdd] rounded-full"
+                          onClick={() =>
+                            updateQuantity(item.id, (item.quantity ?? 1) + 1)
+                          }
+                          aria-label="Increase quantity"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {/* REMOVE */}
+                      <button
+                        className="text-red-600 flex items-center gap-1 text-xs"
+                        onClick={() => removeItem(item.id)}
+                      >
+                        Remove <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* TOTAL ON RIGHT */}
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-neutral-500">Total</p>
+                    <p className="font-semibold text-xs">
+                      {money(
+                        (item.priceWithTax ?? 0) * (item.quantity ?? 1),
+                        localCurrency
+                      )}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
       </div>
     </div>
   );

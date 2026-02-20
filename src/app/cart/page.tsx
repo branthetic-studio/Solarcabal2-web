@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, PencilLine } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useLocalCart } from "@/context/LocalCartContext";
 import { useUser } from "@/context/UserContext";
@@ -16,11 +16,7 @@ import { useQuery } from "@apollo/client/react";
 import { GET_ACCOUNT_DETAILS } from "@/graphql/queries";
 import AuthModal from "@/Components/AuthModal";
 
-
-
-
-
-/** NGN with no decimals (adjust if you need decimals) */
+/** NGN with no decimals */
 const money = (amount: number, currency = "NGN") =>
   new Intl.NumberFormat("en-NG", {
     style: "currency",
@@ -30,26 +26,17 @@ const money = (amount: number, currency = "NGN") =>
 
 export default function CartPage() {
   const router = useRouter();
-
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-
-  // Contexts
-  const { cart, handleAdjustQuantity } = useCart();
-  const {
-    items: localItems,
-    updateQuantity,
-    removeItem,
-    clearCart,
-  } = useLocalCart();
+  // Contexts — same sources as CartItems
+  const { cart, handleAdjustQuantity, removeFromCartMutation } = useCart();
+  const { items: localItems, updateQuantity, removeItem } = useLocalCart();
   const u = useUser() as any;
   const isLoggedIn = !!(u?.me || u?.user || u?.activeCustomer || u?.customer);
 
-  // Server-cart derived
+  // Server-cart derived — mirrors CartItems logic
   const order = cart?.activeOrder;
-  const lines = (isLoggedIn ? order?.lines : []) ?? [];
-
-
+  const lines = isLoggedIn ? order?.lines ?? [] : [];
 
   const serverSubtotal = order?.subTotalWithTax ?? 0;
   const serverShipping = (order?.shippingLines ?? []).reduce(
@@ -73,21 +60,15 @@ export default function CartPage() {
 
   const { data: accountData, loading: accountLoading } = useQuery(
     GET_ACCOUNT_DETAILS,
-    {
-      skip: !isLoggedIn,
-      fetchPolicy: "network-only",
-    }
+    { skip: !isLoggedIn, fetchPolicy: "network-only" }
   );
-
 
   const activeCustomer = (accountData as any)?.activeCustomer ?? null;
   const addresses = activeCustomer?.addresses ?? [];
-
   const defaultShippingAddress =
     addresses.find((a: any) => a.defaultShippingAddress) ?? null;
 
-
-  // Empty states
+  // --- Empty states ---
   if (!isLoggedIn && localItems.length === 0) {
     return (
       <main className="px-4 sm:px-6 lg:px-8 py-10">
@@ -97,7 +78,7 @@ export default function CartPage() {
           <div className="text-5xl mb-3">🛒</div>
           <p className="text-neutral-600">Your cart is empty.</p>
           <Link
-            href="/"
+            href="/products"
             className="mt-6 inline-flex items-center justify-center rounded-full bg-red-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-red-700"
           >
             Continue shopping
@@ -117,7 +98,7 @@ export default function CartPage() {
             <div className="text-5xl mb-3">🛒</div>
             <p className="text-neutral-600">Your cart is empty.</p>
             <Link
-              href="/"
+              href="/products"
               className="mt-6 inline-flex items-center justify-center rounded-full bg-red-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-red-700"
             >
               Continue shopping
@@ -137,7 +118,6 @@ export default function CartPage() {
         {/* Title row */}
         <div className="flex items-center justify-between">
           <h1 className="text-xl sm:text-2xl font-semibold">Shopping Cart</h1>
-          {/* Optional sort UI placeholder */}
         </div>
 
         {/* Grid: Items + Summary */}
@@ -146,16 +126,28 @@ export default function CartPage() {
           <section className="lg:col-span-2">
             <ul className="space-y-4">
               {isLoggedIn
-                ? lines.map((line: any) => {
+                ? (lines as any[]).map((line: any) => {
+                  // Identical asset + name resolution as CartItems
                   const asset =
                     line?.featuredAsset?.preview ??
                     line?.productVariant?.product?.featuredAsset?.preview ??
                     line?.productVariant?.product?.assets?.[0]?.preview ??
                     null;
+
+                  const name =
+                    line?.productVariant?.product?.name ??
+                    line?.productVariant?.name ??
+                    "Product";
+
                   const brand =
                     line?.productVariant?.product?.facetValues?.find?.(
                       (fv: any) => /brand/i.test(fv?.facet?.name ?? "")
-                    )?.name;
+                    )?.name ?? "—";
+
+                  const unitPrice = line?.unitPriceWithTax ?? 0;
+                  const lineTotal =
+                    line?.linePriceWithTax ?? unitPrice * (line?.quantity ?? 1);
+
                   return (
                     <li
                       key={line.id}
@@ -167,10 +159,7 @@ export default function CartPage() {
                           {asset ? (
                             <Image
                               src={asset}
-                              alt={
-                                line.productVariant?.featuredAsset?.preview ?? // ✅ Added ? after featuredAsset
-                                "Product image"
-                              }
+                              alt={name}
                               width={80}
                               height={80}
                               className="h-full w-full object-cover"
@@ -187,30 +176,24 @@ export default function CartPage() {
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
-                                {line.productVariant?.product?.name ??
-                                  line.productVariant?.name}
+                                {name}
                               </p>
                               <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
-                                {brand ?? line.productVariant?.name ?? "—"}
+                                {brand}
                               </p>
                               <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
-                                {money(
-                                  line.unitPriceWithTax ?? 0,
-                                  serverCurrency
-                                )}{" "}
+                                {money(unitPrice, serverCurrency)}{" "}
                                 <span className="text-[11px] font-normal text-neutral-500">
-                                  / pcssss
+                                  / pcs
                                 </span>
                               </p>
                             </div>
 
-                            {/* Right: price + Remove */}
+                            {/* Right: total + Remove */}
                             <div className="text-right">
                               <button
                                 className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
-                                onClick={() =>
-                                  handleAdjustQuantity(line.id, 0)
-                                }
+                                onClick={() => removeFromCartMutation(line.id)}
                                 aria-label="Remove"
                               >
                                 Remove <Trash2 className="h-4 w-4" />
@@ -218,10 +201,7 @@ export default function CartPage() {
                               <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
                                 <span className="mr-1">Total</span>
                                 <span className="font-semibold text-neutral-900">
-                                  {money(
-                                    line.linePriceWithTax ?? 0,
-                                    serverCurrency
-                                  )}
+                                  {money(lineTotal, serverCurrency)}
                                 </span>
                               </div>
                             </div>
@@ -305,7 +285,7 @@ export default function CartPage() {
                             </p>
                           </div>
 
-                          {/* Right: price + Remove */}
+                          {/* Right: total + Remove */}
                           <div className="text-right">
                             <button
                               className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
@@ -314,43 +294,11 @@ export default function CartPage() {
                             >
                               Remove <Trash2 className="h-4 w-4" />
                             </button>
-                            <div className="mt-3 sm:mt-4 flex items-center gap-3">
-                              <div className="flex items-center overflow-hidden">
-                                <button
-                                  onClick={() =>
-                                    updateQuantity(
-                                      line.id,
-                                      Math.max(0, (line.quantity ?? 1) - 1)
-                                    )
-                                  }
-                                  className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
-                                  aria-label="Decrease"
-                                >
-                                  −
-                                </button>
-                                <span className="w-8 text-center text-[13px] font-medium">
-                                  {line.quantity}
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    updateQuantity(
-                                      line.id,
-                                      (line.quantity ?? 1) + 1
-                                    )
-                                  }
-                                  className="h-8 w-8 flex items-center justify-center border border-neutral-200 rounded-full"
-                                  aria-label="Increase"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
                             <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
                               <span className="mr-1 text-xs">Total</span>
                               <span className="font-semibold text-neutral-900">
                                 {money(
-                                  (line.priceWithTax ?? 0) *
-                                  (line.quantity ?? 1),
+                                  (line.priceWithTax ?? 0) * (line.quantity ?? 1),
                                   localCurrency
                                 )}
                               </span>
@@ -359,6 +307,34 @@ export default function CartPage() {
                         </div>
 
                         {/* Qty control */}
+                        <div className="mt-3 sm:mt-4 flex items-center gap-3">
+                          <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
+                            <button
+                              onClick={() =>
+                                updateQuantity(
+                                  line.id,
+                                  Math.max(0, (line.quantity ?? 1) - 1)
+                                )
+                              }
+                              className="h-8 w-8 flex items-center justify-center"
+                              aria-label="Decrease"
+                            >
+                              −
+                            </button>
+                            <span className="w-8 text-center text-[13px] font-medium">
+                              {line.quantity}
+                            </span>
+                            <button
+                              onClick={() =>
+                                updateQuantity(line.id, (line.quantity ?? 1) + 1)
+                              }
+                              className="h-8 w-8 flex items-center justify-center"
+                              aria-label="Increase"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </li>
@@ -378,9 +354,7 @@ export default function CartPage() {
 
           {/* Summary */}
           <aside className="lg:sticky lg:top-6 h-max rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
-            <h2 className="text-base sm:text-lg font-semibold">
-              Order Summary
-            </h2>
+            <h2 className="text-base sm:text-lg font-semibold">Order Summary</h2>
 
             {/* Totals */}
             {isLoggedIn ? (
@@ -403,7 +377,6 @@ export default function CartPage() {
                     {money(serverTax, serverCurrency)}
                   </dd>
                 </div>
-
                 <div className="mt-3 border-t border-neutral-200 pt-3 text-base">
                   <div className="flex justify-between">
                     <dt className="font-semibold">Total</dt>
@@ -429,7 +402,6 @@ export default function CartPage() {
                   <dt className="text-neutral-600">Tax</dt>
                   <dd className="font-semibold">{money(0, localCurrency)}</dd>
                 </div>
-
                 <div className="mt-3 border-t border-neutral-200 pt-3 text-base">
                   <div className="flex justify-between">
                     <dt className="font-semibold">Total</dt>
@@ -441,7 +413,7 @@ export default function CartPage() {
               </dl>
             )}
 
-            {/* Customer details (placeholder – match your screenshot) */}
+            {/* Customer details */}
             <div className="mt-6 rounded-xl border border-neutral-200 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold">Customer Details</p>
@@ -478,17 +450,13 @@ export default function CartPage() {
                   <p className="text-neutral-500">No customer details found</p>
                 )}
               </div>
-
             </div>
 
-            {/* Delivery details (placeholder – match your screenshot) */}
+            {/* Delivery details */}
             <div className="mt-4 rounded-xl border border-neutral-200 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold">Delivery Details</p>
-                <button
-                  // onClick={() => router.push("/checkout")}
-                  className="inline-flex items-center gap-1 text-xs hover:text-red-700"
-                >
+                <button className="inline-flex items-center gap-1 text-xs hover:text-red-700">
                   Change{" "}
                   <Image
                     src="/edit-rectangle.png"
@@ -521,7 +489,6 @@ export default function CartPage() {
                     </p>
                   </>
                 )}
-
               </div>
             </div>
 
@@ -536,7 +503,7 @@ export default function CartPage() {
                     },
                     duration: 4000,
                   });
-                  setIsAuthOpen(true);  // send them to homepage as you requested
+                  setIsAuthOpen(true);
                   return;
                 }
                 router.push("/checkout");
@@ -545,8 +512,6 @@ export default function CartPage() {
             >
               Checkout
             </button>
-
-
           </aside>
         </div>
       </div>
