@@ -115,7 +115,6 @@ export default function ProductGrid({
   const [variantIdMap, setVariantIdMap] = useState<Record<string, string>>({});
   const [openBrands, setOpenBrands] = useState<Record<string, boolean>>({});
 
-
   const autoAddedRef = useRef<Record<string, boolean>>({});
   const processingRef = useRef<Record<string, boolean>>({});
   const isMountedRef = useRef(true);
@@ -151,7 +150,7 @@ export default function ProductGrid({
     const items = data?.search?.items ?? [];
     const facetItems = facetsData?.facets?.items ?? [];
 
-   if (!items.length) return [];
+    if (!items.length) return [];
 
     const facetValueMap: Record<
       string,
@@ -214,21 +213,39 @@ export default function ProductGrid({
       });
     });
 
-    return Object.values(buckets);
-  }, [data, facetsData]);
+    const result = Object.values(buckets);
 
-  // Open the first brand by default once brandBuckets are loaded
+    // Sort items within each brand bucket client-side
+    result.forEach((bucket) => {
+      bucket.items.sort((a, b) => {
+        switch (sort) {
+          case "priceAsc":
+            return (a.priceRaw ?? 0) - (b.priceRaw ?? 0);
+          case "priceDesc":
+            return (b.priceRaw ?? 0) - (a.priceRaw ?? 0);
+          case "nameAsc":
+            return a.name.localeCompare(b.name);
+          case "nameDesc":
+            return b.name.localeCompare(a.name);
+          default:
+            return 0; // relevance — keep original API order
+        }
+      });
+    });
+
+    return result;
+  }, [data, facetsData, sort]);
+
+  // Open all brands by default once brandBuckets are loaded
   useEffect(() => {
     if (brandBuckets.length > 0) {
       const initialState: Record<string, boolean> = {};
       brandBuckets.forEach((b) => {
-        initialState[b.brandId] = true; // all open by default
+        initialState[b.brandId] = true;
       });
       setOpenBrands(initialState);
     }
   }, [brandBuckets]);
-
-
 
   const handleAddToCart = (itemId: string) => {
     setQuantityMap((prev) => ({ ...prev, [itemId]: 1 }));
@@ -349,8 +366,7 @@ export default function ProductGrid({
           updateLocalQuantity(variantId!, qty);
 
           if (customer) {
-            const orderLineId =
-              getOrderLineIdByVariantId(variantId!);
+            const orderLineId = getOrderLineIdByVariantId(variantId!);
             if (orderLineId) {
               await handleAdjustQuantity(orderLineId, qty);
             }
@@ -387,7 +403,6 @@ export default function ProductGrid({
       {brandBuckets.map((brandGroup) => {
         const isOpen = openBrands[brandGroup.brandId] ?? true;
 
-
         return (
           <div
             key={brandGroup.brandId}
@@ -401,9 +416,6 @@ export default function ProductGrid({
                   [brandGroup.brandId]: !prev[brandGroup.brandId],
                 }))
               }
-
-
-
               className="w-full flex items-center justify-between px-4 py-4 text-left"
             >
               <h2 className="text-sm font-semibold">
@@ -442,9 +454,7 @@ export default function ProductGrid({
                           {qty === undefined ? (
                             <button
                               className="w-full bg-black text-white py-2 rounded-md mt-3"
-                              onClick={() =>
-                                handleAddToCart(item.id)
-                              }
+                              onClick={() => handleAddToCart(item.id)}
                             >
                               Add to Cart
                             </button>
@@ -452,22 +462,16 @@ export default function ProductGrid({
                             <div className="flex items-center justify-between mt-3 bg-gray-100 rounded-md px-3 py-2">
                               <button
                                 className="text-lg font-bold bg-black rounded-md text-white px-2"
-                                onClick={() =>
-                                  adjustQuantity(item.id, -1)
-                                }
+                                onClick={() => adjustQuantity(item.id, -1)}
                               >
                                 –
                               </button>
 
-                              <span className="font-semibold">
-                                {qty}
-                              </span>
+                              <span className="font-semibold">{qty}</span>
 
                               <button
                                 className="text-lg font-bold bg-black rounded-md text-white px-2"
-                                onClick={() =>
-                                  adjustQuantity(item.id, +1)
-                                }
+                                onClick={() => adjustQuantity(item.id, +1)}
                               >
                                 +
                               </button>
@@ -479,9 +483,7 @@ export default function ProductGrid({
                           <p className="text-sm text-gray-500 mt-2">
                             {item.brand}
                           </p>
-                          <p className="font-semibold text-sm">
-                            {item.name}
-                          </p>
+                          <p className="font-semibold text-sm">{item.name}</p>
                           <p className="text-md font-bold mt-4">
                             {item.currencyCode}{" "}
                             {item.priceRaw?.toLocaleString()}
@@ -498,5 +500,4 @@ export default function ProductGrid({
       })}
     </div>
   );
-
 }

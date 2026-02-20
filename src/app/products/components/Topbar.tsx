@@ -112,7 +112,7 @@ const Topbar: React.FC<Props> = ({
             className="
               border border-gray-300
               rounded
-              px-3 sm:px-4
+              px-4 sm:px-4
               py-2
               text-sm
               bg-white
