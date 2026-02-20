@@ -151,7 +151,7 @@ export default function ProductGrid({
     const items = data?.search?.items ?? [];
     const facetItems = facetsData?.facets?.items ?? [];
 
-    if (!items.length || !facetItems.length) return [];
+   if (!items.length) return [];
 
     const facetValueMap: Record<
       string,
@@ -380,6 +380,7 @@ export default function ProductGrid({
 
   if (loading) return <div className="text-center mx-auto">Loading products…</div>;
   if (error) return <div>Failed to load products.</div>;
+  if (brandBuckets.length === 0) return <div className="text-center mx-auto">No products found.</div>;
 
   return (
     <div className="w-full space-y-4">
