@@ -53,9 +53,9 @@ const Page = () => {
         sortOrder={sortOrder}
         onSortChange={setSortOrder}
       />
-      <div className="flex flex-col md:flex-row bg-[#f5f5f5] px-3 sm:px-6 md:px-10 lg:px-8 pb-10">
+      <div className="flex flex-col lg:flex-row bg-[#f5f5f5] px-3 sm:px-6 md:px-10 lg:px-8 pb-10">
         {/* Sidebar */}
-        <div className="w-full md:w-1/4 h-full mb-6 md:mb-0">
+        <div className="w-full lg:w-1/4 h-full mb-6 md:mb-0">
           <Sidebar
             selectedCategorySlug={selectedCategorySlug}
             onCategorySelect={(slug: string, brand?: string) => {
@@ -88,7 +88,7 @@ const Page = () => {
             priceRange={priceRange}
           />
         </div>
-        <div className="w-2/5 product-cart hidden md:block">
+        <div className="w-2/5 product-cart hidden lg:block">
           <CartItems />
         </div>
       </div>
