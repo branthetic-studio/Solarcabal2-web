@@ -311,9 +311,9 @@ const ProductDetailsPage = () => {
         <div className="mb-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Left - Product Images */}
-            <div className="space-y-4 ">
+            <div className="space-y-8">
               {/* Main Image */}
-              <div className="bg-gray-100 rounded-lg p-4 aspect-square flex items-center align-center">
+              <div className="w-full bg-gray-100 rounded-lg p-4 aspect-square flex items-center justify-center">
                 <img
                   src={mainImageSrc}
                   alt={product.name}
