@@ -43,6 +43,7 @@ const Topbar: React.FC<Props> = ({
         </h1>
 
         {/* Brand Filter (Scrollable on Mobile) */}
+
         <div
           className="
             flex gap-3

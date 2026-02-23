@@ -97,51 +97,83 @@ const PackageList: React.FC = () => {
   useEffect(() => { setMounted(true); }, []);
 
   /* ---------------------------------------------------------------
-   * LEVEL 1 — Sidebar: Battery, Panels, Inverter
-   * Source: storeFacets where facet.name === "Category"
+   * STEP 1 — Find the "Installation" Tag facet from storeFacets
+   * storeFacets log confirmed: { name: "Installation", facet: { name: "Tag" } }
+   * This is the correct facet per the docs — NOT the Category facets
    * --------------------------------------------------------------- */
-  const categoryFacets = useMemo(() => {
-    return storeFacets.filter(
-      (f: FlatFacet) => f.facet?.name?.toLowerCase() === "category"
-    );
-  }, [storeFacets]);
-
-  const [selectedCategoryFacet, setSelectedCategoryFacet] = useState<
-    FlatFacet | undefined
-  >(undefined);
+  const [installationFacet, setInstallationFacet] = useState<FlatFacet | undefined>(undefined);
 
   useEffect(() => {
-    if (!selectedCategoryFacet && categoryFacets.length > 0) {
-      setSelectedCategoryFacet(categoryFacets[0]);
-    }
-  }, [categoryFacets, selectedCategoryFacet]);
+    if (installationFacet) return;
+    const found = storeFacets.find(
+      (f: FlatFacet) => f.name?.toLowerCase() === "installation"
+    );
+    if (found) setInstallationFacet(found);
+  }, [storeFacets]);
 
   /* ---------------------------------------------------------------
-   * Fetch the category collection to get its slug and featuredAsset
+   * STEP 2 — GET_CATEGORIES_BY_FACET with Installation facet ID
+   * Returns KVA package collections — these are the sidebar items
+   * Each collection has its own featuredAsset (the icon/image)
+   * Docs: skip: facet === undefined (strict check)
    * --------------------------------------------------------------- */
   const {
-    data: categoryCollectionData,
-    loading: categoryLoading,
+    data: collectionsData,
+    loading: collectionsLoading,
   } = useQuery<FacetCollectionsData, FacetCollectionsVars>(
     GET_CATEGORIES_BY_FACET,
     {
-      variables: { facetValues: { and: selectedCategoryFacet?.id } },
-      skip: selectedCategoryFacet === undefined,
+      variables: { facetValues: { and: installationFacet?.id } },
+      skip: installationFacet === undefined,
     }
   );
 
-  const categoryCollection = useMemo(() => {
-    const list = categoryCollectionData?.search?.collections ?? [];
-    return list.find(
-      (x) =>
-        x.collection.name.toLowerCase() ===
-        selectedCategoryFacet?.name?.toLowerCase()
-    )?.collection;
-  }, [categoryCollectionData, selectedCategoryFacet]);
+  /* De-dupe collections */
+  const collections = useMemo(() => {
+    const raw = collectionsData?.search?.collections?.map((x) => x.collection) ?? [];
+    return Array.from(new Map(raw.map((c) => [c.slug, c])).values());
+  }, [collectionsData]);
 
   /* ---------------------------------------------------------------
-   * LEVEL 2 — Brands from storeFacets where facet.name === "Brand"
-   * No extra query needed — already in storeFacets
+   * STEP 3 — Track selected slug, auto-select first on load
+   * --------------------------------------------------------------- */
+  const [selectedSlug, setSelectedSlug] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!selectedSlug && collections.length > 0) {
+      setSelectedSlug(collections[0].slug);
+    }
+  }, [collections, selectedSlug]);
+
+  const selectedCategory = useMemo(
+    () => collections.find((c) => c.slug === selectedSlug),
+    [collections, selectedSlug]
+  );
+
+  /* ---------------------------------------------------------------
+   * STEP 4 — SEARCH_PACKAGES for selected collection
+   * Docs: find collection where item.collection.slug === selected
+   * --------------------------------------------------------------- */
+  const {
+    data: packagesData,
+    loading: packagesLoading,
+    error: packagesError,
+  } = useQuery<SearchPackagesData, SearchPackagesVars>(SEARCH_PACKAGES, {
+    variables: { input: { collectionSlug: selectedSlug ?? "" } },
+    skip: !selectedSlug,
+  });
+
+  const selectedCollection = useMemo(() => {
+    if (!packagesData) return undefined;
+    return packagesData.search.collections.find(
+      (item) => item.collection.slug === selectedSlug
+    )?.collection;
+  }, [packagesData, selectedSlug]);
+
+  const allVariants = selectedCollection?.productVariants?.items ?? [];
+
+  /* ---------------------------------------------------------------
+   * Group variants by Brand facet name — same logic as before
    * --------------------------------------------------------------- */
   const brandFacets = useMemo(() => {
     return storeFacets.filter(
@@ -149,34 +181,6 @@ const PackageList: React.FC = () => {
     );
   }, [storeFacets]);
 
-  /* ---------------------------------------------------------------
-   * LEVEL 3 — Fetch all variants for the selected category collection
-   * --------------------------------------------------------------- */
-  const {
-    data: packagesData,
-    loading: packagesLoading,
-    error: packagesError,
-  } = useQuery<SearchPackagesData, SearchPackagesVars>(SEARCH_PACKAGES, {
-    variables: {
-      input: { collectionSlug: categoryCollection?.slug ?? "" },
-    },
-    skip: !categoryCollection?.slug,
-  });
-
-  const selectedCollection = useMemo(() => {
-    if (!packagesData || !categoryCollection) return undefined;
-    return packagesData.search.collections.find(
-      (item) => item.collection.slug === categoryCollection.slug
-    )?.collection;
-  }, [packagesData, categoryCollection]);
-
-  const allVariants = selectedCollection?.productVariants?.items ?? [];
-
-  /* ---------------------------------------------------------------
-   * Group variants by brand name.
-   * Each brand facet name (e.g. "Coleman") is matched against the
-   * variant name. Variants that don't match any brand go into "Other".
-   * --------------------------------------------------------------- */
   const variantsByBrand = useMemo(() => {
     const groups: Array<{ brandName: string; variants: Variant[] }> = [];
 
@@ -189,10 +193,7 @@ const PackageList: React.FC = () => {
       }
     });
 
-    // Catch any variants not matched by any brand
-    const matchedIds = new Set(
-      groups.flatMap((g) => g.variants.map((v) => v.id))
-    );
+    const matchedIds = new Set(groups.flatMap((g) => g.variants.map((v) => v.id)));
     const others = allVariants.filter((v) => !matchedIds.has(v.id));
     if (others.length > 0) {
       groups.push({ brandName: "Other", variants: others });
@@ -243,93 +244,82 @@ const PackageList: React.FC = () => {
 
         <h1>Select Package</h1>
 
-        {/* Mobile: Category dropdown */}
+        {/* Mobile dropdown */}
         <div className="block md:hidden mb-4">
           <select
-            value={selectedCategoryFacet?.id ?? ""}
-            onChange={(e) => {
-              const found = categoryFacets.find(
-                (f: FlatFacet) => f.id === e.target.value
-              );
-              setSelectedCategoryFacet(found);
-            }}
+            value={selectedSlug ?? ""}
+            onChange={(e) => setSelectedSlug(e.target.value)}
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
           >
-            {categoryFacets.map((f: FlatFacet) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
+            <option value="" disabled>Select Package</option>
+            {collections.map((c) => (
+              <option key={c.id} value={c.slug}>{c.name}</option>
             ))}
           </select>
         </div>
 
-        {/* Desktop: Category list with icon */}
+        {/* Desktop: KVA package list with each collection's own featuredAsset icon */}
         <div className="hidden md:block">
-          {categoryFacets.map((f: FlatFacet) => {
-            const isSelected = selectedCategoryFacet?.id === f.id;
-            const imgUrl = isSelected
-              ? categoryCollection?.featuredAsset?.preview
-              : undefined;
-
-            return (
-              <button
-                key={f.id}
-                onClick={() => setSelectedCategoryFacet(f)}
-                className={`
-                  w-full flex items-center justify-between
-                  border-b border-[#f5f5f5]
-                  px-4 py-2 text-left text-sm transition
-                  ${isSelected
-                    ? "text-red-600 font-semibold"
-                    : "hover:bg-gray-100 text-gray-700"
-                  }
-                `}
-              >
-                <div className="flex items-center gap-2">
-                  {imgUrl ? (
-                    <img
-                      src={imgUrl}
-                      alt={f.name}
-                      className="w-6 h-6 object-contain"
-                    />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-gray-100" />
-                  )}
-                  <span>{f.name}</span>
-                </div>
-                <ChevronRight size={20} />
-              </button>
-            );
-          })}
+          {collections.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setSelectedSlug(c.slug)}
+              className={`
+                w-full flex items-center justify-between
+                border-b border-[#f5f5f5]
+                px-4 py-2 text-left text-sm transition
+                ${selectedSlug === c.slug
+                  ? "text-red-600 font-semibold"
+                  : "hover:bg-gray-100 text-gray-700"
+                }
+              `}
+            >
+              <div className="flex items-center gap-2">
+                {/* ✅ Each collection's own featuredAsset — shows for ALL items */}
+                {c.featuredAsset?.preview ? (
+                  <img
+                    src={c.featuredAsset.preview}
+                    alt={c.name}
+                    className="w-6 h-6 object-contain shrink-0"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-gray-100 shrink-0" />
+                )}
+                <span>{c.name}</span>
+              </div>
+              <ChevronRight size={20} />
+            </button>
+          ))}
         </div>
 
-        {categoryLoading && (
+        {collectionsLoading && (
           <p className="text-sm text-gray-400 mt-2">Loading...</p>
         )}
       </div>
 
-      {/* ── Products: grouped by brand ── */}
+      {/* ── Products: grouped by brand — same UI as before ── */}
       <div className="package-main">
-        {categoryCollection && (
+        {selectedCategory && (
           <h2 className="text-md font-semibold mb-6 text-red-600 border-b pb-2 border-[#e0e0e0]">
-            {categoryCollection.name}
+            {selectedCategory.name}
           </h2>
         )}
 
-        {!categoryCollection && !categoryLoading && (
-          <p className="text-gray-500">Select a category to view products.</p>
+        {!selectedCategory && !collectionsLoading && (
+          <p className="text-gray-500">Select a package to view products.</p>
         )}
 
         {packagesLoading && <p>Loading products...</p>}
         {packagesError && <p>Error loading products.</p>}
 
-        {/* ✅ One section per brand, rendered in order */}
+        {/* One section per brand, rendered in order */}
         {variantsByBrand.map(({ brandName, variants }) => (
           <div key={brandName} className="mb-10">
-            {/* Brand heading */}
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-gray-800">{brandName}</h3>
-              <span className="text-xs text-gray-400">{variants.length} product{variants.length !== 1 ? "s" : ""}</span>
+              <span className="text-xs text-gray-400">
+                {variants.length} product{variants.length !== 1 ? "s" : ""}
+              </span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-6">
@@ -358,7 +348,7 @@ const PackageList: React.FC = () => {
                         },
                       ],
                     }}
-                    collectionSlug={categoryCollection?.slug}
+                    collectionSlug={selectedSlug ?? undefined}
                     variantId={variant.id}
                     productSlug={variant.product?.slug ?? undefined}
                   />
