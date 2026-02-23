@@ -530,8 +530,8 @@ export default function InstallationListingPage() {
                     </div>
                     {activeVariant?.customFields?.packageCapacity && (
                       <div className="flex justify-between py-3 border-b border-neutral-200">
-                        <span className="text-sm text-neutral-600">Capacity</span>
-                        <span className="text-sm font-medium text-neutral-900">
+                        <span className="text-sm text-neutral-600">Capacityy</span>
+                        <span className="text-sm w-70 font-medium text-neutral-900">
                           {activeVariant.customFields.packageCapacity}
                         </span>
                       </div>
