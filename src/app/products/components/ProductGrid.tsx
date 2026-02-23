@@ -185,11 +185,11 @@ export default function ProductGrid({
     result.forEach((bucket) => {
       bucket.items.sort((a, b) => {
         switch (sort) {
-          case "priceAsc":  return (a.priceRaw ?? 0) - (b.priceRaw ?? 0);
+          case "priceAsc": return (a.priceRaw ?? 0) - (b.priceRaw ?? 0);
           case "priceDesc": return (b.priceRaw ?? 0) - (a.priceRaw ?? 0);
-          case "nameAsc":   return a.name.localeCompare(b.name);
-          case "nameDesc":  return b.name.localeCompare(a.name);
-          default:          return 0;
+          case "nameAsc": return a.name.localeCompare(b.name);
+          case "nameDesc": return b.name.localeCompare(a.name);
+          default: return 0;
         }
       });
     });
@@ -344,7 +344,7 @@ export default function ProductGrid({
   );
 
   if (loading) return <div className="text-center mx-auto">Loading products…</div>;
-  if (error)   return <div>Failed to load products.</div>;
+  if (error) return <div>Failed to load products.</div>;
   if (brandBuckets.length === 0) return <div className="text-center mx-auto">No products found.</div>;
 
   return (
@@ -418,7 +418,7 @@ export default function ProductGrid({
                           <p className="text-sm text-gray-500 mt-2">{item.brand}</p>
                           <p className="font-semibold text-sm">{item.name}</p>
                           <p className="text-md font-bold mt-4">
-                            {item.currencyCode} {item.priceRaw?.toLocaleString()}
+                            {item.currencyCode} {item.priceRaw ? (item.priceRaw / 100).toLocaleString() : '0.0'}
                           </p>
                         </div>
                       </div>

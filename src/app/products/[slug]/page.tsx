@@ -247,7 +247,8 @@ const ProductDetailsPage = () => {
     selectedVariant?.currencyCode ?? variants[0]?.currencyCode ?? "NGN";
   const currencySymbol =
     currency === "NGN" ? "₦" : currency === "USD" ? "$" : currency;
-  const formattedPrice = (currentPrice).toLocaleString();
+  const priceInNaira = currentPrice / 100;
+const formattedPrice = priceInNaira.toLocaleString();
 
   /* ---------- Loading / Error states ---------- */
   if (loading) {
