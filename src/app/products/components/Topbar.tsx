@@ -44,65 +44,7 @@ const Topbar: React.FC<Props> = ({
 
         {/* Brand Filter (Scrollable on Mobile) */}
 
-        <div
-          className="
-            flex gap-3
-            overflow-x-auto
-            pb-2
-            md:pb-0
-            md:overflow-visible
-            scrollbar-hide
-          "
-        >
-          {/* All button */}
-          <button
-            onClick={() => onBrandChange([])}
-            className={`
-              whitespace-nowrap
-              px-4 sm:px-5
-              py-2
-              rounded-md
-              text-xs sm:text-sm
-              font-medium
-              border
-              transition-colors
-              ${selectedBrand.length === 0
-                ? "text-[#ff0000] border-0"
-                : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-              }
-            `}
-          >
-            All
-          </button>
-
-          {brands.map((brand) => {
-            const isSelected = selectedBrand.includes(brand);
-
-            return (
-              <button
-                key={brand}
-                onClick={() => handleBrandClick(brand)}
-                className={`
-                  whitespace-nowrap
-                  px-4 sm:px-5
-                  py-2
-                  rounded-md
-                  text-xs sm:text-sm
-                  font-medium
-                  border
-                  transition-colors
-                  ${isSelected
-                    ? "text-[#ff0000] border-0"
-                    : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                  }
-                `}
-              >
-                {brand}
-              </button>
-            );
-          })}
-        </div>
-
+        
         {/* Sort */}
         <div className="flex items-center gap-2 justify-between sm:justify-start">
           <span className="text-gray-700 text-sm font-medium whitespace-nowrap">
