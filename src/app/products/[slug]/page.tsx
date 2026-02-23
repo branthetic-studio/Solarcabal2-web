@@ -11,6 +11,7 @@ import Suscribe from "@/Components/Suscribe/Suscribe";
 import { Star } from "lucide-react";
 import Image from "next/image";
 import StarRating from "../components/StarRating";
+import { useRouter } from "next/navigation";
 
 /* ===================== Types ===================== */
 
@@ -137,6 +138,7 @@ const ProductDetailsPage = () => {
   const slug = params?.slug as string;
   const { addToCartMutation } = useCart();
   const [isAdding, setIsAdding] = useState(false);
+  const router = useRouter();
 
   const handleAddToCart = async () => {
     if (!selectedVariant) {
@@ -155,6 +157,32 @@ const ProductDetailsPage = () => {
     } catch (e) {
       console.error(e);
       alert("Could not add to cart");
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+
+  const handleBuyNow = async () => {
+    if (!selectedVariant) {
+      alert("Please select a variant");
+      return;
+    }
+
+    setIsAdding(true);
+
+    try {
+      await addToCartMutation({
+        productVariantId: selectedVariant.id,
+        quantity,
+      });
+
+      // Redirect immediately to checkout
+      router.push("/checkout");
+
+    } catch (e) {
+      console.error(e);
+      alert("Could not process Buy Now");
     } finally {
       setIsAdding(false);
     }
@@ -248,7 +276,7 @@ const ProductDetailsPage = () => {
   const currencySymbol =
     currency === "NGN" ? "₦" : currency === "USD" ? "$" : currency;
   const priceInNaira = currentPrice / 100;
-const formattedPrice = priceInNaira.toLocaleString();
+  const formattedPrice = priceInNaira.toLocaleString();
 
   /* ---------- Loading / Error states ---------- */
   if (loading) {
@@ -398,7 +426,7 @@ const formattedPrice = priceInNaira.toLocaleString();
               )}
 
               <p>
-               {product.description}
+                {product.description}
               </p>
 
               {/* Quantity and Add to Cart */}
@@ -434,8 +462,12 @@ const formattedPrice = priceInNaira.toLocaleString();
                     {isAdding ? "Adding..." : "Add to Cart"}
                   </button>
 
-                  <button className=" flex-1 px-6 py-3 bg-[#242425] text-[#ffffff] rounded-lg cursor-pointer transition-colors">
-                    Buy Now
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={isAdding || !selectedVariant}
+                    className="flex-1 px-6 py-3 bg-[#242425] text-[#ffffff] rounded-lg cursor-pointer transition-colors disabled:opacity-50"
+                  >
+                    {isAdding ? "Processing..." : "Buy Now"}
                   </button>
 
 
