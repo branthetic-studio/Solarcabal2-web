@@ -13,8 +13,13 @@ import { useCart } from "@/context/CartContext";
 import { useLocalCart } from "@/context/LocalCartContext";
 import Link from "next/link";
 
-/* ---------------- Types (minimal, local) ---------------- */
-type FlatFacet = { id: string; name: string };
+/* ---------------- Types ---------------- */
+type FlatFacet = {
+  id: string;
+  name: string;
+  facetId?: string;
+  facet?: { id: string; name: string };
+};
 
 type FacetCollectionsData = {
   search: {
@@ -30,179 +35,182 @@ type FacetCollectionsData = {
 };
 
 type FacetCollectionsVars = {
-  facetValues: {
-    and?: string;
-  };
+  facetValues: { and?: string };
+};
+
+type Variant = {
+  id: string;
+  name: string;
+  priceWithTax?: number | null;
+  product?: {
+    slug?: string | null;
+    featuredAsset?: { id: string; preview?: string | null } | null;
+  } | null;
+  featuredAsset?: { id: string; preview?: string | null } | null;
+  customFields?: {
+    packageCapacity?: string | null;
+    packageComponents?: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      featuredAsset?: { id: string; preview?: string | null } | null;
+    }> | null;
+  } | null;
 };
 
 type SearchPackagesData = {
   search: {
+    totalItems: number;
     collections: Array<{
       collection: {
         id: string;
         name: string;
         slug: string;
         productVariants: {
-          items: Array<{
-            id: string;
-            name: string;
-            priceWithTax?: number | null;
-            product?: { slug?: string | null } | null;
-            featuredAsset?: { id: string; preview?: string | null } | null;
-            customFields?: {
-              packageCapacity?: string | null;
-              packageComponents?: Array<{
-                id: string;
-                name: string;
-                slug: string;
-                featuredAsset?: { id: string; preview?: string | null } | null;
-              }> | null;
-            } | null;
-          }>;
+          items: Variant[];
         };
-      };
-    }>;
-    facetValues?: Array<{
-      count: number;
-      facetValue: {
-        id: string;
-        name: string;
-        facet: { id: string; name: string };
       };
     }>;
   };
 };
 
 type SearchPackagesVars = {
-  input: {
-    collectionSlug: string;
-  };
+  input: { collectionSlug: string };
 };
 
-/* ---------------- ✅ CHANGED: Helpers for correct KVA ordering ---------------- */
-const extractKva = (text: string) => {
-  const s = (text || "").toLowerCase().replace(/\s+/g, "");
-  const m = s.match(/(\d+(\.\d+)?)kva/);
-  if (!m) return Number.POSITIVE_INFINITY;
-  return parseFloat(m[1]);
+/* ---------------- Price formatter ---------------- */
+const formatPrice = (priceWithTax?: number | null): string => {
+  if (!priceWithTax) return "₦0";
+  return (priceWithTax / 100).toLocaleString("en-NG", {
+    style: "currency",
+    currency: "NGN",
+  });
 };
 
 const PackageList: React.FC = () => {
   const { storeFacets } = useFacet();
+  const { cart } = useCart();
+  const { items: localItems } = useLocalCart();
+  const { customer } = useUser();
 
   const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  /* ---------------------------------------------------------------
+   * LEVEL 1 — Sidebar: Battery, Panels, Inverter
+   * Source: storeFacets where facet.name === "Category"
+   * --------------------------------------------------------------- */
+  const categoryFacets = useMemo(() => {
+    return storeFacets.filter(
+      (f: FlatFacet) => f.facet?.name?.toLowerCase() === "category"
+    );
+  }, [storeFacets]);
 
-
-  const [installationFacet, setInstallationFacet] = useState<
+  const [selectedCategoryFacet, setSelectedCategoryFacet] = useState<
     FlatFacet | undefined
   >(undefined);
 
-  const [selectedSlug, setSelectedSlug] = useState<string | undefined>(
-    undefined,
+  useEffect(() => {
+    if (!selectedCategoryFacet && categoryFacets.length > 0) {
+      setSelectedCategoryFacet(categoryFacets[0]);
+    }
+  }, [categoryFacets, selectedCategoryFacet]);
+
+  /* ---------------------------------------------------------------
+   * Fetch the category collection to get its slug and featuredAsset
+   * --------------------------------------------------------------- */
+  const {
+    data: categoryCollectionData,
+    loading: categoryLoading,
+  } = useQuery<FacetCollectionsData, FacetCollectionsVars>(
+    GET_CATEGORIES_BY_FACET,
+    {
+      variables: { facetValues: { and: selectedCategoryFacet?.id } },
+      skip: selectedCategoryFacet === undefined,
+    }
   );
 
-  /* ---------------- Find "installation" facet ---------------- */
-  useEffect(() => {
-    const installation = storeFacets.find(
-      (f: FlatFacet) => f.name?.toLowerCase() === "installation",
+  const categoryCollection = useMemo(() => {
+    const list = categoryCollectionData?.search?.collections ?? [];
+    return list.find(
+      (x) =>
+        x.collection.name.toLowerCase() ===
+        selectedCategoryFacet?.name?.toLowerCase()
+    )?.collection;
+  }, [categoryCollectionData, selectedCategoryFacet]);
+
+  /* ---------------------------------------------------------------
+   * LEVEL 2 — Brands from storeFacets where facet.name === "Brand"
+   * No extra query needed — already in storeFacets
+   * --------------------------------------------------------------- */
+  const brandFacets = useMemo(() => {
+    return storeFacets.filter(
+      (f: FlatFacet) => f.facet?.name?.toLowerCase() === "brand"
     );
-    if (installation) setInstallationFacet(installation);
   }, [storeFacets]);
 
-  /* ---------------- Sidebar: get installation package collections ---------------- */
+  /* ---------------------------------------------------------------
+   * LEVEL 3 — Fetch all variants for the selected category collection
+   * --------------------------------------------------------------- */
   const {
     data: packagesData,
     loading: packagesLoading,
     error: packagesError,
-  } = useQuery<FacetCollectionsData, FacetCollectionsVars>(
-    GET_CATEGORIES_BY_FACET,
-    {
-      variables: {
-        facetValues: {
-          and: installationFacet?.id,
-        },
-      },
-      skip: !installationFacet?.id,
-    },
-  );
-
-  /* ---------------- ✅ CHANGED: Build, DEDUPE and SORT categories by KVA ---------------- */
-  const categories = useMemo(() => {
-    const raw =
-      packagesData?.search?.collections?.map((x) => x.collection) ?? [];
-
-    // De-dupe by slug (your UI screenshot shows repeated package rows)
-    const uniq = Array.from(new Map(raw.map((c) => [c.slug, c])).values());
-
-    // Sort low -> high by KVA (use name first, fallback to slug)
-    return uniq.sort((a, b) => {
-      const aKva = extractKva(a.name || a.slug);
-      const bKva = extractKva(b.name || b.slug);
-      if (aKva !== bKva) return aKva - bKva;
-      return (a.name || a.slug).localeCompare(b.name || b.slug);
-    });
-  }, [packagesData]);
-
-  /* ---------------- ✅ CHANGED: Auto-select LOWEST KVA on first load ---------------- */
-  useEffect(() => {
-    if (!selectedSlug && categories.length > 0) {
-      setSelectedSlug(categories[0].slug); // categories is sorted => lowest KVA
-    }
-  }, [categories, selectedSlug]);
-
-  /* ---------------- Grid: get tiers/variants for selected package ---------------- */
-  const {
-    data: tiersData,
-    loading: tiersLoading,
-    error: tiersError,
   } = useQuery<SearchPackagesData, SearchPackagesVars>(SEARCH_PACKAGES, {
     variables: {
-      input: {
-        collectionSlug: selectedSlug ?? "",
-      },
+      input: { collectionSlug: categoryCollection?.slug ?? "" },
     },
-    skip: !selectedSlug,
+    skip: !categoryCollection?.slug,
   });
 
-  /* ---------------- Selected package collection + tiers ---------------- */
   const selectedCollection = useMemo(() => {
-    const list = tiersData?.search?.collections ?? [];
-    return list.find((x) => x.collection.slug === selectedSlug)?.collection;
-  }, [tiersData, selectedSlug]);
+    if (!packagesData || !categoryCollection) return undefined;
+    return packagesData.search.collections.find(
+      (item) => item.collection.slug === categoryCollection.slug
+    )?.collection;
+  }, [packagesData, categoryCollection]);
 
-  const tiers = selectedCollection?.productVariants?.items ?? [];
+  const allVariants = selectedCollection?.productVariants?.items ?? [];
 
-  /* ---------------- ✅ CHANGED: Find selected category object for header ---------------- */
-  const selectedCategory = useMemo(() => {
-    return categories.find((c) => c.slug === selectedSlug);
-  }, [categories, selectedSlug]);
+  /* ---------------------------------------------------------------
+   * Group variants by brand name.
+   * Each brand facet name (e.g. "Coleman") is matched against the
+   * variant name. Variants that don't match any brand go into "Other".
+   * --------------------------------------------------------------- */
+  const variantsByBrand = useMemo(() => {
+    const groups: Array<{ brandName: string; variants: Variant[] }> = [];
 
-  // Sidebar loading/errors
-  if (packagesLoading) return <p>Loading categories...</p>;
-  if (packagesError) return <p>Error loading categories.</p>;
+    brandFacets.forEach((brand: FlatFacet) => {
+      const matched = allVariants.filter((v) =>
+        v.name.toLowerCase().includes(brand.name.toLowerCase())
+      );
+      if (matched.length > 0) {
+        groups.push({ brandName: brand.name, variants: matched });
+      }
+    });
 
-  const { cart } = useCart();
-  const { items: localItems } = useLocalCart();
-  const { customer, logout, loading } = useUser();
-
-  const getCartCount = () => {
-    if (customer) {
-      const lines = cart?.activeOrder?.lines ?? [];
-      return lines.length;
-    } else {
-      return localItems.length;
+    // Catch any variants not matched by any brand
+    const matchedIds = new Set(
+      groups.flatMap((g) => g.variants.map((v) => v.id))
+    );
+    const others = allVariants.filter((v) => !matchedIds.has(v.id));
+    if (others.length > 0) {
+      groups.push({ brandName: "Other", variants: others });
     }
-  };
 
-  const cartCount = mounted ? getCartCount() : 0;
+    return groups;
+  }, [allVariants, brandFacets]);
+
+  /* ---------------- Cart count ---------------- */
+  const cartCount = useMemo(() => {
+    if (!mounted) return 0;
+    if (customer) return cart?.activeOrder?.lines?.length ?? 0;
+    return localItems.length;
+  }, [mounted, customer, cart, localItems]);
 
   return (
     <div className="package-container flex">
-      {/* Sidebar Categories */}
+      {/* ── Sidebar ── */}
       <div className="package-sidebar">
         <div className="flex justify-between">
           <h1 className="text-lg font-semibold">Installation Package</h1>
@@ -213,17 +221,15 @@ const PackageList: React.FC = () => {
           >
             Cart
             <Image src="/shop-cart.png" alt="Cart" width={20} height={20} />
-
             {mounted && cartCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">
                 {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}
           </Link>
-
         </div>
 
-        {/* Search (UI unchanged; not wired) */}
+        {/* Search */}
         <div className="relative mb-4">
           <div className="absolute top-[50%] left-3 transform -translate-y-1/2">
             <Search className="text-[#e0e0e0]" />
@@ -234,111 +240,133 @@ const PackageList: React.FC = () => {
             className="w-full bg-[#FAFAFA] border border-[#E0E0E0] rounded-full px-12 py-2 text-sm focus:outline-none"
           />
         </div>
-        <h1>Select Package</h1>
-        {/* ✅ Mobile Dropdown */}
-        <div className="block w-50 md:hidden mb-4">
-          <select
-            value={selectedSlug ?? ""}
-            onChange={(e) => setSelectedSlug(e.target.value)}
-            className="
-      w-75
-      border
-      border-gray-300
-      rounded-md
-      px-3
-      py-2
-      text-sm
-      bg-white
-      focus:outline-none
-      focus:ring-2
-      focus:ring-red-500
-    "
-          >
-            <option value="" disabled className="text-xs w-full">
-              Select Package
-            </option>
 
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.slug} className="text-xs w-50">
-                {cat.name}
+        <h1>Select Package</h1>
+
+        {/* Mobile: Category dropdown */}
+        <div className="block md:hidden mb-4">
+          <select
+            value={selectedCategoryFacet?.id ?? ""}
+            onChange={(e) => {
+              const found = categoryFacets.find(
+                (f: FlatFacet) => f.id === e.target.value
+              );
+              setSelectedCategoryFacet(found);
+            }}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
+          >
+            {categoryFacets.map((f: FlatFacet) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
               </option>
             ))}
           </select>
         </div>
 
-        {/* ✅ Desktop Buttons */}
+        {/* Desktop: Category list with icon */}
         <div className="hidden md:block">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedSlug(cat.slug)}
-              className={`
-        w-full flex items-center justify-between
-        border-b border-[#f5f5f5]
-        px-4 py-2 text-left text-sm
-        transition
-        ${selectedSlug === cat.slug
-                  ? "text-red-600 font-semibold"
-                  : "hover:bg-gray-100 text-gray-700"
-                }
-      `}
-            >
-              <span>{cat.name}</span>
-              <ChevronRight size={20} />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Products (tiers) */}
-      <div className="package-main">
-        {/* Header (UI unchanged; now uses selected package NAME to match UI) */}
-        {selectedSlug && (
-          <h2 className="text-md font-semibold mb-6 text-red-600 border-b pb-2 border-[#e0e0e0]">
-            {selectedCategory?.name ?? selectedSlug.replace("-", " ")} package
-          </h2>
-        )}
-
-        {!selectedSlug && (
-          <p className="text-gray-500">
-            Select a category to view available products.
-          </p>
-        )}
-
-        {tiersLoading && <p>Loading products...</p>}
-        {tiersError && <p>Error loading products.</p>}
-
-        {/* Grid (UI unchanged) */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-6">
-          {tiers.map((variant, idx) => {
-            const price = variant.priceWithTax
-              ? `${variant.priceWithTax}`
-              : "0";
+          {categoryFacets.map((f: FlatFacet) => {
+            const isSelected = selectedCategoryFacet?.id === f.id;
+            const imgUrl = isSelected
+              ? categoryCollection?.featuredAsset?.preview
+              : undefined;
 
             return (
-              <PackageCard
-                key={variant.id ?? idx}
-                option={{
-                  title: variant.name, // tier name e.g. Gold / Silver / Normal
-                  price,
-                  features: [
-                    variant.customFields?.packageCapacity
-                      ? `Capacity: ${variant.customFields.packageCapacity}`
-                      : "Installation tier",
-                  ],
-                  items: [
-                    {
-                      name: variant.name,
-                      desc: variant.product?.slug ?? "",
-                      img: variant.featuredAsset?.preview ?? "",
-                    },
-                  ],
-                }}
-                collectionSlug={selectedSlug ?? undefined}
-              />
+              <button
+                key={f.id}
+                onClick={() => setSelectedCategoryFacet(f)}
+                className={`
+                  w-full flex items-center justify-between
+                  border-b border-[#f5f5f5]
+                  px-4 py-2 text-left text-sm transition
+                  ${isSelected
+                    ? "text-red-600 font-semibold"
+                    : "hover:bg-gray-100 text-gray-700"
+                  }
+                `}
+              >
+                <div className="flex items-center gap-2">
+                  {imgUrl ? (
+                    <img
+                      src={imgUrl}
+                      alt={f.name}
+                      className="w-6 h-6 object-contain"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-gray-100" />
+                  )}
+                  <span>{f.name}</span>
+                </div>
+                <ChevronRight size={20} />
+              </button>
             );
           })}
         </div>
+
+        {categoryLoading && (
+          <p className="text-sm text-gray-400 mt-2">Loading...</p>
+        )}
+      </div>
+
+      {/* ── Products: grouped by brand ── */}
+      <div className="package-main">
+        {categoryCollection && (
+          <h2 className="text-md font-semibold mb-6 text-red-600 border-b pb-2 border-[#e0e0e0]">
+            {categoryCollection.name}
+          </h2>
+        )}
+
+        {!categoryCollection && !categoryLoading && (
+          <p className="text-gray-500">Select a category to view products.</p>
+        )}
+
+        {packagesLoading && <p>Loading products...</p>}
+        {packagesError && <p>Error loading products.</p>}
+
+        {/* ✅ One section per brand, rendered in order */}
+        {variantsByBrand.map(({ brandName, variants }) => (
+          <div key={brandName} className="mb-10">
+            {/* Brand heading */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-800">{brandName}</h3>
+              <span className="text-xs text-gray-400">{variants.length} product{variants.length !== 1 ? "s" : ""}</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-6">
+              {variants.map((variant, idx) => {
+                const imgUrl =
+                  variant.product?.featuredAsset?.preview ??
+                  variant.featuredAsset?.preview ??
+                  "";
+
+                return (
+                  <PackageCard
+                    key={variant.id ?? idx}
+                    option={{
+                      title: variant.name,
+                      price: formatPrice(variant.priceWithTax),
+                      features: [
+                        variant.customFields?.packageCapacity
+                          ? `Capacity: ${variant.customFields.packageCapacity}`
+                          : "Package",
+                      ],
+                      items: [
+                        {
+                          name: variant.name,
+                          desc: variant.product?.slug ?? "",
+                          img: imgUrl,
+                        },
+                      ],
+                    }}
+                    collectionSlug={categoryCollection?.slug}
+                    variantId={variant.id}
+                    productSlug={variant.product?.slug ?? undefined}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="flex-2 package-cart">

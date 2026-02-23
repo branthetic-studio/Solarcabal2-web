@@ -494,7 +494,6 @@ const MY_REFERRAL_EARNING = gql`
   }
 `;
 
-
 /** Ask server to send a reset email */
 export const REQUEST_PASSWORD_RESET = gql`
   mutation RequestPasswordReset($emailAddress: String!) {
@@ -752,6 +751,10 @@ export const SEARCH_PACKAGES = gql`
               priceWithTax
               product {
                 slug
+                featuredAsset {
+                  id
+                  preview
+                }
               }
               featuredAsset {
                 id

@@ -19,41 +19,43 @@ interface PackageOption {
 
 interface Props {
   option: PackageOption;
-  /** Pass the actual collection/category slug from the parent (PackageList) */
   collectionSlug?: string;
+  variantId?: string;
+  /** product.slug from the variant — needed by the detail page to fetch the correct product */
+  productSlug?: string;
 }
 
-const PackageCard: React.FC<Props> = ({ option, collectionSlug }) => {
+const PackageCard: React.FC<Props> = ({ option, collectionSlug, variantId, productSlug }) => {
   const fallbackSlug = option.title.replace(/\s+/g, "-").toLowerCase();
-  const href = `/installation/${encodeURIComponent(
-    collectionSlug || fallbackSlug
-  )}`;
+  const slug = collectionSlug || fallbackSlug;
+
+  const params = new URLSearchParams();
+  if (productSlug) params.set("productSlug", productSlug);
+  if (variantId) params.set("variantId", variantId);
+  const href = `/installation/${encodeURIComponent(slug)}${params.toString() ? `?${params.toString()}` : ""}`;
 
   return (
-    <div className="bg-white p-2 md:p-6">
-      <div className="package-header">
-        {/* <div className="">
-          <h3 className="text-sm">{option.title}</h3>
-          <p className="bg-[#ff0000] text-white px-4 py-1 rounded-md text-sm w-full"><span className="text-xs">{option.features.join(", ")}</span> {option.price}</p>
-        </div> */}
-
-        {/* ✅ Use collection slug, not product/title slug */}
-
-      </div>
-
-      
-
+    <div className="bg-white p-2 md:p-4 rounded-lg border border-[#f0f0f0]">
+      {/* Product image */}
       <div className="items">
         {option.items.map((item, i) => (
           <ItemCard key={i} item={item} />
         ))}
       </div>
-      <button className="text-sm bg-[#000000] text-white py-3 rounded-lg w-full mt-6">
-        <Link href={href} >
+
+      {/* ✅ Name and price shown under image */}
+      <div className="mt-2 px-1">
+        <p className="text-sm font-medium text-gray-600 line-clamp-2 leading-snug">
+          {option.title}
+        </p>
+        <p className="text-sm font-bold mt-1">{option.price}</p>
+      </div>
+
+      <button className="text-sm bg-[#000000] text-white py-3 rounded-lg w-full mt-4">
+        <Link href={href}>
           View
         </Link>
       </button>
-
     </div>
   );
 };

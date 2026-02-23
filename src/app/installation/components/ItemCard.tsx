@@ -1,7 +1,6 @@
 "use client"
 import React from 'react';
 
-
 interface Item {
   name: string;
   desc: string;
@@ -14,17 +13,22 @@ interface Props {
 
 const ItemCard: React.FC<Props> = ({ item }) => {
   return (
-    <div className="my-4">
+    <div className="my-4 mx-auto">
       <div className='relative h-full w-full'>
-        {/* <div className='flex-1'>
-          <p className="text-xs">{item.name}</p>
-          <p className="text-xs">{item.desc}</p>
-        </div> */}
-        <img src={item.img} alt={item.name} className='w-full h-full object-cover' />
+        {item.img ? (
+          <img
+            src={item.img}
+            alt={item.name}
+            className='w-40 h-40 object-cover'
+          />
+        ) : (
+          <div className='w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-400'>
+            No image
+          </div>
+        )}
       </div>
-
     </div>
   );
 };
 
-export default ItemCard;
+export default ItemCard;  
