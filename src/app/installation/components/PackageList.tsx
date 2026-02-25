@@ -351,6 +351,7 @@ const PackageList: React.FC = () => {
                     collectionSlug={selectedSlug ?? undefined}
                     variantId={variant.id}
                     productSlug={variant.product?.slug ?? undefined}
+                    collectionImg={selectedCategory?.featuredAsset?.preview ?? undefined} // ← add this
                   />
                 );
               })}

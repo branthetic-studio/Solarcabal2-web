@@ -21,11 +21,11 @@ interface Props {
   option: PackageOption;
   collectionSlug?: string;
   variantId?: string;
-  /** product.slug from the variant — needed by the detail page to fetch the correct product */
   productSlug?: string;
+  collectionImg?: string; // ← add here
 }
 
-const PackageCard: React.FC<Props> = ({ option, collectionSlug, variantId, productSlug }) => {
+const PackageCard: React.FC<Props> = ({ option, collectionSlug, variantId, productSlug, collectionImg }) => {
   const fallbackSlug = option.title.replace(/\s+/g, "-").toLowerCase();
   const slug = collectionSlug || fallbackSlug;
 
@@ -39,11 +39,11 @@ const PackageCard: React.FC<Props> = ({ option, collectionSlug, variantId, produ
       {/* Product image */}
       <div className="items">
         {option.items.map((item, i) => (
-          <ItemCard key={i} item={item} />
+          <ItemCard key={i} item={item} collectionImg={collectionImg} /> // ← pass it here
         ))}
       </div>
 
-      {/* ✅ Name and price shown under image */}
+      {/* Name and price shown under image */}
       <div className="mt-2 px-1">
         <p className="text-sm font-medium text-gray-600 line-clamp-2 leading-snug">
           {option.title}

@@ -5,21 +5,25 @@ interface Item {
   name: string;
   desc: string;
   img: string;
+  collectionImg?: string; // ← add this
 }
 
 interface Props {
   item: Item;
+  collectionImg?: string; // ← or pass as a separate prop
 }
 
-const ItemCard: React.FC<Props> = ({ item }) => {
+const ItemCard: React.FC<Props> = ({ item, collectionImg }) => {
+  const displayImg = collectionImg || item.img; // sidebar image takes priority
+
   return (
     <div className="my-4 mx-auto">
       <div className='relative h-full w-full'>
-        {item.img ? (
+        {displayImg ? (
           <img
-            src={item.img}
+            src={displayImg}
             alt={item.name}
-            className='w-40 h-40 object-cover'
+            className='w-full h-50 mx-auto object-cover'
           />
         ) : (
           <div className='w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-400'>
@@ -31,4 +35,4 @@ const ItemCard: React.FC<Props> = ({ item }) => {
   );
 };
 
-export default ItemCard;  
+export default ItemCard;
