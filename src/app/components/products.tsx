@@ -233,6 +233,7 @@ const Products = () => {
                 {item.productAsset?.preview ? (
                   <Image
                     src={item.productAsset.preview}
+                    unoptimized
                     alt={item.productName}
                     width={200}
                     height={200}
