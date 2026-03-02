@@ -16,6 +16,15 @@ import {
   Pipette,
 } from "lucide-react";
 
+/**
+ * IMPORTANT: The `href` slug values below (e.g. "battery", "inverter") MUST
+ * exactly match the `slug` field returned by your Vendure
+ * GET_TOP_LEVEL_COLLECTIONS query. If your API returns "batteries" instead of
+ * "battery", update the href accordingly.
+ *
+ * To verify your slugs, check the network tab on the /products page and look
+ * at the GetTopLevelCollections response.
+ */
 const categories = [
   { name: "Battery", icon: Battery, href: "/products?category=battery" },
   { name: "Inverter", icon: Zap, href: "/products?category=inverter" },
@@ -107,7 +116,7 @@ const Banner = () => {
               manage everything in one place.
             </p>
 
-            <div className="flex gap-4 flex-wrap ">
+            <div className="flex gap-4 flex-wrap">
               <Link
                 href="/products"
                 className="inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit text-xs sm:text-xs font-medium"
@@ -116,7 +125,7 @@ const Banner = () => {
               </Link>
               <Link
                 href="/installation"
-                className="inline-flex items-center justify-center border boreder-red-600  hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit text-xs sm:text-xs font-medium"
+                className="inline-flex items-center justify-center border border-white hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit text-xs sm:text-xs font-medium"
               >
                 Installation
               </Link>
@@ -126,7 +135,6 @@ const Banner = () => {
               >
                 Referral
               </Link>
-
             </div>
           </div>
         </div>

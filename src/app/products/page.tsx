@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, Suspense } from "react";
 import { useQuery } from "@apollo/client/react";
 import { gql } from "@apollo/client";
+import { useSearchParams } from "next/navigation";
 import { useBrandFacetIds } from "@/data/useBrandFacetsIds";
 import { useFacet } from "@/context/useFacet";
 
@@ -107,9 +108,14 @@ function BrandsLoader({
   return <>{children(brands)}</>;
 }
 
-/* ── Main store page ── */
-const Page = () => {
-  const [selectedCategorySlug, setSelectedCategorySlug] = useState<string>("");
+/* ── Inner page component that uses useSearchParams ── */
+function PageContent() {
+  const searchParams = useSearchParams();
+  const categoryParam = searchParams.get("category");
+
+  const [selectedCategorySlug, setSelectedCategorySlug] = useState<string>(
+    categoryParam ?? ""
+  );
   const [selectedBrand, setSelectedBrand] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<string>("relevance");
   const facetValueIds = useBrandFacetIds(selectedBrand);
@@ -122,15 +128,25 @@ const Page = () => {
   }>(GET_TOP_LEVEL_COLLECTIONS);
 
   const collections = (collectionsData?.collections?.items ?? []).filter(
-    (c) => !c.slug.toLowerCase().includes("installation") && !c.name.toLowerCase().includes("installation")
+    (c) =>
+      !c.slug.toLowerCase().includes("installation") &&
+      !c.name.toLowerCase().includes("installation")
   );
 
-  /* Auto-select first category once loaded */
+  /* Auto-select first category once loaded — only if nothing is selected yet */
   React.useEffect(() => {
     if (!selectedCategorySlug && collections.length > 0) {
       setSelectedCategorySlug(collections[0].slug);
     }
   }, [collections, selectedCategorySlug]);
+
+  /* When the URL param changes (e.g. user clicks a banner link), sync the state */
+  React.useEffect(() => {
+    if (categoryParam) {
+      setSelectedCategorySlug(categoryParam);
+      setSelectedBrand([]);
+    }
+  }, [categoryParam]);
 
   const minPrice = 0;
   const maxPrice = 10_000_000;
@@ -217,6 +233,23 @@ const Page = () => {
       </div>
       <Footer />
     </div>
+  );
+}
+
+/* ── Main store page — wraps content in Suspense for useSearchParams ── */
+const Page = () => {
+  return (
+    <Suspense
+      fallback={
+        <div>
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <p className="text-sm text-gray-500">Loading…</p>
+          </div>
+        </div>
+      }
+    >
+      <PageContent />
+    </Suspense>
   );
 };
 
