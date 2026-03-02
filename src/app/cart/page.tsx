@@ -22,7 +22,7 @@ const money = (amount: number, currency = "NGN") =>
     style: "currency",
     currency,
     maximumFractionDigits: 0,
-  }).format(Math.max(0, amount || 0));
+  }).format(Math.max(0, (amount || 0) / 100));
 
 export default function CartPage() {
   const router = useRouter();
