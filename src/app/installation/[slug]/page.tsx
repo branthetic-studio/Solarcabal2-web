@@ -17,10 +17,6 @@ import Link from "next/link";
 
 /* ===================== QUERIES ===================== */
 
-/**
- * Fetch all products in a collection (used for thumbnails + related tab).
- * collectionSlug = the category slug e.g. "battery"
- */
 const GET_COLLECTION_PRODUCTS = gql`
   query GetCollectionProducts($slug: String!, $skip: Int, $take: Int) {
     search(
@@ -56,10 +52,6 @@ const GET_COLLECTION_PRODUCTS = gql`
   }
 `;
 
-/**
- * Fetch a specific product variant by its slug + variant ID.
- * Docs: viewing a particular package requires product_slug + variant_id.
- */
 const GET_PRODUCT_VARIANT = gql`
   query GetProductVariant($slug: String!) {
     product(slug: $slug) {
@@ -100,7 +92,6 @@ const GET_PRODUCT_VARIANT = gql`
   }
 `;
 
-/** Collection header for breadcrumb + category name */
 const GET_COLLECTION_HEADER = gql`
   query GetCollectionHeader($slug: String!) {
     collection(slug: $slug) {
@@ -183,25 +174,28 @@ export default function InstallationListingPage() {
   const params = useParams() as Record<string, string | string[] | undefined> | null;
   const searchParams = useSearchParams();
 
-  // collectionSlug from the URL path (e.g. "battery")
   const collectionSlug = Array.isArray(params?.slug)
     ? params?.slug?.[0]
     : params?.slug;
 
-  // variantId from query param — set by PackageCard href
-  // Docs: viewing a particular package requires product_slug + variant_id
   const variantId = searchParams?.get("variantId") ?? undefined;
-
-  // productSlug from query param — set by PackageCard when product.slug is known
-  // Falls back to collectionSlug if not provided
   const productSlug = searchParams?.get("productSlug") ?? undefined;
+
+  // Collection image from URL (passed by PackageList/PackageCard)
+  const collectionImgParam = searchParams?.get("collectionImg")
+    ? decodeURIComponent(searchParams.get("collectionImg")!)
+    : undefined;
+
+  // ✅ Variant image from URL — set when a variant option is clicked
+  const variantImgParam = searchParams?.get("variantImg")
+    ? decodeURIComponent(searchParams.get("variantImg")!)
+    : undefined;
 
   const [activeTab, setActiveTab] = useState<"details" | "reviews" | "related">("details");
   const [selectedImageIdx, setSelectedImageIdx] = useState(0);
 
   const take = 20;
 
-  /* ── Fetch all products in the collection (for thumbnails + related tab) ── */
   const {
     data: productsData,
     loading: productsLoading,
@@ -211,7 +205,6 @@ export default function InstallationListingPage() {
     skip: !collectionSlug,
   });
 
-  /* ── Fetch the specific product variant by product slug ── */
   const {
     data: productData,
     loading: productLoading,
@@ -220,7 +213,6 @@ export default function InstallationListingPage() {
     skip: !productSlug,
   });
 
-  /* ── Collection header for breadcrumb ── */
   const { data: headerData } = useQuery<GetCollectionHeaderResponse>(
     GET_COLLECTION_HEADER,
     {
@@ -232,33 +224,72 @@ export default function InstallationListingPage() {
   const collectionItems = productsData?.search.items ?? [];
   const product = productData?.product ?? null;
 
-  /* ── Find the specific variant from variantId ── */
   const activeVariant = useMemo(() => {
     if (!product || !variantId) return product?.variants?.[0] ?? null;
     return product.variants.find((v) => v.id === variantId) ?? product.variants[0] ?? null;
   }, [product, variantId]);
 
-  /* ── Build image gallery from product assets ── */
+  /* ── Build image gallery ──
+   * Priority order:
+   * 1. variantImg from URL — shown FIRST when a variant option is selected
+   * 2. collectionImg from URL param OR collection featuredAsset from query
+   * 3. Product featuredAsset
+   * 4. Other product assets
+   * 5. Variant featuredAsset (from GQL, as fallback)
+   */
   const galleryImages = useMemo(() => {
     const imgs: string[] = [];
-    if (product?.featuredAsset?.preview) imgs.push(product.featuredAsset.preview);
+
+    // 1️⃣ If a variant option was clicked, show its image first
+    if (variantImgParam) {
+      imgs.push(variantImgParam);
+    }
+
+    // 2️⃣ Collection/sidebar image
+    const collectionImg =
+      collectionImgParam ?? headerData?.collection?.featuredAsset?.preview ?? null;
+    if (collectionImg && !imgs.includes(collectionImg)) {
+      imgs.push(collectionImg);
+    }
+
+    // 3️⃣ Product featured asset
+    if (
+      product?.featuredAsset?.preview &&
+      !imgs.includes(product.featuredAsset.preview)
+    ) {
+      imgs.push(product.featuredAsset.preview);
+    }
+
+    // 4️⃣ Other product assets
     product?.assets?.forEach((a) => {
       if (a.preview && !imgs.includes(a.preview)) imgs.push(a.preview);
     });
-    if (activeVariant?.featuredAsset?.preview && !imgs.includes(activeVariant.featuredAsset.preview)) {
+
+    // 5️⃣ Variant featured asset (GQL fallback)
+    if (
+      activeVariant?.featuredAsset?.preview &&
+      !imgs.includes(activeVariant.featuredAsset.preview)
+    ) {
       imgs.push(activeVariant.featuredAsset.preview);
     }
-    return imgs;
-  }, [product, activeVariant]);
 
-  // Clamp selectedImageIdx when gallery changes
+    return imgs;
+  }, [product, activeVariant, collectionImgParam, variantImgParam, headerData]);
+
+  // ✅ Reset to index 0 whenever the variant changes so the new variant image shows immediately
   useEffect(() => {
-    if (selectedImageIdx >= galleryImages.length) setSelectedImageIdx(0);
+    setSelectedImageIdx(0);
+  }, [variantId, productSlug]);
+
+  // Clamp if gallery shrinks
+  useEffect(() => {
+    if (selectedImageIdx >= galleryImages.length && galleryImages.length > 0) {
+      setSelectedImageIdx(0);
+    }
   }, [galleryImages.length, selectedImageIdx]);
 
   const activePrice = useMemo(() => {
     if (activeVariant?.priceWithTax) return activeVariant.priceWithTax / 100;
-    // Fallback: find the matching item from search results
     const match = collectionItems.find((i) => i.slug === productSlug);
     if (!match) return 0;
     const p = match.priceWithTax;
@@ -281,6 +312,17 @@ export default function InstallationListingPage() {
       return "Package";
     }
   }, [collectionSlug]);
+
+  // ✅ Helper to build variant href — carries collectionImg + variantImg into URL
+  const buildVariantHref = (v: ProductVariant) => {
+    const variantImg = v.featuredAsset?.preview ?? "";
+    const params = new URLSearchParams();
+    if (productSlug) params.set("productSlug", productSlug);
+    params.set("variantId", v.id);
+    if (collectionImgParam) params.set("collectionImg", collectionImgParam);
+    if (variantImg) params.set("variantImg", variantImg);
+    return `/installation/${collectionSlug}?${params.toString()}`;
+  };
 
   if (productsLoading || productLoading) {
     return (
@@ -350,7 +392,7 @@ export default function InstallationListingPage() {
                   )}
                 </div>
 
-                {/* Thumbnails — from product assets */}
+                {/* Thumbnails */}
                 {galleryImages.length > 1 && (
                   <div className="flex items-start justify-start gap-3 h-20">
                     {galleryImages.slice(0, 10).map((src, idx) => (
@@ -437,7 +479,7 @@ export default function InstallationListingPage() {
                   </p>
                 </div>
 
-                {/* Variant selector if product has multiple variants */}
+                {/* ✅ Variant selector — each option carries its own image in the URL */}
                 {product && product.variants.length > 1 && (
                   <div className="mt-4">
                     <p className="text-sm font-medium text-neutral-700 mb-2">Select option:</p>
@@ -445,7 +487,7 @@ export default function InstallationListingPage() {
                       {product.variants.map((v) => (
                         <Link
                           key={v.id}
-                          href={`/installation/${collectionSlug}?productSlug=${productSlug}&variantId=${v.id}`}
+                          href={buildVariantHref(v)}
                           className={`px-3 py-1 text-xs rounded-full border transition ${
                             v.id === variantId
                               ? "border-red-600 text-red-600 font-semibold"
@@ -458,18 +500,6 @@ export default function InstallationListingPage() {
                     </div>
                   </div>
                 )}
-
-                {/* <div className="mt-6 flex items-center justify-between w-100 gap-8">
-                  <button className="w-full rounded-lg border-2 border-neutral-900 bg-white text-neutral-900 py-2 px-2 text-sm font-semibold hover:bg-neutral-50 transition-colors">
-                    Add to Cart
-                  </button>
-                  <button className="w-full rounded-lg bg-neutral-900 text-white py-2 px-6 text-sm font-semibold hover:bg-neutral-800 transition-colors">
-                    Buy Now
-                  </button>
-                  <button className="w-full rounded-lg bg-red-600 text-white py-2 px-6 text-sm font-semibold hover:bg-red-700 transition-colors">
-                    Pay Later
-                  </button>
-                </div> */}
               </div>
             </div>
           </div>
@@ -530,7 +560,7 @@ export default function InstallationListingPage() {
                     </div>
                     {activeVariant?.customFields?.packageCapacity && (
                       <div className="flex justify-between py-3 border-b border-neutral-200">
-                        <span className="text-sm text-neutral-600">Capacityy</span>
+                        <span className="text-sm text-neutral-600">Capacity</span>
                         <span className="text-sm w-70 font-medium text-neutral-900">
                           {activeVariant.customFields.packageCapacity}
                         </span>
@@ -545,7 +575,7 @@ export default function InstallationListingPage() {
                   </div>
                 </div>
 
-                {/* Package Components (if any) */}
+                {/* Package Components */}
                 {activeVariant?.customFields?.packageComponents &&
                   activeVariant.customFields.packageComponents.length > 0 && (
                     <div className="mb-8">
@@ -667,7 +697,7 @@ export default function InstallationListingPage() {
                     return (
                       <Link
                         key={it.productId}
-                        href={`/installation/${collectionSlug}?productSlug=${it.slug}&variantId=`}
+                        href={`/installation/${collectionSlug}?productSlug=${it.slug}${collectionImgParam ? `&collectionImg=${encodeURIComponent(collectionImgParam)}` : ""}`}
                         className="bg-white border border-neutral-200 rounded-lg p-4 text-left hover:border-red-500 hover:shadow-lg transition-all group"
                       >
                         <div className="relative w-full h-40 bg-neutral-50 rounded-lg overflow-hidden mb-3">
