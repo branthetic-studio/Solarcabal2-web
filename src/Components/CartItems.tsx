@@ -99,7 +99,7 @@ export default function CartItems({ onClose }: CartItemsProps) {
                 className="w-full flex items-start gap-4 border-b border-[#f3f5f7] pb-4"
               >
                 {/* IMAGE */}
-                <div className="h-[70px] w-[70px] shrink-0 bg-[#f3f5f7] rounded-lg overflow-hidden">
+                <div className="h-17.5 w-17.5 shrink-0 bg-[#f3f5f7] rounded-lg overflow-hidden">
                   {asset ? (
                     <Image
                       src={asset}
@@ -177,7 +177,7 @@ export default function CartItems({ onClose }: CartItemsProps) {
                 className="w-full flex items-start gap-4 border-b border-[#f3f5f7] pb-4"
               >
                 {/* IMAGE */}
-                <div className="h-[70px] w-[70px] shrink-0 bg-[#f3f5f7] rounded-lg overflow-hidden">
+                <div className="h-17.5 w-17.5 shrink-0 bg-[#f3f5f7] rounded-lg overflow-hidden">
                   {item.image ? (
                     <Image
                       src={item.image}

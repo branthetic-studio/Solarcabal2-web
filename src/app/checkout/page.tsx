@@ -452,7 +452,7 @@ function Row({ label, value, bold, big }: any) {
 function InfoRow({ icon, title, text }: InfoRowProps) {
   return (
     <div className="flex items-center gap-3 border-b border-[#f0f0f0] pb-2">
-      <Image className="flex-shrink-0" src={icon} alt="Icon" width={24} height={24} />
+      <Image className="shrink-0" src={icon} alt="Icon" width={24} height={24} />
       <div>
         <p className="font-medium">{title}</p>
         <p className="text-xs text-gray-500">{text}</p>
