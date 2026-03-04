@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
+import { toast } from "sonner";
 import Navbar from "@/Components/Navbar/Navbar";
 import Footer from "@/Components/Footer/Footer";
 import Suscribe from "@/Components/Suscribe/Suscribe";
@@ -14,6 +15,9 @@ import systemImage from "../../../Assets/Vector (2).png";
 import safetyImage from "../../../Assets/Vector (3).png";
 import "../Installation.css";
 import Link from "next/link";
+import { useCart } from "@/context/CartContext";
+import { useLocalCart } from "@/context/LocalCartContext";
+import { useUser } from "@/context/UserContext";
 
 /* ===================== QUERIES ===================== */
 
@@ -171,8 +175,14 @@ const NGN = new Intl.NumberFormat("en-NG", {
 });
 
 export default function InstallationListingPage() {
+  const router = useRouter();
   const params = useParams() as Record<string, string | string[] | undefined> | null;
   const searchParams = useSearchParams();
+
+  // ── Cart hooks ──────────────────────────────────────────────────────────────
+  const { customer } = useUser();
+  const { addToCartMutation } = useCart();
+  const { addItem: addLocalItem } = useLocalCart();
 
   const collectionSlug = Array.isArray(params?.slug)
     ? params?.slug?.[0]
@@ -181,18 +191,17 @@ export default function InstallationListingPage() {
   const variantId = searchParams?.get("variantId") ?? undefined;
   const productSlug = searchParams?.get("productSlug") ?? undefined;
 
-  // Collection image from URL (passed by PackageList/PackageCard)
   const collectionImgParam = searchParams?.get("collectionImg")
     ? decodeURIComponent(searchParams.get("collectionImg")!)
     : undefined;
 
-  // ✅ Variant image from URL — set when a variant option is clicked
   const variantImgParam = searchParams?.get("variantImg")
     ? decodeURIComponent(searchParams.get("variantImg")!)
     : undefined;
 
   const [activeTab, setActiveTab] = useState<"details" | "reviews" | "related">("details");
   const [selectedImageIdx, setSelectedImageIdx] = useState(0);
+  const [addingToCart, setAddingToCart] = useState(false);
 
   const take = 20;
 
@@ -229,43 +238,22 @@ export default function InstallationListingPage() {
     return product.variants.find((v) => v.id === variantId) ?? product.variants[0] ?? null;
   }, [product, variantId]);
 
-  /* ── Build image gallery ──
-   * Priority order:
-   * 1. variantImg from URL — shown FIRST when a variant option is selected
-   * 2. collectionImg from URL param OR collection featuredAsset from query
-   * 3. Product featuredAsset
-   * 4. Other product assets
-   * 5. Variant featuredAsset (from GQL, as fallback)
-   */
   const galleryImages = useMemo(() => {
     const imgs: string[] = [];
 
-    // 1️⃣ If a variant option was clicked, show its image first
-    if (variantImgParam) {
-      imgs.push(variantImgParam);
-    }
+    if (variantImgParam) imgs.push(variantImgParam);
 
-    // 2️⃣ Collection/sidebar image
     const collectionImg =
       collectionImgParam ?? headerData?.collection?.featuredAsset?.preview ?? null;
-    if (collectionImg && !imgs.includes(collectionImg)) {
-      imgs.push(collectionImg);
-    }
+    if (collectionImg && !imgs.includes(collectionImg)) imgs.push(collectionImg);
 
-    // 3️⃣ Product featured asset
-    if (
-      product?.featuredAsset?.preview &&
-      !imgs.includes(product.featuredAsset.preview)
-    ) {
+    if (product?.featuredAsset?.preview && !imgs.includes(product.featuredAsset.preview))
       imgs.push(product.featuredAsset.preview);
-    }
 
-    // 4️⃣ Other product assets
     product?.assets?.forEach((a) => {
       if (a.preview && !imgs.includes(a.preview)) imgs.push(a.preview);
     });
 
-    // 5️⃣ Variant featured asset (GQL fallback)
     if (
       activeVariant?.featuredAsset?.preview &&
       !imgs.includes(activeVariant.featuredAsset.preview)
@@ -276,12 +264,10 @@ export default function InstallationListingPage() {
     return imgs;
   }, [product, activeVariant, collectionImgParam, variantImgParam, headerData]);
 
-  // ✅ Reset to index 0 whenever the variant changes so the new variant image shows immediately
   useEffect(() => {
     setSelectedImageIdx(0);
   }, [variantId, productSlug]);
 
-  // Clamp if gallery shrinks
   useEffect(() => {
     if (selectedImageIdx >= galleryImages.length && galleryImages.length > 0) {
       setSelectedImageIdx(0);
@@ -296,9 +282,10 @@ export default function InstallationListingPage() {
     return (p.__typename === "SinglePrice" ? p.value : p.min) / 100;
   }, [activeVariant, collectionItems, productSlug]);
 
-  const productName = product?.name
-    ?? collectionItems.find((i) => i.slug === productSlug)?.productName
-    ?? "";
+  const productName =
+    product?.name ??
+    collectionItems.find((i) => i.slug === productSlug)?.productName ??
+    "";
 
   const packageTitle = useMemo(() => {
     try {
@@ -313,17 +300,76 @@ export default function InstallationListingPage() {
     }
   }, [collectionSlug]);
 
-  // ✅ Helper to build variant href — carries collectionImg + variantImg into URL
   const buildVariantHref = (v: ProductVariant) => {
     const variantImg = v.featuredAsset?.preview ?? "";
-    const params = new URLSearchParams();
-    if (productSlug) params.set("productSlug", productSlug);
-    params.set("variantId", v.id);
-    if (collectionImgParam) params.set("collectionImg", collectionImgParam);
-    if (variantImg) params.set("variantImg", variantImg);
-    return `/installation/${collectionSlug}?${params.toString()}`;
+    const p = new URLSearchParams();
+    if (productSlug) p.set("productSlug", productSlug);
+    p.set("variantId", v.id);
+    if (collectionImgParam) p.set("collectionImg", collectionImgParam);
+    if (variantImg) p.set("variantImg", variantImg);
+    return `/installation/${collectionSlug}?${p.toString()}`;
   };
 
+  // ── Add to cart handler ─────────────────────────────────────────────────────
+  const handleAddToCart = useCallback(async () => {
+    if (!activeVariant) {
+      toast.error("Please select a variant first");
+      return;
+    }
+
+    setAddingToCart(true);
+
+    try {
+      const image =
+        galleryImages[0] ??
+        product?.featuredAsset?.preview ??
+        undefined;
+
+      // Always add to local cart first (instant, optimistic)
+      addLocalItem({
+        id: activeVariant.id,
+        name: productName || packageTitle,
+        slug: productSlug ?? collectionSlug ?? "",
+        priceWithTax: activeVariant.priceWithTax,
+        currencyCode: "NGN",
+        image,
+        quantity: 1,
+      });
+
+      // If logged in, also push to server
+      if (customer) {
+        await addToCartMutation({
+          productVariantId: activeVariant.id,
+          quantity: 1,
+        });
+      }
+
+      toast.success("Added to cart!");
+    } catch (e) {
+      console.error("[InstallationPage] Add to cart error:", e);
+      toast.error("Failed to add to cart");
+    } finally {
+      setAddingToCart(false);
+    }
+  }, [
+    activeVariant,
+    galleryImages,
+    product,
+    productName,
+    packageTitle,
+    productSlug,
+    collectionSlug,
+    customer,
+    addLocalItem,
+    addToCartMutation,
+  ]);
+
+  const handleBuyNow = useCallback(async () => {
+    await handleAddToCart();
+    router.push("/checkout");
+  }, [handleAddToCart, router]);
+
+  // ── Loading / error states ──────────────────────────────────────────────────
   if (productsLoading || productLoading) {
     return (
       <main className="min-h-screen bg-white">
@@ -377,7 +423,6 @@ export default function InstallationListingPage() {
             {/* LEFT: Image gallery */}
             <div className="w-full md:w-1/2">
               <div className="flex flex-col gap-3.5 h-137 mt-6">
-                {/* Main image */}
                 <div className="relative w-full h-full flex items-center justify-center bg-[#EBEEF7] rounded-md">
                   {galleryImages[selectedImageIdx] ? (
                     <Image
@@ -392,7 +437,6 @@ export default function InstallationListingPage() {
                   )}
                 </div>
 
-                {/* Thumbnails */}
                 {galleryImages.length > 1 && (
                   <div className="flex items-start justify-start gap-3 h-20">
                     {galleryImages.slice(0, 10).map((src, idx) => (
@@ -418,7 +462,6 @@ export default function InstallationListingPage() {
                   </div>
                 )}
 
-                {/* Fallback thumbnails from collection items */}
                 {galleryImages.length <= 1 && collectionItems.length > 0 && (
                   <div className="flex items-start justify-start gap-3 h-20">
                     {collectionItems.slice(0, 10).map((it, idx) => {
@@ -479,7 +522,6 @@ export default function InstallationListingPage() {
                   </p>
                 </div>
 
-                {/* ✅ Variant selector — each option carries its own image in the URL */}
                 {product && product.variants.length > 1 && (
                   <div className="mt-4">
                     <p className="text-sm font-medium text-neutral-700 mb-2">Select option:</p>
@@ -500,6 +542,24 @@ export default function InstallationListingPage() {
                     </div>
                   </div>
                 )}
+
+                {/* ✅ Add to Cart / Buy Now */}
+                <div className="mt-6 flex items-center justify-between w-100 gap-8">
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={addingToCart || !activeVariant}
+                    className="w-full rounded-lg border-2 border-neutral-900 bg-white text-neutral-900 py-2 px-2 text-sm font-semibold hover:bg-neutral-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {addingToCart ? "Adding…" : "Add to Cart"}
+                  </button>
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={addingToCart || !activeVariant}
+                    className="w-full rounded-lg bg-neutral-900 text-white py-2 px-6 text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Buy Now
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -575,7 +635,6 @@ export default function InstallationListingPage() {
                   </div>
                 </div>
 
-                {/* Package Components */}
                 {activeVariant?.customFields?.packageComponents &&
                   activeVariant.customFields.packageComponents.length > 0 && (
                     <div className="mb-8">
@@ -595,7 +654,6 @@ export default function InstallationListingPage() {
                     </div>
                   )}
 
-                {/* What's Included */}
                 <div>
                   <h3 className="text-xl font-semibold text-neutral-900 mb-6">What&apos;s Included</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -690,9 +748,10 @@ export default function InstallationListingPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                   {collectionItems.slice(0, 8).map((it) => {
                     const img = it.productAsset?.preview;
-                    const price = it.priceWithTax.__typename === "SinglePrice"
-                      ? it.priceWithTax.value
-                      : it.priceWithTax.min;
+                    const price =
+                      it.priceWithTax.__typename === "SinglePrice"
+                        ? it.priceWithTax.value
+                        : it.priceWithTax.min;
 
                     return (
                       <Link

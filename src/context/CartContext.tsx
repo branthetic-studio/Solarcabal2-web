@@ -22,11 +22,10 @@ import {
   AdjustOrderLineMutationVariables,
   ActiveOrder,
 } from "@/graphql/types.manual";
-
-// Types for what the context provides
-type AddToCartFn = (options: {
-  variables: AddItemToOrderMutationVariables;
-}) => Promise<void>;
+// ✅ These three were missing
+import { useUser } from "@/context/UserContext";
+import { useLocalCart } from "@/context/LocalCartContext";
+import { useSyncCartOnLogin } from "@/hooks/useSyncCartOnLogin";
 
 type UseCartContext = {
   cart: GetActiveOrderData | undefined;
@@ -49,36 +48,32 @@ const initialCtx: UseCartContext = {
   activeOrder: undefined,
   getCount: () => 0,
   loading: false,
-  addToCartMutation: async () => {},
-  handleAdjustQuantity: async () => {},
-  removeFromCartMutation: async () => {},
+  addToCartMutation: async () => { },
+  handleAdjustQuantity: async () => { },
+  removeFromCartMutation: async () => { },
   getOrderLineIdByVariantId: () => undefined,
 };
 
 const CartContext = createContext<UseCartContext>(initialCtx);
-
 export const useCart = () => useContext(CartContext);
 
 const CartProvider = ({ children }: PropsWithChildren) => {
+  // ✅ Pull in customer and clearCart for sync
+  const { customer } = useUser();
+  const { clearCart } = useLocalCart();
+
   const { data, refetch, loading } = useQuery<GetActiveOrderData>(
     GET_ACTIVE_ORDER,
-    {
-      fetchPolicy: "cache-and-network",
-    }
+    { fetchPolicy: "cache-and-network" }
   );
 
-  const [addItem] = useMutation<
-    AddItemToOrderMutation,
-    AddItemToOrderMutationVariables
-  >(ADD_TO_CART, {
+
+  const [addItem] = useMutation<AddItemToOrderMutation>(ADD_TO_CART, {
     refetchQueries: [{ query: GET_ACTIVE_ORDER }],
     awaitRefetchQueries: true,
   });
 
-  const [adjustLine] = useMutation<
-    AdjustOrderLineMutation,
-    AdjustOrderLineMutationVariables
-  >(ADJUST_QUANTITY, {
+  const [adjustLine] = useMutation<AdjustOrderLineMutation>(ADJUST_QUANTITY, {
     refetchQueries: [{ query: GET_ACTIVE_ORDER }],
     awaitRefetchQueries: true,
   });
@@ -96,11 +91,10 @@ const CartProvider = ({ children }: PropsWithChildren) => {
       ) ?? 0;
   }, [data]);
 
-  const getOrderLineIdByVariantId = (variantId: string) => {
-    return data?.activeOrder?.lines?.find(
+  const getOrderLineIdByVariantId = (variantId: string) =>
+    data?.activeOrder?.lines?.find(
       (line) => line?.productVariant?.id === variantId
     )?.id;
-  };
 
   const addToCartMutation = async (
     variables: AddItemToOrderMutationVariables
@@ -117,14 +111,15 @@ const CartProvider = ({ children }: PropsWithChildren) => {
   };
 
   const removeFromCartMutation = async (orderLineId: string) => {
-    await removeLine({
-      variables: { orderLineId },
-    });
+    await removeLine({ variables: { orderLineId } });
   };
 
   useEffect(() => {
     void refetch();
   }, [refetch]);
+
+  // ✅ This is what was missing — triggers the sync on login
+  useSyncCartOnLogin(!!customer, addToCartMutation, clearCart);
 
   return (
     <CartContext.Provider
