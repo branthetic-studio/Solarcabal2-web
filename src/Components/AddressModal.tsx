@@ -4,15 +4,16 @@ import * as React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { useQuery } from "@apollo/client/react";
-import { useUser } from "@/context/UserContext"; // adjust if needed
+import { useUser } from "@/context/UserContext";
 import { GET_CUSTOMER_ADDRESSES } from "@/graphql/queries";
+import * as NaijaStates from "naija-state-local-government";
 
 type AddressForm = {
   fullName: string;
   streetLine1: string;
-  streetLine2?: string;
+  streetLine2?: string; // used to store LGA
   city: string;
-  province?: string;
+  province?: string;   // stores selected State
   postalCode?: string;
   countryCode?: string;
   phoneNumber: string;
@@ -21,11 +22,7 @@ type AddressForm = {
 type AddressModalProps = {
   trigger: React.ReactNode;
   onSubmit: (data: AddressForm) => void;
-
-  /** Optional: prefill form (e.g. existing order shipping address) */
   initialValue?: Partial<AddressForm>;
-
-  /** Optional controlled open */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 };
@@ -81,6 +78,19 @@ const savedToForm = (a: SavedAddress): AddressForm => ({
   countryCode: a.country?.code ?? "NG",
 });
 
+// All Nigerian states
+const ALL_STATES: string[] = NaijaStates.states();
+
+// Get LGAs for a given state (returns [] if not found)
+const getLgas = (state: string): string[] => {
+  if (!state) return [];
+  try {
+    return NaijaStates.lgas(state)?.lgas ?? [];
+  } catch {
+    return [];
+  }
+};
+
 export default function AddressModal({
   trigger,
   onSubmit,
@@ -99,7 +109,6 @@ export default function AddressModal({
     onOpenChange?.(next);
   };
 
-  // Fetch saved addresses only when modal is open + logged in
   const { data, loading } = useQuery<GetCustomerAddressesData>(
     GET_CUSTOMER_ADDRESSES,
     {
@@ -113,13 +122,11 @@ export default function AddressModal({
     savedAddresses.find((a) => a.defaultShippingAddress) ?? null;
 
   const [selectedSavedId, setSelectedSavedId] = React.useState<string>("");
-
   const [form, setForm] = React.useState<AddressForm>(toForm(initialValue));
 
-  // On open:
-  // - If initialValue provided (editing order address), use that
-  // - Else if default saved exists, prefill with default saved
-  // - Else start blank
+  // LGAs derived from selected state (province)
+  const lgas = React.useMemo(() => getLgas(form.province ?? ""), [form.province]);
+
   React.useEffect(() => {
     if (!open) return;
 
@@ -139,7 +146,6 @@ export default function AddressModal({
     setForm(toForm(undefined));
   }, [open, initialValue, defaultSaved?.id]);
 
-  // When user picks a saved address
   React.useEffect(() => {
     if (!open) return;
     if (!selectedSavedId) return;
@@ -151,13 +157,20 @@ export default function AddressModal({
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+
+    setForm((prev) => {
+      const updated = { ...prev, [name]: value };
+      // Reset LGA whenever state changes
+      if (name === "province") {
+        updated.streetLine2 = "";
+      }
+      return updated;
+    });
   };
 
   const clearToManual = () => {
     setSelectedSavedId("");
-    // keep initialValue if it exists? user asked "opportunity to change whether there is one or not"
-    // so "manual" means blank
     setForm(toForm(undefined));
   };
 
@@ -173,7 +186,7 @@ export default function AddressModal({
       ...form,
       streetLine2: form.streetLine2 || "",
       province: form.province || "",
-      postalCode: form.postalCode || "",
+      postalCode: "",
       countryCode: form.countryCode || "NG",
     });
     setOpen(false);
@@ -196,7 +209,6 @@ export default function AddressModal({
             <Dialog.Title className="text-lg font-semibold text-neutral-800">
               {title}
             </Dialog.Title>
-
             <Dialog.Close asChild>
               <button
                 type="button"
@@ -208,7 +220,7 @@ export default function AddressModal({
             </Dialog.Close>
           </div>
 
-          {/* Saved address picker (only for logged-in customers) */}
+          {/* Saved address picker */}
           {customer?.id ? (
             <div className="mb-4 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
               <div className="flex items-center justify-between">
@@ -274,6 +286,7 @@ export default function AddressModal({
           ) : null}
 
           <form className="space-y-4" onSubmit={handleSubmit}>
+            {/* Full Name */}
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Full Name <span className="text-red-500">*</span>
@@ -289,6 +302,7 @@ export default function AddressModal({
               />
             </div>
 
+            {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Phone Number <span className="text-red-500">*</span>
@@ -304,6 +318,7 @@ export default function AddressModal({
               />
             </div>
 
+            {/* Street Address */}
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Street Address <span className="text-red-500">*</span>
@@ -319,20 +334,7 @@ export default function AddressModal({
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">
-                Apartment, Suite, etc. (Optional)
-              </label>
-              <input
-                type="text"
-                name="streetLine2"
-                placeholder="e.g. Apt 4B"
-                value={form.streetLine2 ?? ""}
-                onChange={handleChange}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600"
-              />
-            </div>
-
+            {/* City + State */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
@@ -341,7 +343,7 @@ export default function AddressModal({
                 <input
                   type="text"
                   name="city"
-                  placeholder="e.g. Lagos"
+                  placeholder="e.g. Ikeja"
                   value={form.city}
                   onChange={handleChange}
                   className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600"
@@ -351,32 +353,48 @@ export default function AddressModal({
 
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  State/Province
+                  State <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   name="province"
-                  placeholder="e.g. Lagos"
                   value={form.province ?? ""}
                   onChange={handleChange}
                   className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600"
-                />
+                  required
+                >
+                  <option value="">— Select State —</option>
+                  {ALL_STATES.map((state) => (
+                    <option key={state} value={state}>
+                      {state}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
+            {/* LGA + Country */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Postal Code
+                  LGA <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  name="postalCode"
-                  placeholder="e.g. 100001"
-                  value={form.postalCode ?? ""}
+                <select
+                  name="streetLine2"
+                  value={form.streetLine2 ?? ""}
                   onChange={handleChange}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600"
-                />
+                  disabled={!form.province}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600 disabled:bg-neutral-100 disabled:text-neutral-400"
+                  required
+                >
+                  <option value="">
+                    {form.province ? "— Select LGA —" : "— Select State first —"}
+                  </option>
+                  {lgas.map((lga) => (
+                    <option key={lga} value={lga}>
+                      {lga}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
