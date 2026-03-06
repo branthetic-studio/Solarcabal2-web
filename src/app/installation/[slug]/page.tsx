@@ -443,11 +443,10 @@ export default function InstallationListingPage() {
                       <button
                         key={idx}
                         onClick={() => setSelectedImageIdx(idx)}
-                        className={`shrink-0 rounded-lg border-2 ${
-                          idx === selectedImageIdx
-                            ? "border-[#00AAFF]"
-                            : "border-neutral-200 hover:border-neutral-300"
-                        } bg-white transition-all`}
+                        className={`shrink-0 rounded-lg border-2 ${idx === selectedImageIdx
+                          ? "border-[#00AAFF]"
+                          : "border-neutral-200 hover:border-neutral-300"
+                          } bg-white transition-all`}
                       >
                         <div className="relative w-19.5 h-19.5">
                           <Image
@@ -470,11 +469,10 @@ export default function InstallationListingPage() {
                         <button
                           key={it.productId}
                           onClick={() => setSelectedImageIdx(idx)}
-                          className={`shrink-0 rounded-lg border-2 ${
-                            idx === selectedImageIdx
-                              ? "border-[#00AAFF]"
-                              : "border-neutral-200 hover:border-neutral-300"
-                          } bg-white transition-all`}
+                          className={`shrink-0 rounded-lg border-2 ${idx === selectedImageIdx
+                            ? "border-[#00AAFF]"
+                            : "border-neutral-200 hover:border-neutral-300"
+                            } bg-white transition-all`}
                           title={it.productName}
                         >
                           <div className="relative w-19.5 h-19.5">
@@ -513,7 +511,7 @@ export default function InstallationListingPage() {
                   </div>
                 </div>
 
-                <div className="mt-6 pt-6 border-t border-neutral-200">
+                <div className="mt-6 pt-6 px-4 border-t border-neutral-200">
                   <p className="text-3xl font-bold text-neutral-900">
                     {NGN.format(activePrice)}
                   </p>
@@ -523,18 +521,17 @@ export default function InstallationListingPage() {
                 </div>
 
                 {product && product.variants.length > 1 && (
-                  <div className="mt-4">
+                  <div className="mt-4 px-4">
                     <p className="text-sm font-medium text-neutral-700 mb-2">Select option:</p>
                     <div className="flex flex-wrap gap-2">
                       {product.variants.map((v) => (
                         <Link
                           key={v.id}
                           href={buildVariantHref(v)}
-                          className={`px-3 py-1 text-xs rounded-full border transition ${
-                            v.id === variantId
-                              ? "border-red-600 text-red-600 font-semibold"
-                              : "border-gray-300 text-gray-600 hover:border-gray-400"
-                          }`}
+                          className={`px-3 py-1 text-xs rounded-full border transition ${v.id === variantId
+                            ? "border-red-600 text-red-600 font-semibold"
+                            : "border-gray-300 text-gray-600 hover:border-gray-400"
+                            }`}
                         >
                           {v.name}
                         </Link>
@@ -544,7 +541,7 @@ export default function InstallationListingPage() {
                 )}
 
                 {/* ✅ Add to Cart / Buy Now */}
-                <div className="mt-6 flex items-center justify-between w-100 gap-8">
+                <div className="mt-6 flex items-center justify-between w-100 gap-6">
                   <button
                     onClick={handleAddToCart}
                     disabled={addingToCart || !activeVariant}
@@ -559,6 +556,14 @@ export default function InstallationListingPage() {
                   >
                     Buy Now
                   </button>
+
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={addingToCart || !activeVariant}
+                    className="w-full rounded-lg bg-[#ff0000] text-white py-2 px-6 text-sm font-semibold hover:bg-transparent hover:text-[#ff0000] hover:border-2 border-[#ff0000] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Pay Later
+                  </button>
                 </div>
               </div>
             </div>
@@ -571,11 +576,10 @@ export default function InstallationListingPage() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`pb-4 text-sm font-medium border-b-2 transition-colors capitalize ${
-                    activeTab === tab
-                      ? "border-red-600 text-neutral-900"
-                      : "border-transparent text-neutral-600 hover:text-neutral-900"
-                  }`}
+                  className={`pb-4 text-sm font-medium border-b-2 transition-colors capitalize ${activeTab === tab
+                    ? "border-red-600 text-neutral-900"
+                    : "border-transparent text-neutral-600 hover:text-neutral-900"
+                    }`}
                 >
                   {tab === "details" ? "Product Detail" : tab === "reviews" ? "Reviews" : "Related Product"}
                 </button>
@@ -619,7 +623,7 @@ export default function InstallationListingPage() {
                       </span>
                     </div>
                     {activeVariant?.customFields?.packageCapacity && (
-                      <div className="flex justify-between py-3 border-b border-neutral-200">
+                      <div className="flex gap-4 justify-between py-3 border-b border-neutral-200">
                         <span className="text-sm text-neutral-600">Capacity</span>
                         <span className="text-sm w-70 font-medium text-neutral-900">
                           {activeVariant.customFields.packageCapacity}
