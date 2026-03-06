@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import AuthModal from "../AuthModal";
-import { Search, User, ShoppingCart, Menu, X, LogOut } from "lucide-react";
+import { Search, Menu, X, LogOut } from "lucide-react";
 import SearchUI from "../SearchUI";
 import { useCart } from "@/context/CartContext";
 import { useLocalCart } from "@/context/LocalCartContext";

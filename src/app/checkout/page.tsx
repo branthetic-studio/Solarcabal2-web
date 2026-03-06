@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { gql } from "@apollo/client";
 import Suscribe from "@/Components/Suscribe/Suscribe";
 import AddressModal from "@/Components/AddressModal";
+import InstallmentPayment, { InstallmentPlan } from "@/Components/Installmentpayment";
 import { StaticImageData } from "next/image";
 
 import {
@@ -25,7 +26,7 @@ import {
 } from "@/graphql/queries";
 
 /* ------------------- Types ------------------- */
-type PaymentMethod = "bank" | "card" | "Installment Payment";
+type PaymentMethod = "bank" | "card" | "installment";
 
 type ActiveOrderLine = {
   id: string;
@@ -86,12 +87,15 @@ interface InfoRowProps {
   text: string;
 }
 
-/* ------------------- Formatter ------------------- */
+/* ------------------- Formatters ------------------- */
 const NGN = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",
   maximumFractionDigits: 0,
 });
+
+// Vendure stores prices in kobo — always divide by 100 before display
+const formatNaira = (kobo: number) => NGN.format(kobo / 100);
 
 /* ------------------- GraphQL Update Cart Mutation ------------------- */
 const UPDATE_CART = gql`
@@ -125,11 +129,14 @@ const UPDATE_CART = gql`
 
 const Page = () => {
   const router = useRouter();
+
+  // ✅ Cast initial value so TS keeps the full union type
   const [method, setMethod] = useState<PaymentMethod>("card");
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<string | null>(null);
   const [shippingAddress, setShippingAddress] = useState<any>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+  const [installmentPlan, setInstallmentPlan] = useState<InstallmentPlan | null>(null);
 
   /* ------------------- Active Order Query ------------------- */
   const { data: activeOrderData, refetch } = useQuery<{
@@ -145,7 +152,6 @@ const Page = () => {
     skip: !activeOrder,
   });
 
-  // ✅ Filter out any BNPL shipping methods
   const shippingMethods = (shippingMethodsData?.eligibleShippingMethods ?? []).filter(
     (m) => !m.name.toLowerCase().includes("bnpl")
   );
@@ -172,7 +178,14 @@ const Page = () => {
       const res = await updateCartMutation({ variables: { lineId, quantity: qty } });
       const payload = res.data as {
         adjustOrderLineQuantity:
-        | { __typename: "Order"; id: string; totalQuantity: number; lines: ActiveOrderLine[]; totalWithTax: number; subTotalWithTax?: number }
+        | {
+          __typename: "Order";
+          id: string;
+          totalQuantity: number;
+          lines: ActiveOrderLine[];
+          totalWithTax: number;
+          subTotalWithTax?: number;
+        }
         | { __typename: "OrderModificationError"; message: string };
       };
       if (payload.adjustOrderLineQuantity.__typename === "Order") {
@@ -217,11 +230,21 @@ const Page = () => {
     }
   };
 
+  /* ------------------- Installment Plan Confirmed ------------------- */
+  const handleInstallmentConfirm = (plan: InstallmentPlan) => {
+    setInstallmentPlan(plan);
+    toast.success("Installment plan set. Proceed to checkout.");
+  };
+
   /* ------------------- Checkout + Paystack ------------------- */
   const handleCheckout = async () => {
     if (!activeOrder) { toast.error("No active order found."); return; }
     if (!activeOrder.shippingAddress && !shippingAddress) { toast.error("Please add a shipping address"); return; }
     if (!selectedShippingMethod) { toast.error("Please select a shipping method"); return; }
+    if (method === "installment" && !installmentPlan) {
+      toast.error("Please confirm your installment plan first.");
+      return;
+    }
 
     try {
       setIsPaying(true);
@@ -232,7 +255,11 @@ const Page = () => {
 
       const transitionResult = await transitionToState({ variables: { state: "ArrangingPayment" } });
       const transitionResponse = transitionResult.data?.transitionOrderToState;
-      if (transitionResponse && "__typename" in transitionResponse && transitionResponse.__typename === "OrderStateTransitionError") {
+      if (
+        transitionResponse &&
+        "__typename" in transitionResponse &&
+        transitionResponse.__typename === "OrderStateTransitionError"
+      ) {
         toast.error(`Cannot proceed: ${transitionResponse.transitionError}`);
         setIsPaying(false);
         return;
@@ -240,15 +267,23 @@ const Page = () => {
 
       await createPaystackIntent({ variables: { orderCode: activeOrder.code } });
 
+      // Installment: charge deposit amount (convert naira → kobo). Otherwise charge full order.
+      const chargeAmount =
+        method === "installment" && installmentPlan
+          ? installmentPlan.depositAmount * 100
+          : activeOrder.totalWithTax;
+
       const { default: PaystackPop } = await import("@paystack/inline-js");
       const paystack = new PaystackPop();
       paystack.newTransaction({
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
-        amount: activeOrder.totalWithTax,
+        amount: chargeAmount,
         email: activeOrder.customer?.emailAddress || "",
         reference: activeOrder.code,
         onSuccess: () => {
-          router.replace(`/main/checkout/paystack-redirect?reference=${activeOrder.id}&status=success&amount=${activeOrder.totalWithTax}`);
+          router.replace(
+            `/main/checkout/paystack-redirect?reference=${activeOrder.id}&status=success&amount=${chargeAmount}`
+          );
         },
         onCancel: async () => {
           await recreateFailedOrder({ variables: { orderCode: activeOrder.code } });
@@ -264,6 +299,15 @@ const Page = () => {
     }
   };
 
+  /* ------------------- Checkout button label ------------------- */
+  const checkoutLabel = useMemo(() => {
+    if (isPaying) return "Processing...";
+    if (method === "installment" && installmentPlan) {
+      return `Pay Deposit — ${NGN.format(installmentPlan.depositAmount)}`;
+    }
+    return "Checkout";
+  }, [isPaying, method, installmentPlan]);
+
   return (
     <main className="min-h-screen bg-neutral-50">
       <Navbar />
@@ -275,84 +319,125 @@ const Page = () => {
         <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
           {/* ---------------- LEFT SIDE ---------------- */}
           <section className="space-y-6">
-            <div className="rounded-2xl border border-[#d1d1d1] p-5">
-              <p className="mb-4 text-lg font-semibold">Payment</p>
 
-              <div className="flex flex-col gap-4">
-                <RadioRow checked={method === "bank"} onChange={() => setMethod("bank")} label="Bank Transfer" />
-                <RadioRow
-                  checked={method === "card"}
-                  onChange={() => setMethod("card")}
-                  label="Debit Cards"
-                  right={
-                    <div className="flex gap-2 items-center">
-                      <Image src="/master card.png" alt="Mastercard" width={36} height={36} />
-                      <Image src="/visapay.png" alt="Visa" width={36} height={36} />
-                      <button onClick={() => setShowPayment(true)} className="w-6 h-6 flex items-center justify-center border rounded-full">
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                  }
-                />
-                <RadioRow checked={method === "Installment Payment"} onChange={() => setMethod("Installment Payment")} label={<span>Installment Payment</span>} />
-              </div>
+            {method === "installment" ? (
+              <InstallmentPayment
+                totalAmount={activeOrder?.totalWithTax ?? 0}
+                onConfirm={handleInstallmentConfirm}
+                onBack={() => setMethod("card")}
+              />
+            ) : (
+              <div className="rounded-2xl border border-[#d1d1d1] p-5">
+                <p className="mb-4 text-lg font-semibold">Payment</p>
 
-              {/* Billing address */}
-              <div className="my-6">
-                <p className="mb-2 text-sm font-semibold">Billing Address</p>
-
-                <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5">
-                  <p className="mb-4 text-lg font-semibold">Shipping Address</p>
-                  {activeOrder?.shippingAddress || shippingAddress ? (
-                    <div className="bg-neutral-100 rounded-xl p-3">
-                      <p className="text-sm font-medium">{activeOrder?.shippingAddress?.fullName || shippingAddress?.fullName}</p>
-                      <p className="text-xs text-neutral-600">{activeOrder?.shippingAddress?.streetLine1 || shippingAddress?.streetLine1}</p>
-                      <p className="text-xs text-neutral-600">{activeOrder?.shippingAddress?.city || shippingAddress?.city}</p>
-                      <AddressModal
-                        trigger={<button className="mt-2 text-xs text-red-500 hover:text-red-600">Change Address</button>}
-                        onSubmit={handleAddressSubmit}
-                      />
-                    </div>
-                  ) : (
-                    <AddressModal
-                      trigger={<button className="w-full py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600">Add Shipping Address</button>}
-                      onSubmit={handleAddressSubmit}
-                    />
-                  )}
+                <div className="flex flex-col gap-4">
+                  <RadioRow
+                    checked={method === "bank"}
+                    onChange={() => setMethod("bank")}
+                    label="Bank Transfer"
+                  />
+                  <RadioRow
+                    checked={method === "card"}
+                    onChange={() => setMethod("card")}
+                    label="Debit Cards"
+                    right={
+                      <div className="flex gap-2 items-center">
+                        <Image src="/master card.png" alt="Mastercard" width={36} height={36} />
+                        <Image src="/visapay.png" alt="Visa" width={36} height={36} />
+                        <button
+                          onClick={() => setShowPayment(true)}
+                          className="w-6 h-6 flex items-center justify-center border rounded-full"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    }
+                  />
+                  <RadioRow
+                    checked={(method as PaymentMethod) === "installment"}
+                    onChange={() => setMethod("installment")}
+                    label="Installment Payment"
+                  />
                 </div>
 
-                <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5 mt-6">
-                  <p className="mb-4 text-lg font-semibold">Shipping Method</p>
-                  <div className="space-y-3">
-                    {shippingMethods.map((m) => (
-                      <label key={m.id} className="flex items-center justify-between p-3 bg-neutral-100 rounded-lg cursor-pointer hover:bg-neutral-200">
-                        <div className="flex gap-3 items-center">
-                          <input
-                            type="radio"
-                            name="shipping"
-                            checked={selectedShippingMethod === m.id}
-                            onChange={() => setSelectedShippingMethod(m.id)}
-                            className="accent-red-500"
-                          />
-                          <div>
-                            <p className="font-medium text-sm">{m.name}</p>
-                            <p className="text-xs text-neutral-600">{m.description}</p>
+                <div className="my-6">
+                  <p className="mb-2 text-sm font-semibold">Billing Address</p>
+
+                  <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5">
+                    <p className="mb-4 text-lg font-semibold">Shipping Address</p>
+                    {activeOrder?.shippingAddress || shippingAddress ? (
+                      <div className="bg-neutral-100 rounded-xl p-3">
+                        <p className="text-sm font-medium">
+                          {activeOrder?.shippingAddress?.fullName || shippingAddress?.fullName}
+                        </p>
+                        <p className="text-xs text-neutral-600">
+                          {activeOrder?.shippingAddress?.streetLine1 || shippingAddress?.streetLine1}
+                        </p>
+                        <p className="text-xs text-neutral-600">
+                          {activeOrder?.shippingAddress?.city || shippingAddress?.city}
+                        </p>
+                        <AddressModal
+                          trigger={
+                            <button className="mt-2 text-xs text-red-500 hover:text-red-600">
+                              Change Address
+                            </button>
+                          }
+                          onSubmit={handleAddressSubmit}
+                        />
+                      </div>
+                    ) : (
+                      <AddressModal
+                        trigger={
+                          <button className="w-full py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600">
+                            Add Shipping Address
+                          </button>
+                        }
+                        onSubmit={handleAddressSubmit}
+                      />
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5 mt-6">
+                    <p className="mb-4 text-lg font-semibold">Shipping Method</p>
+                    <div className="space-y-3">
+                      {shippingMethods.map((m) => (
+                        <label
+                          key={m.id}
+                          className="flex items-center justify-between p-3 bg-neutral-100 rounded-lg cursor-pointer hover:bg-neutral-200"
+                        >
+                          <div className="flex gap-3 items-center">
+                            <input
+                              type="radio"
+                              name="shipping"
+                              checked={selectedShippingMethod === m.id}
+                              onChange={() => setSelectedShippingMethod(m.id)}
+                              className="accent-red-500"
+                            />
+                            <div>
+                              <p className="font-medium text-sm">{m.name}</p>
+                              <p className="text-xs text-neutral-600">{m.description}</p>
+                            </div>
                           </div>
-                        </div>
-                        <span className="text-sm font-semibold">{NGN.format(m.price / 100)}</span>
-                      </label>
-                    ))}
+                          <span className="text-sm font-semibold">{formatNaira(m.price)}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            <button onClick={() => router.push("/cart")} className="text-red-500 text-sm font-medium flex items-center gap-2">
+            <button
+              onClick={() => router.push("/cart")}
+              className="text-red-500 text-sm font-medium flex items-center gap-2"
+            >
               <Image src="/shopping-cart.png" alt="Back" width={16} height={16} /> Return to Cart
             </button>
 
             <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5 pt-8">
-              <h3 className="text-sm font-semibold mb-4 border-b border-[#d1d1d1] pb-4">Delivery & Products</h3>
+              <h3 className="text-sm font-semibold mb-4 border-b border-[#d1d1d1] pb-4">
+                Delivery & Products
+              </h3>
               <div className="flex flex-col gap-5">
                 <InfoRow icon="/truck.png" title="Delivery" text="1–9 business days" />
                 <InfoRow icon="/repeat.png" title="Returns" text="7-day return policy" />
@@ -370,7 +455,10 @@ const Page = () => {
                 {activeOrder?.lines?.map((ln) => (
                   <div key={ln.id} className="flex gap-3 items-start">
                     <Image
-                      src={ln.productVariant?.product?.featuredAsset?.preview || "/placeholder.png"}
+                      src={
+                        ln.productVariant?.product?.featuredAsset?.preview ||
+                        "/placeholder.png"
+                      }
                       alt="preview"
                       width={75}
                       height={75}
@@ -381,14 +469,27 @@ const Page = () => {
                       <p className="text-xs text-neutral-500">Category</p>
                       <div className="flex justify-between">
                         <div className="flex items-center gap-2 mt-2">
-                          <button className="w-4 h-4 border rounded-full text-xs" onClick={() => updateQuantity(ln.id, ln.quantity - 1)}>–</button>
+                          <button
+                            className="w-4 h-4 border rounded-full text-xs"
+                            onClick={() => updateQuantity(ln.id, ln.quantity - 1)}
+                          >
+                            –
+                          </button>
                           <span className="text-xs">{ln.quantity}</span>
-                          <button className="w-4 h-4 border rounded-full text-xs" onClick={() => updateQuantity(ln.id, ln.quantity + 1)}>+</button>
+                          <button
+                            className="w-4 h-4 border rounded-full text-xs"
+                            onClick={() => updateQuantity(ln.id, ln.quantity + 1)}
+                          >
+                            +
+                          </button>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-semibold">{NGN.format(ln.linePriceWithTax)}</p>
+                          <p className="text-sm font-semibold">
+                            {formatNaira(ln.linePriceWithTax)}
+                          </p>
                           <button className="text-xs text-red-500 flex items-center gap-1">
-                            Remove <Image src="/trash.png" alt="Remove" width={12} height={12} />
+                            Remove{" "}
+                            <Image src="/trash.png" alt="Remove" width={12} height={12} />
                           </button>
                         </div>
                       </div>
@@ -398,21 +499,46 @@ const Page = () => {
               </div>
 
               <div className="mt-4 border-t pt-4 space-y-2 text-sm">
-                <Row label="Subtotal" value={NGN.format(activeOrder?.subTotalWithTax ?? 0)} />
-                <Row label="Discount" value="- ₦1,011.87" />
-                <Row label="Shipping" value="₦252,000" />
+                <Row
+                  label="Subtotal"
+                  value={formatNaira(activeOrder?.subTotalWithTax ?? 0)}
+                />
+                <Row label="Discount" value="- ₦0" />
+                <Row label="Shipping" value="₦0" />
+                {method === "installment" && installmentPlan && (
+                  <>
+                    <Row
+                      label="Deposit (now)"
+                      value={NGN.format(installmentPlan.depositAmount)}
+                    />
+                    <Row
+                      label={`${installmentPlan.periods}× ${installmentPlan.frequency} repayments`}
+                      value={NGN.format(installmentPlan.repaymentAmount)}
+                    />
+                    <Row
+                      label="Insurance Fee (1%)"
+                      value={NGN.format(installmentPlan.insuranceFee)}
+                    />
+                  </>
+                )}
               </div>
 
               <div className="mt-3">
-                <Row big bold label="Grand Total" value={NGN.format(activeOrder?.totalWithTax ?? 0)} />
+                <Row
+                  big
+                  bold
+                  label="Grand Total"
+                  value={formatNaira(activeOrder?.totalWithTax ?? 0)}
+                />
               </div>
 
               <button
                 onClick={handleCheckout}
                 disabled={isPaying}
-                className={`mt-4 w-full py-3 rounded-full text-white text-sm font-medium ${isPaying ? "bg-red-300" : "bg-red-500 hover:bg-red-600"}`}
+                className={`mt-4 w-full py-3 rounded-full text-white text-sm font-medium ${isPaying ? "bg-red-300" : "bg-red-500 hover:bg-red-600"
+                  }`}
               >
-                {isPaying ? "Processing..." : "Checkout"}
+                {checkoutLabel}
               </button>
             </div>
           </aside>

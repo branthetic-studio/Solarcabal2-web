@@ -9,17 +9,18 @@ import { X, Eye, EyeOff } from "lucide-react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useUser } from "@/context/UserContext";
 import { GET_ACTIVE_ORDER } from "@/graphql/queries";
-import { MdEmail } from "react-icons/md";
 import { toast } from "sonner";
 import { FaGoogle } from "react-icons/fa";
 import { signIn } from "next-auth/react";
 
-// --- GraphQL Mutation for Register ---
+// ---------------------------------------------------------------------------
+// GraphQL
+// ---------------------------------------------------------------------------
 const REGISTER_MUTATION: TypedDocumentNode<
   {
     registerCustomerAccount:
-      | { __typename: "Success"; success: boolean }
-      | { __typename: "ErrorResult"; errorCode: string; message: string };
+    | { __typename: "Success"; success: boolean }
+    | { __typename: "ErrorResult"; errorCode: string; message: string };
   },
   {
     input: {
@@ -44,27 +45,37 @@ const REGISTER_MUTATION: TypedDocumentNode<
   }
 `;
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 type AuthModalProps = {
   trigger?: React.ReactNode;
-  open?: boolean; // controlled open
-  onOpenChange?: (open: boolean) => void; // controlled setter
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
-export default function AuthModal({ trigger, open: controlledOpen, onOpenChange }: AuthModalProps) {
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+export default function AuthModal({
+  trigger,
+  open: controlledOpen,
+  onOpenChange,
+}: AuthModalProps) {
   const apollo = useApolloClient();
-  const { login, loading: userLoading, customer } = useUser();
+  const { login, loading: userLoading } = useUser();
 
   // Tabs
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
 
-  // --- Login State ---
+  // Login state
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginErr, setLoginErr] = useState<string | null>(null);
   const [loginSubmitting, setLoginSubmitting] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
-  // --- Register State ---
+  // Register state
   const [registerForm, setRegisterForm] = useState({
     fullName: "",
     email: "",
@@ -73,26 +84,22 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
     referCode: "",
   });
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
-  const [
-    register,
-    { loading: registerLoading, error: registerError, data: registerData },
-  ] = useMutation(REGISTER_MUTATION);
+  const [register, { loading: registerLoading, error: registerError, data: registerData }] =
+    useMutation(REGISTER_MUTATION);
 
-  // --- Handlers ---
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginErr(null);
     setLoginSubmitting(true);
     try {
       await login(loginForm.email, loginForm.password, rememberMe);
-      toast("✅ Login successful");
-
+      toast.success("✅ Login successful");
       await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
-
-      // close modal on success
       onOpenChange?.(false);
     } catch (err: any) {
-      console.error(err);
       setLoginErr(err?.message ?? "Login failed");
     } finally {
       setLoginSubmitting(false);
@@ -115,6 +122,36 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
     });
   };
 
+  // Google just triggers NextAuth — UserProvider's useEffect handles the Vendure bridge
+  const handleGoogleSignIn = () => {
+    signIn("google");
+  };
+
+  // ---------------------------------------------------------------------------
+  // Shared UI elements
+  // ---------------------------------------------------------------------------
+  const GoogleButton = (
+    <button
+      type="button"
+      onClick={handleGoogleSignIn}
+      className="w-full flex items-center justify-center gap-2 rounded-full border border-gray-300 py-3 text-sm font-medium hover:bg-gray-50 transition-colors"
+    >
+      <FaGoogle className="text-[#4285F4]" />
+      Continue with Google
+    </button>
+  );
+
+  const Divider = (
+    <div className="flex items-center gap-3 my-2">
+      <div className="flex-1 border-t border-gray-200" />
+      <span className="text-gray-400 text-xs">or</span>
+      <div className="flex-1 border-t border-gray-200" />
+    </div>
+  );
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
     <Dialog.Root open={controlledOpen} onOpenChange={onOpenChange}>
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
@@ -127,12 +164,9 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
             <Dialog.Description>Log in or create an account to continue.</Dialog.Description>
           </VisuallyHidden>
 
-          {/* Close Button */}
+          {/* Close */}
           <Dialog.Close asChild>
-            <button
-              className="absolute right-4 top-4 text-gray-400 hover:text-black"
-              aria-label="Close"
-            >
+            <button className="absolute right-4 top-4 text-gray-400 hover:text-black" aria-label="Close">
               <X className="h-5 w-5" />
             </button>
           </Dialog.Close>
@@ -141,183 +175,182 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
           <div className="flex mb-6 border-b">
             <button
               onClick={() => setActiveTab("login")}
-              className={`flex-1 py-2 text-center ${
-                activeTab === "login" ? "border-b border-[#3C3C3C] font-semibold" : "text-gray-500"
-              }`}
+              className={`flex-1 py-2 text-center ${activeTab === "login" ? "border-b border-[#3C3C3C] font-semibold" : "text-gray-500"
+                }`}
             >
               Log in
             </button>
             <button
               onClick={() => setActiveTab("register")}
-              className={`flex-1 py-2 text-center ${
-                activeTab === "register" ? "border-b border-black font-light" : "text-gray-500"
-              }`}
+              className={`flex-1 py-2 text-center ${activeTab === "register" ? "border-b border-black font-light" : "text-gray-500"
+                }`}
             >
               Create Account
             </button>
           </div>
 
-          {/* Login Form */}
+          {/* LOGIN TAB */}
           {activeTab === "login" && (
-            <form onSubmit={handleLogin} className="flex flex-col gap-4">
-              <input
-                type="email"
-                placeholder="Enter Email"
-                value={loginForm.email}
-                onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                className="w-full rounded-full border px-4 py-3 focus:outline-none"
-                required
-              />
-              <div className="relative">
-                <input
-                  type={showLoginPassword ? "text" : "password"}
-                  placeholder="Password"
-                  value={loginForm.password}
-                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                  className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowLoginPassword(!showLoginPassword)}
-                  className="absolute right-3 top-3 text-gray-500"
-                >
-                  {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
+            <div className="flex flex-col gap-4">
+              {GoogleButton}
+              {Divider}
 
-              <label className="flex items-center text-sm">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="mr-2"
-                />
-                Keep me logged in
-              </label>
-
-              <a href="/forgot-password" className="text-red-600 hover:underline font-medium text-sm">
-                Forgot password?
-              </a>
-
-              <button
-                type="submit"
-                disabled={loginSubmitting || userLoading}
-                className="w-full rounded-full bg-red-600 py-3 text-white font-semibold disabled:opacity-60"
-              >
-                {loginSubmitting || userLoading ? "Logging in..." : "Sign in"}
-              </button>
-              {loginErr && <p className="text-red-500">{loginErr}</p>}
-            </form>
-          )}
-
-          {/* Register Form */}
-          {activeTab === "register" && (
-            <form onSubmit={handleRegister} className="flex flex-col gap-3">
-              {/* Name, Email, Password, Referral, Terms Checkbox */}
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-[#1C1C1C]">Full Name</label>
-                <input
-                  type="text"
-                  placeholder="Enter Full Name"
-                  value={registerForm.fullName}
-                  onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })}
-                  className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-[#1C1C1C]">Email</label>
+              <form onSubmit={handleLogin} className="flex flex-col gap-4">
                 <input
                   type="email"
                   placeholder="Enter Email"
-                  value={registerForm.email}
-                  onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                  className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
+                  value={loginForm.email}
+                  onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                  className="w-full rounded-full border px-4 py-3 focus:outline-none"
                   required
                 />
-              </div>
+                <div className="relative">
+                  <input
+                    type={showLoginPassword ? "text" : "password"}
+                    placeholder="Password"
+                    value={loginForm.password}
+                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                    className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    className="absolute right-3 top-3 text-gray-500"
+                  >
+                    {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
 
-              <div className="relative">
-                <label className="text-xs font-semibold text-[#1C1C1C]">Password</label>
-                <input
-                  type={showRegisterPassword ? "text" : "password"}
-                  placeholder="Password"
-                  value={registerForm.password}
-                  onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                  className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none"
-                  required
-                />
+                <label className="flex items-center text-sm">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="mr-2"
+                  />
+                  Keep me logged in
+                </label>
+
+                <a href="/forgot-password" className="text-red-600 hover:underline font-medium text-sm">
+                  Forgot password?
+                </a>
+
                 <button
-                  type="button"
-                  onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                  className="absolute right-3 top-3 text-gray-500"
+                  type="submit"
+                  disabled={loginSubmitting || userLoading}
+                  className="w-full rounded-full bg-red-600 py-3 text-white font-semibold disabled:opacity-60"
                 >
-                  {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {loginSubmitting || userLoading ? "Logging in..." : "Sign in"}
                 </button>
-              </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-[#1C1C1C]">Referral Code (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="Enter Referral Code"
-                  value={registerForm.referCode}
-                  onChange={(e) => setRegisterForm({ ...registerForm, referCode: e.target.value })}
-                  className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
-                />
-              </div>
+                {loginErr && <p className="text-red-500 text-sm">{loginErr}</p>}
+              </form>
 
-              <label className="flex items-center text-sm">
-                <input
-                  type="checkbox"
-                  checked={registerForm.agree}
-                  onChange={(e) => setRegisterForm({ ...registerForm, agree: e.target.checked })}
-                  className="mr-2"
-                />
-                <p className="text-xs">I agree to all </p>
-                <a href="#" className="underline font-medium ml-1 text-xs">Terms & Conditions</a>
-              </label>
-
-              <button
-                type="submit"
-                disabled={registerLoading || !registerForm.agree}
-                className="w-full rounded-full bg-red-600 py-2 text-white text-sm font-semibold disabled:opacity-60"
-              >
-                {registerLoading ? "Creating..." : "Create an Account"}
-              </button>
-
-              {registerError && <p className="text-red-500">{registerError.message}</p>}
-              {registerData?.registerCustomerAccount?.__typename === "Success" && (
-                <p className="text-green-600">
-                  Registered! Please check your email to verify your account.
-                </p>
-              )}
-
-              {/* Social login */}
-              <div className="flex items-center my-2">
-                <div className="flex-1 border-t" />
-                <span className="px-2 text-gray-500 text-sm">Or Sign Up with</span>
-                <div className="flex-1 border-t" />
-              </div>
-
-              <div className="flex gap-3">
-                <button type="button" className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-2 bg-black text-white text-xs">
-                  <MdEmail /> Email
+              <p className="text-center text-sm">
+                Don't have an account?{" "}
+                <button type="button" onClick={() => setActiveTab("register")} className="text-[#FF0000] font-medium">
+                  Create one
                 </button>
-                <button type="button" onClick={() => signIn("google")} className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-2 text-xs">
-                  <FaGoogle /> Continue with Google
-                </button>
-              </div>
+              </p>
+            </div>
+          )}
 
-              <p className="text-center text-sm mt-4">
+          {/* REGISTER TAB */}
+          {activeTab === "register" && (
+            <div className="flex flex-col gap-3">
+              {GoogleButton}
+              {Divider}
+
+              <form onSubmit={handleRegister} className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-[#1C1C1C]">Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="Enter Full Name"
+                    value={registerForm.fullName}
+                    onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })}
+                    className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-[#1C1C1C]">Email</label>
+                  <input
+                    type="email"
+                    placeholder="Enter Email"
+                    value={registerForm.email}
+                    onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                    className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="relative flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-[#1C1C1C]">Password</label>
+                  <input
+                    type={showRegisterPassword ? "text" : "password"}
+                    placeholder="Password"
+                    value={registerForm.password}
+                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                    className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                    className="absolute right-3 bottom-2 text-gray-500"
+                  >
+                    {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-[#1C1C1C]">Referral Code (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Enter Referral Code"
+                    value={registerForm.referCode}
+                    onChange={(e) => setRegisterForm({ ...registerForm, referCode: e.target.value })}
+                    className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+
+                <label className="flex items-center text-sm">
+                  <input
+                    type="checkbox"
+                    checked={registerForm.agree}
+                    onChange={(e) => setRegisterForm({ ...registerForm, agree: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-xs">I agree to all </span>
+                  <a href="#" className="underline font-medium ml-1 text-xs">Terms & Conditions</a>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={registerLoading || !registerForm.agree}
+                  className="w-full rounded-full bg-red-600 py-2 text-white text-sm font-semibold disabled:opacity-60"
+                >
+                  {registerLoading ? "Creating..." : "Create an Account"}
+                </button>
+
+                {registerError && <p className="text-red-500 text-sm">{registerError.message}</p>}
+                {registerData?.registerCustomerAccount?.__typename === "Success" && (
+                  <p className="text-green-600 text-sm">
+                    Registered! Please check your email to verify your account.
+                  </p>
+                )}
+              </form>
+
+              <p className="text-center text-sm mt-2">
                 Already have an account?{" "}
                 <button type="button" onClick={() => setActiveTab("login")} className="text-[#FF0000] font-medium">
                   Sign in
                 </button>
               </p>
-            </form>
+            </div>
           )}
         </Dialog.Content>
       </Dialog.Portal>

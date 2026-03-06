@@ -1,13 +1,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 
-/**
- * NextAuth configuration
- */
 const handler = NextAuth({
-  // ==============================
-  // Providers
-  // ==============================
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -15,55 +9,38 @@ const handler = NextAuth({
     }),
   ],
 
-  // ==============================
-  // Session Strategy
-  // ==============================
   session: {
-    strategy: "jwt", // Use JWT (recommended for App Router)
+    strategy: "jwt",
   },
 
-  // ==============================
-  // Security
-  // ==============================
   secret: process.env.NEXTAUTH_SECRET,
 
-  // ==============================
-  // Custom Pages (Optional)
-  // ==============================
   pages: {
-    signIn: "/", // You already use modal
-    error: "/", // Redirect errors to home
+    signIn: "/",
+    error: "/",
   },
 
-  // ==============================
-  // Callbacks
-  // ==============================
   callbacks: {
     /**
-     * Runs when JWT is created/updated
+     * Runs immediately after Google redirects back.
+     * We DON'T call Vendure here because this runs server-side —
+     * any Set-Cookie from Vendure would never reach the browser.
+     * Instead we store the id_token in the JWT and let the client
+     * call Vendure directly (see AuthModal useEffect).
      */
-    async jwt({ token, account, user }) {
-      // Save Google ID Token
+    async jwt({ token, account }) {
       if (account?.id_token) {
         token.googleToken = account.id_token;
       }
-
       return token;
     },
 
-    /**
-     * Make token available in session
-     */
     async session({ session, token }) {
       session.googleToken = token.googleToken as string | undefined;
-
       return session;
     },
   },
 
-  // ==============================
-  // Debug (Disable in Prod)
-  // ==============================
   debug: process.env.NODE_ENV === "development",
 });
 

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useSession } from "next-auth/react";
 import { GET_CURRENT_USER, LOGIN, LOGOUT } from "@/graphql/queries";
 import type {
   GetCurrentUserData,
@@ -12,12 +13,9 @@ import type {
 type UserCtx = {
   loading: boolean;
   customer: GetCurrentUserData["activeCustomer"] | null | undefined;
-  login: (
-    username: string,
-    password: string,
-    rememberMe?: boolean
-  ) => Promise<void>;
+  login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
+  refetchUser: () => Promise<void>;
 };
 
 const Ctx = createContext<UserCtx>({
@@ -25,16 +23,16 @@ const Ctx = createContext<UserCtx>({
   customer: undefined,
   login: async () => { },
   logout: async () => { },
+  refetchUser: async () => { },
 });
 
 export const useUser = () => useContext(Ctx);
 
 const UserProvider = ({ children }: { children: React.ReactNode }) => {
+  const { data: session } = useSession();
   const { data, loading, refetch } = useQuery<GetCurrentUserData>(
     GET_CURRENT_USER,
-    {
-      fetchPolicy: "network-only", // always fetch fresh user data
-    }
+    { fetchPolicy: "network-only" }
   );
 
   const [isActing, setIsActing] = useState(false);
@@ -49,39 +47,60 @@ const UserProvider = ({ children }: { children: React.ReactNode }) => {
     awaitRefetchQueries: true,
   });
 
-  const login = async (
-    username: string,
-    password: string,
-    rememberMe = true
-  ) => {
+  // ---------------------------------------------------------------------------
+  // Google → Vendure bridge
+  //
+  // Lives here (always mounted) instead of AuthModal (unmounted after redirect).
+  // Fires once per unique googleToken — the ref persists across re-renders.
+  // ---------------------------------------------------------------------------
+  const lastGoogleToken = useRef<string | null>(null);
+
+  useEffect(() => {
+    const googleToken = session?.googleToken;
+    if (!googleToken || googleToken === lastGoogleToken.current) return;
+
+    lastGoogleToken.current = googleToken; // deduplicate
+
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/google-login", {
+          method: "POST",
+          credentials: "include", // lets browser receive Vendure's Set-Cookie
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: googleToken }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          console.error("Vendure Google auth failed:", data.error);
+          return;
+        }
+
+        // Refresh Vendure session → triggers navbar/customer to update
+        await refetch();
+      } catch (err) {
+        console.error("Vendure Google auth error:", err);
+      }
+    })();
+  }, [session?.googleToken]);
+
+  // ---------------------------------------------------------------------------
+  // Login / Logout
+  // ---------------------------------------------------------------------------
+  const login = async (username: string, password: string, rememberMe = true) => {
     setIsActing(true);
     try {
-      console.log("🔵 LOGIN: Sending mutation...", { username, rememberMe });
-
       const res = await loginMut({
         variables: { username, password, rememberMe },
         context: { fetchOptions: { credentials: "include" } },
       });
 
-      console.log("🟢 LOGIN: Full response:", res);
-      console.log("🟢 LOGIN: Response data:", res.data);
-      console.log("🟢 LOGIN: Login payload:", res.data?.login);
-
       const payload: any = res.data?.login;
-
-      console.log("🟢 LOGIN: Payload __typename:", payload?.__typename);
-      console.log("🟢 LOGIN: Payload errorCode:", payload?.errorCode);
-      console.log("🟢 LOGIN: Payload message:", payload?.message);
-
       if (payload?.errorCode) {
-        console.error("❌ LOGIN: Error detected:", payload);
         throw new Error(payload?.message ?? "Login failed");
       }
-
-      console.log("✅ LOGIN: Success!");
-      // user data is refetched automatically via refetchQueries
     } catch (error) {
-      console.error("❌ LOGIN: Exception caught:", error);
       throw error;
     } finally {
       setIsActing(false);
@@ -100,12 +119,17 @@ const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const refetchUser = async () => {
+    await refetch();
+  };
+
   const value = useMemo<UserCtx>(
     () => ({
       loading: loading || isActing,
       customer: data?.activeCustomer,
       login,
       logout,
+      refetchUser,
     }),
     [loading, isActing, data]
   );
