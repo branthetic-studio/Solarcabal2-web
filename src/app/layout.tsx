@@ -7,6 +7,7 @@ import UserProvider from "@/context/UserContext";
 import FacetsProvider from "@/context/useFacet";
 import { Toaster } from "sonner";
 import LocalCartProvider from "@/context/LocalCartContext";
+import { ClerkProvider } from "@clerk/nextjs";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -26,19 +27,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} antialiased`}>
-        <Toaster position="top-right" expand={true} richColors closeButton />
-        <ApolloWrapper>
-          <UserProvider>
-            <FacetsProvider>
-              <LocalCartProvider>
-                <CartProvider>{children}</CartProvider>
-              </LocalCartProvider>
-            </FacetsProvider>
-          </UserProvider>
-        </ApolloWrapper>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body className={`${inter.variable} antialiased`}>
+          <Toaster position="top-right" expand={true} richColors closeButton />
+          <ApolloWrapper>
+            <UserProvider>
+              <FacetsProvider>
+                <LocalCartProvider>
+                  <CartProvider>{children}</CartProvider>
+                </LocalCartProvider>
+              </FacetsProvider>
+            </UserProvider>
+          </ApolloWrapper>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

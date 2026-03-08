@@ -11,7 +11,7 @@ import { useUser } from "@/context/UserContext";
 import { GET_ACTIVE_ORDER } from "@/graphql/queries";
 import { toast } from "sonner";
 import { FaGoogle } from "react-icons/fa";
-import { signIn } from "next-auth/react";
+import { useSignIn, useClerk, useAuth } from "@clerk/nextjs";
 
 // ---------------------------------------------------------------------------
 // GraphQL
@@ -45,18 +45,12 @@ const REGISTER_MUTATION: TypedDocumentNode<
   }
 `;
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 type AuthModalProps = {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 };
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 export default function AuthModal({
   trigger,
   open: controlledOpen,
@@ -65,8 +59,12 @@ export default function AuthModal({
   const apollo = useApolloClient();
   const { login, loading: userLoading } = useUser();
 
-  // Tabs
+  const { signIn } = useSignIn();
+  const { signOut } = useClerk();
+  const { isSignedIn } = useAuth();
+
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   // Login state
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
@@ -122,22 +120,56 @@ export default function AuthModal({
     });
   };
 
-  // Google just triggers NextAuth — UserProvider's useEffect handles the Vendure bridge
-  const handleGoogleSignIn = () => {
-    signIn("google");
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      // If Clerk already has a session (e.g. Vendure verification failed last time),
+      // sign out of Clerk first so we can restart the OAuth flow cleanly.
+      if (isSignedIn) {
+        await signOut();
+      }
+
+      if (!signIn) {
+        toast.error("Auth not ready, please try again.");
+        setGoogleLoading(false);
+        return;
+      }
+
+      const { error } = await signIn.sso({
+        strategy: "oauth_google",
+        redirectCallbackUrl: "/sso-callback",
+        redirectUrl: "/",
+      });
+
+      if (error) {
+        console.error("Google SSO error:", error);
+        toast.error("Google sign-in failed. Please try again.");
+        setGoogleLoading(false);
+      }
+      // On success the browser navigates away — don't reset googleLoading
+    } catch (err: any) {
+      console.error("Google OAuth error:", err);
+      toast.error(err?.errors?.[0]?.message ?? err?.message ?? "Google sign-in failed.");
+      setGoogleLoading(false);
+    }
   };
 
   // ---------------------------------------------------------------------------
-  // Shared UI elements
+  // Shared UI
   // ---------------------------------------------------------------------------
   const GoogleButton = (
     <button
       type="button"
       onClick={handleGoogleSignIn}
-      className="w-full flex items-center justify-center gap-2 rounded-full border border-gray-300 py-3 text-sm font-medium hover:bg-gray-50 transition-colors"
+      disabled={googleLoading}
+      className="w-full flex items-center justify-center gap-2 rounded-full border border-gray-300 py-3 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
     >
-      <FaGoogle className="text-[#4285F4]" />
-      Continue with Google
+      {googleLoading ? (
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+      ) : (
+        <FaGoogle className="text-[#4285F4]" />
+      )}
+      {googleLoading ? "Redirecting to Google..." : "Continue with Google"}
     </button>
   );
 
@@ -149,9 +181,6 @@ export default function AuthModal({
     </div>
   );
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
   return (
     <Dialog.Root open={controlledOpen} onOpenChange={onOpenChange}>
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
@@ -164,7 +193,6 @@ export default function AuthModal({
             <Dialog.Description>Log in or create an account to continue.</Dialog.Description>
           </VisuallyHidden>
 
-          {/* Close */}
           <Dialog.Close asChild>
             <button className="absolute right-4 top-4 text-gray-400 hover:text-black" aria-label="Close">
               <X className="h-5 w-5" />
@@ -175,15 +203,13 @@ export default function AuthModal({
           <div className="flex mb-6 border-b">
             <button
               onClick={() => setActiveTab("login")}
-              className={`flex-1 py-2 text-center ${activeTab === "login" ? "border-b border-[#3C3C3C] font-semibold" : "text-gray-500"
-                }`}
+              className={`flex-1 py-2 text-center ${activeTab === "login" ? "border-b border-[#3C3C3C] font-semibold" : "text-gray-500"}`}
             >
               Log in
             </button>
             <button
               onClick={() => setActiveTab("register")}
-              className={`flex-1 py-2 text-center ${activeTab === "register" ? "border-b border-black font-light" : "text-gray-500"
-                }`}
+              className={`flex-1 py-2 text-center ${activeTab === "register" ? "border-b border-black font-light" : "text-gray-500"}`}
             >
               Create Account
             </button>
@@ -194,7 +220,6 @@ export default function AuthModal({
             <div className="flex flex-col gap-4">
               {GoogleButton}
               {Divider}
-
               <form onSubmit={handleLogin} className="flex flex-col gap-4">
                 <input
                   type="email"
@@ -221,7 +246,6 @@ export default function AuthModal({
                     {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-
                 <label className="flex items-center text-sm">
                   <input
                     type="checkbox"
@@ -231,11 +255,9 @@ export default function AuthModal({
                   />
                   Keep me logged in
                 </label>
-
                 <a href="/forgot-password" className="text-red-600 hover:underline font-medium text-sm">
                   Forgot password?
                 </a>
-
                 <button
                   type="submit"
                   disabled={loginSubmitting || userLoading}
@@ -243,10 +265,8 @@ export default function AuthModal({
                 >
                   {loginSubmitting || userLoading ? "Logging in..." : "Sign in"}
                 </button>
-
                 {loginErr && <p className="text-red-500 text-sm">{loginErr}</p>}
               </form>
-
               <p className="text-center text-sm">
                 Don't have an account?{" "}
                 <button type="button" onClick={() => setActiveTab("register")} className="text-[#FF0000] font-medium">
@@ -261,7 +281,6 @@ export default function AuthModal({
             <div className="flex flex-col gap-3">
               {GoogleButton}
               {Divider}
-
               <form onSubmit={handleRegister} className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-semibold text-[#1C1C1C]">Full Name</label>
@@ -274,7 +293,6 @@ export default function AuthModal({
                     required
                   />
                 </div>
-
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-semibold text-[#1C1C1C]">Email</label>
                   <input
@@ -286,7 +304,6 @@ export default function AuthModal({
                     required
                   />
                 </div>
-
                 <div className="relative flex flex-col gap-1">
                   <label className="text-xs font-semibold text-[#1C1C1C]">Password</label>
                   <input
@@ -305,7 +322,6 @@ export default function AuthModal({
                     {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-semibold text-[#1C1C1C]">Referral Code (Optional)</label>
                   <input
@@ -316,7 +332,6 @@ export default function AuthModal({
                     className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
                   />
                 </div>
-
                 <label className="flex items-center text-sm">
                   <input
                     type="checkbox"
@@ -327,7 +342,6 @@ export default function AuthModal({
                   <span className="text-xs">I agree to all </span>
                   <a href="#" className="underline font-medium ml-1 text-xs">Terms & Conditions</a>
                 </label>
-
                 <button
                   type="submit"
                   disabled={registerLoading || !registerForm.agree}
@@ -335,7 +349,6 @@ export default function AuthModal({
                 >
                   {registerLoading ? "Creating..." : "Create an Account"}
                 </button>
-
                 {registerError && <p className="text-red-500 text-sm">{registerError.message}</p>}
                 {registerData?.registerCustomerAccount?.__typename === "Success" && (
                   <p className="text-green-600 text-sm">
@@ -343,7 +356,6 @@ export default function AuthModal({
                   </p>
                 )}
               </form>
-
               <p className="text-center text-sm mt-2">
                 Already have an account?{" "}
                 <button type="button" onClick={() => setActiveTab("login")} className="text-[#FF0000] font-medium">
@@ -352,6 +364,9 @@ export default function AuthModal({
               </p>
             </div>
           )}
+
+          {/* Required by Clerk for bot protection on custom flows */}
+          <div id="clerk-captcha" />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

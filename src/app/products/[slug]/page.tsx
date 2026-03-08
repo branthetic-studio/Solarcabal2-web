@@ -471,9 +471,9 @@ const ProductDetailsPage = () => {
                   </button>
 
 
-                  {/* <button className=" flex-1 bg-[#ff0000] text-white py-3 rounded-lg font-medium hover:bg-[#751c1c] transition-colors cursor-pointer">
+                  <button className=" flex-1 bg-[#ff0000] text-white py-3 rounded-lg font-medium hover:bg-[#751c1c] transition-colors cursor-pointer">
                     Pay Later
-                  </button> */}
+                  </button>
                 </div>
 
 
