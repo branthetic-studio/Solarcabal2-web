@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import Image from "next/image";
 import {
@@ -11,24 +13,42 @@ import { TbBrandX } from "react-icons/tb";
 
 const Suscribe = () => {
   const [checked, setChecked] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    if (!checked) {
+      e.preventDefault();
+      return;
+    }
+  };
+
   return (
-   <div className="bg-[#1C1C1C] w-full py-12 md:py-16 px-4 sm:px-6 md:px-12 lg:px-20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 text-left">
+    <div className="bg-[#1C1C1C] w-full py-12 md:py-16 px-4 sm:px-6 md:px-12 lg:px-20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 text-left">
 
-
-      <div className="">
-        <Image src="/full logo.png" alt="Logo" className="object-contain" width={180} height={180} />
+      {/* Logo */}
+      <div>
+        <Image
+          src="/full logo.png"
+          alt="Logo"
+          className="object-contain"
+          width={180}
+          height={180}
+        />
       </div>
 
+      {/* Subscribe Section */}
       <div className="pr-16">
-        <h3 className="text-lg md:text-lg font-bold text-white mb-4 text-left">
+        <h3 className="text-lg md:text-lg font-bold text-white mb-4">
           Subscribe to our Newsletter
         </h3>
 
-        <p className="text-sm text-gray-300 mb-8 max-w-2xl text-left">
+        <p className="text-sm text-gray-300 mb-8 max-w-2xl">
           Subscribe to our newsletter to receive updates
         </p>
 
-        <form className="flex flex-col sm:flex-row items-left md:items:center justify-start gap-4 max-w-xl">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col sm:flex-row items-left md:items:center justify-start gap-4 max-w-xl"
+        >
           <input
             type="email"
             placeholder="Enter your email address"
@@ -38,13 +58,18 @@ const Suscribe = () => {
 
           <button
             type="submit"
-            className="px-8 py-3 bg-[#FF0000] text-center md:text-left text-white rounded-full text-xs hover:bg-gray-900 transition"
+            disabled={!checked}
+            className={`px-8 py-3 text-center md:text-left text-white rounded-full text-xs transition
+            ${checked
+                ? "bg-[#FF0000] hover:bg-gray-900 cursor-pointer"
+                : "bg-gray-500 cursor-not-allowed opacity-60"
+              }`}
           >
             Subscribe
           </button>
         </form>
 
-        {/* Checkbox Section */}
+        {/* Checkbox */}
         <div className="flex items-start gap-3 mt-6">
           <input
             type="checkbox"
@@ -54,13 +79,12 @@ const Suscribe = () => {
             className="h-4 w-4 mt-1 accent-[#ED544E] cursor-pointer"
           />
 
-          <div className="text-gray-300 text-sm text-left leading-snug">
+          <div className="text-gray-300 text-sm leading-snug">
             <p>
-              I agree to SolarCabal’s Privacy and Cookie Policy. You can unsubscribe
-              from newsletters at any time.
+              I agree to SolarCabal’s Privacy and Cookie Policy. You can
+              unsubscribe from newsletters at any time.
             </p>
 
-            {/* Legal terms link that turns red when checked */}
             <p
               className={`mt-1 cursor-pointer ${checked ? "text-[#ED544E]" : "text-gray-400"
                 }`}
@@ -71,72 +95,67 @@ const Suscribe = () => {
         </div>
       </div>
 
-
+      {/* App Section */}
       <div>
         <section className="text-white">
-
           <div className="mx-auto text-center md:text-left">
 
-            {/* Header */}
-            <h2 className="text-left md:text-left font-semibold mb-10">
+            <h2 className="font-semibold mb-10">
               Download the SolarCabal App
             </h2>
 
-            {/* Features Grid */}
+            {/* Features */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-2 gap-x-8 text-gray-300 mb-6">
-              <p className="flex items-center gap-3 text-sm md:text-sm">
-                <span><Image src="/down arrow.png" alt="sales" width={20} height={20} /></span> Sales alerts
-              </p>
-              <p className="flex items-center gap-3 text-sm md:text-sm">
-                <span><Image src="/truck-fast.png" alt="sales" width={20} height={20} /></span> Track orders any time
+              <p className="flex items-center gap-3 text-sm">
+                <Image src="/down arrow.png" alt="sales" width={20} height={20} />
+                Sales alerts
               </p>
 
-              <p className="flex items-center gap-3 text-sm md:text-sm">
-                <span><Image src="/tag.png" alt="sales" width={20} height={20} /></span> Coupons & offers
-              </p>
-              <p className="flex items-center gap-3 text-sm md:text-sm">
-                <span><Image src="/ticket-discount.png" alt="sales" width={20} height={20} /></span> Exclusive offers
+              <p className="flex items-center gap-3 text-sm">
+                <Image src="/truck-fast.png" alt="sales" width={20} height={20} />
+                Track orders any time
               </p>
 
-              <p className="flex items-center gap-3 text-sm md:text-sm">
-                <span><Image src="/security-safe.png" alt="sales" width={20} height={20} /></span> Quicker, safer checkout
+              <p className="flex items-center gap-3 text-sm">
+                <Image src="/tag.png" alt="sales" width={20} height={20} />
+                Coupons & offers
               </p>
-              <p className="flex items-center gap-3 text-sm md:text-sm">
-                <span><Image src="/timer.png" alt="sales" width={20} height={20} /></span> Low stock items alerts
+
+              <p className="flex items-center gap-3 text-sm">
+                <Image src="/ticket-discount.png" alt="sales" width={20} height={20} />
+                Exclusive offers
+              </p>
+
+              <p className="flex items-center gap-3 text-sm">
+                <Image src="/security-safe.png" alt="sales" width={20} height={20} />
+                Quicker, safer checkout
+              </p>
+
+              <p className="flex items-center gap-3 text-sm">
+                <Image src="/timer.png" alt="sales" width={20} height={20} />
+                Low stock items alerts
               </p>
             </div>
 
-            {/* App Store Buttons */}
+            {/* Store Buttons */}
             <div className="flex flex-col sm:flex-row items-start gap-5 mb-6">
 
-              {/* Apple Store */}
               <a
                 href="#"
                 className="flex items-center gap-3 border border-gray-500 px-6 py-3 rounded-full"
               >
-                <Image
-                  src="/apple-icon.png"
-                  alt="Apple"
-                  width={30}
-                  height={30}
-                />
+                <Image src="/apple-icon.png" alt="Apple" width={30} height={30} />
                 <div className="text-left leading-tight">
                   <p className="text-xs text-gray-300">Download on the</p>
                   <p className="text-md font-semibold">App Store</p>
                 </div>
               </a>
 
-              {/* Google Play */}
               <a
                 href="#"
-                className="flex items-center gap-3 border border-gray-500 px-6 py-3 rounded-full "
+                className="flex items-center gap-3 border border-gray-500 px-6 py-3 rounded-full"
               >
-                <Image
-                  src="/googleplay-icon.png"
-                  alt="Google Play"
-                  width={30}
-                  height={30}
-                />
+                <Image src="/googleplay-icon.png" alt="Google Play" width={30} height={30} />
                 <div className="text-left leading-tight">
                   <p className="text-xs text-gray-300">Get it on</p>
                   <span className="text-md font-semibold">Google Play</span>
@@ -147,9 +166,9 @@ const Suscribe = () => {
 
             {/* Social Media */}
             <div>
-              <h3 className="text-md text-left md:text-left font-semibold mb-4">Connect with us</h3>
-              <div className="flex items-start gap-6 text-2xl">
+              <h3 className="text-md font-semibold mb-4">Connect with us</h3>
 
+              <div className="flex items-start gap-6 text-2xl">
                 <a href="#" className="hover:text-red-500 transition">
                   <FaInstagram />
                 </a>
@@ -173,14 +192,11 @@ const Suscribe = () => {
                 <a href="#" className="hover:text-red-500 transition">
                   <FaYoutube />
                 </a>
-
               </div>
             </div>
 
           </div>
-
         </section>
-
       </div>
     </div>
   );
