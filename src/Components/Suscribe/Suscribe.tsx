@@ -99,7 +99,7 @@ const Suscribe = () => {
       {/* App Section */}
       <div>
         <section className="text-white">
-          <div className="mx-auto text-center md:text-left">
+          <div className="mx-auto text-left md:text-center">
 
             <h2 className="font-semibold mb-10">
               Download the SolarCabal App

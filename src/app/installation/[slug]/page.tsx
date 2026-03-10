@@ -541,11 +541,11 @@ export default function InstallationListingPage() {
                 )}
 
                 {/* ✅ Add to Cart / Buy Now */}
-                <div className="mt-6 flex items-center justify-between w-100 gap-6">
+                <div className="mt-6 flex items-center justify-between w-100 gap-6 px-4">
                   <button
                     onClick={handleAddToCart}
                     disabled={addingToCart || !activeVariant}
-                    className="w-full rounded-lg border-2 border-neutral-900 bg-white text-neutral-900 py-2 px-2 text-sm font-semibold hover:bg-neutral-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full rounded-lg border-2 border-neutral-900 bg-white text-neutral-900 py-2 px-2 text-xs md:text-sm font-semibold hover:bg-neutral-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {addingToCart ? "Adding…" : "Add to Cart"}
                   </button>
