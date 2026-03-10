@@ -8,6 +8,7 @@ import {
   FaLinkedinIn,
   FaTiktok,
   FaYoutube,
+  FaTelegram
 } from "react-icons/fa";
 import { TbBrandX } from "react-icons/tb";
 
@@ -169,28 +170,32 @@ const Suscribe = () => {
               <h3 className="text-md font-semibold mb-4">Connect with us</h3>
 
               <div className="flex items-start gap-6 text-2xl">
-                <a href="#" className="hover:text-red-500 transition">
+                <a href="https://www.instagram.com/solarcabal?igsh=MWk1dG52NW1lMmZibQ==" className="hover:text-red-500 transition">
                   <FaInstagram />
                 </a>
 
-                <a href="#" className="hover:text-red-500 transition">
+                <a href="https://www.facebook.com/share/1ZtkqQW2Zn/" className="hover:text-red-500 transition">
                   <FaFacebookF />
                 </a>
 
-                <a href="#" className="hover:text-red-500 transition">
+                <a href="https://x.com/solarcabal" className="hover:text-red-500 transition">
                   <TbBrandX />
                 </a>
 
-                <a href="#" className="hover:text-red-500 transition">
+                <a href="https://www.linkedin.com/company/solarcabal/" className="hover:text-red-500 transition">
                   <FaLinkedinIn />
                 </a>
 
-                <a href="#" className="hover:text-red-500 transition">
+                <a href="https://www.tiktok.com/@solarcabal?_r=1&_t=ZS-94YaOytJ4NE" className="hover:text-red-500 transition">
                   <FaTiktok />
                 </a>
 
-                <a href="#" className="hover:text-red-500 transition">
+                <a href="https://youtube.com/@solarcabalofficial?si=JAfmZVPqMJ3RPFZS" className="hover:text-red-500 transition">
                   <FaYoutube />
+                </a>
+
+                <a href="https://t.me/solarcabal" className="hover:text-red-500 transition">
+                  <FaTelegram />
                 </a>
               </div>
             </div>

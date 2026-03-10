@@ -456,7 +456,11 @@ export default function CartPage() {
             <div className="mt-4 rounded-xl border border-neutral-200 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold">Delivery Details</p>
-                <button className="inline-flex items-center gap-1 text-xs hover:text-red-700">
+
+                <button
+                  onClick={() => router.push("/Accounts")}
+                  className="inline-flex items-center gap-1 text-xs hover:text-red-700"
+                >
                   Change{" "}
                   <Image
                     src="/edit-rectangle.png"
