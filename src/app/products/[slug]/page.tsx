@@ -151,9 +151,6 @@ const ProductDetailsPage = () => {
         productVariantId: selectedVariant.id,
         quantity,
       });
-
-      // optional: show toast / open mini-cart
-      // toast.success("Added to cart");
     } catch (e) {
       console.error(e);
       alert("Could not add to cart");
@@ -162,27 +159,43 @@ const ProductDetailsPage = () => {
     }
   };
 
-
   const handleBuyNow = async () => {
     if (!selectedVariant) {
       alert("Please select a variant");
       return;
     }
-
     setIsAdding(true);
-
     try {
       await addToCartMutation({
         productVariantId: selectedVariant.id,
         quantity,
       });
-
-      // Redirect immediately to checkout
       router.push("/checkout");
-
     } catch (e) {
       console.error(e);
       alert("Could not process Buy Now");
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  // ✅ Pay Later: adds to cart then navigates to /checkout?method=installment
+  // The checkout page reads this param and pre-selects the installment payment option
+  const handlePayLater = async () => {
+    if (!selectedVariant) {
+      alert("Please select a variant");
+      return;
+    }
+    setIsAdding(true);
+    try {
+      await addToCartMutation({
+        productVariantId: selectedVariant.id,
+        quantity,
+      });
+      router.push("/checkout?method=installment");
+    } catch (e) {
+      console.error(e);
+      alert("Could not process Pay Later");
     } finally {
       setIsAdding(false);
     }
@@ -205,7 +218,6 @@ const ProductDetailsPage = () => {
     }
   );
 
-  // initialize selectedVariant when data arrives
   React.useEffect(() => {
     if (
       data?.product?.variants &&
@@ -262,11 +274,6 @@ const ProductDetailsPage = () => {
         slug: variant!.product!.slug,
       }));
   }, [product]);
-
-  /* ---------- Quantity helpers ---------- */
-  const increaseQuantity = () => setQuantity((prev) => prev + 1);
-  const decreaseQuantity = () =>
-    setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
 
   /* ---------- Price formatting ---------- */
   const currentPrice =
@@ -356,10 +363,11 @@ const ProductDetailsPage = () => {
                   <button
                     key={index}
                     onClick={() => setSelectedImage(index)}
-                    className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 p-2 ${selectedImage === index
-                      ? "border-[#00AAFF]"
-                      : "border-gray-200"
-                      }`}
+                    className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 p-2 ${
+                      selectedImage === index
+                        ? "border-[#00AAFF]"
+                        : "border-gray-200"
+                    }`}
                   >
                     <img
                       src={image}
@@ -406,10 +414,11 @@ const ProductDetailsPage = () => {
                       <button
                         key={variant.id}
                         onClick={() => setSelectedVariant(variant)}
-                        className={`px-4 py-2 border rounded-lg text-sm font-medium transition-colors ${selectedVariant?.id === variant.id
-                          ? "border-blue-500 bg-blue-50 text-blue-700"
-                          : "border-gray-300 hover:bg-gray-50"
-                          }`}
+                        className={`px-4 py-2 border rounded-lg text-sm font-medium transition-colors ${
+                          selectedVariant?.id === variant.id
+                            ? "border-blue-500 bg-blue-50 text-blue-700"
+                            : "border-gray-300 hover:bg-gray-50"
+                        }`}
                       >
                         {variant.name}
                       </button>
@@ -425,39 +434,15 @@ const ProductDetailsPage = () => {
                 </div>
               )}
 
-              <p>
-                {product.description}
-              </p>
+              <p>{product.description}</p>
 
-              {/* Quantity and Add to Cart */}
+              {/* Action Buttons */}
               <div className="space-y-4">
-                {/* <div className="flex items-center gap-4">
-                  <label className="text-gray-700 font-medium">Quantity:</label>
-                  <div className="flex items-center border border-gray-300 rounded-lg">
-                    <button
-                      onClick={decreaseQuantity}
-                      className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-l-lg"
-                    >
-                      -
-                    </button>
-                    <span className="px-4 py-2 min-w-[60px] text-center border-x border-gray-300">
-                      {quantity}
-                    </span>
-                    <button
-                      onClick={increaseQuantity}
-                      className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-r-lg"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div> */}
-
                 <div className="flex flex-col md:flex-row gap-2 md:gap-4">
-
                   <button
                     onClick={handleAddToCart}
                     disabled={isAdding || !selectedVariant}
-                    className="flex-1 border-2 border-[#242425] text-[#242425] py-3 px-6 rounded-lg font-medium cursor-pointer transition-colors"
+                    className="flex-1 border-2 border-[#242425] text-[#242425] py-3 px-6 rounded-lg font-medium cursor-pointer transition-colors disabled:opacity-50"
                   >
                     {isAdding ? "Adding..." : "Add to Cart"}
                   </button>
@@ -470,16 +455,16 @@ const ProductDetailsPage = () => {
                     {isAdding ? "Processing..." : "Buy Now"}
                   </button>
 
-
-                  <button className=" flex-1 bg-[#ff0000] text-white py-3 rounded-lg font-medium hover:bg-[#751c1c] transition-colors cursor-pointer">
-                    Pay Later
+                  {/* ✅ FIXED: calls handlePayLater → /checkout?method=installment */}
+                  <button
+                    onClick={handlePayLater}
+                    disabled={isAdding || !selectedVariant}
+                    className="flex-1 bg-[#ff0000] text-white py-3 rounded-lg font-medium hover:bg-[#751c1c] transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isAdding ? "Processing..." : "Pay Later"}
                   </button>
                 </div>
-
-
               </div>
-
-
             </div>
           </div>
         </div>
@@ -493,10 +478,11 @@ const ProductDetailsPage = () => {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
-                      ? "border-black text-black"
-                      : "border-transparent text-gray-500 hover:text-gray-700"
-                      }`}
+                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === tab
+                        ? "border-black text-black"
+                        : "border-transparent text-gray-500 hover:text-gray-700"
+                    }`}
                   >
                     {tab}
                   </button>
@@ -578,20 +564,15 @@ function LocalProductCard({
   product: ProductDetails;
 }) {
   if (status === "Reviews") {
-    // Simple placeholder reviews section (keeps UI light)
-
     const totalReviews = ratingData.reduce((a, b) => a + b.count, 0);
     const [isOpen, setIsOpen] = useState(false);
     return (
-      <div className=" space-y-8">
+      <div className="space-y-8">
 
         {/* ===== Rating Summary ===== */}
         <div className="flex gap-10 border border-[#E4E9EE] rounded-xl p-6">
-
-          {/* Average Rating */}
           <div className="flex gap-3 items-center min-w-40">
             <div className="relative w-20 h-20 flex items-center justify-center">
-              {/* Circular ring */}
               <svg className="absolute inset-0" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -602,13 +583,8 @@ function LocalProductCard({
                   strokeWidth="6"
                 />
               </svg>
-
-              {/* Rating text */}
-              <span className="text-3xl font-semibold text-gray-800">
-                4.8
-              </span>
+              <span className="text-3xl font-semibold text-gray-800">4.8</span>
             </div>
-
             <div>
               <div className="flex mt-1">
                 {[1, 2, 3, 4, 5].map((i) => (
@@ -621,22 +597,19 @@ function LocalProductCard({
             </div>
           </div>
 
-          {/* Rating Breakdown */}
           <div className="flex-1 space-y-2">
-            {/* const [isOpen, setIsOpen] = useState(false); */}
             {ratingData.map((r) => (
               <div key={r.stars} className="flex items-center gap-3">
-                <span className="flex gap-1 w-8 text-sm">{r.stars}.0<Star className="w-5 h-5 fill-[#FFA133] text-[#FFA133]" /></span>
-
+                <span className="flex gap-1 w-8 text-sm">
+                  {r.stars}.0
+                  <Star className="w-5 h-5 fill-[#FFA133] text-[#FFA133]" />
+                </span>
                 <div className="flex-1 h-2 bg-gray-200 rounded">
                   <div
                     className="h-2 bg-black rounded"
-                    style={{
-                      width: `${(r.count / totalReviews) * 100}%`,
-                    }}
+                    style={{ width: `${(r.count / totalReviews) * 100}%` }}
                   />
                 </div>
-
                 <span className="w-12 text-sm text-right text-gray-500">
                   {r.count}
                 </span>
@@ -647,8 +620,6 @@ function LocalProductCard({
 
         {/* ===== Reviews Section ===== */}
         <div className="grid grid-cols-12 gap-8">
-
-          {/* Filters */}
           <aside className="col-span-2 space-y-6 text-[#818B9C]">
             <div>
               <h3 className="mb-3 text-black">Rating</h3>
@@ -659,7 +630,6 @@ function LocalProductCard({
                 </label>
               ))}
             </div>
-
             <div>
               <h3 className="text-black mb-3">Review Topics</h3>
               {["Product Quality", "Product Price", "Shipment"].map((t) => (
@@ -671,93 +641,83 @@ function LocalProductCard({
             </div>
           </aside>
 
-          {/* Review List */}
           <div className="col-span-10 space-y-6">
-            <>
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="space-y-4">
-                  <h2 className="text-xl font-semibold">Review Lists</h2>
-
-                  <div className="flex gap-3">
-                    <button className="px-4 py-2 bg-red-500 text-white rounded-lg">
-                      All Reviews
-                    </button>
-                    <button className="px-4 py-2 border rounded-lg">
-                      With Photo & Video
-                    </button>
-                    <button className="px-4 py-2 border rounded-lg">
-                      With Description
-                    </button>
-                  </div>
+            <div className="flex items-center justify-between mb-6">
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold">Review Lists</h2>
+                <div className="flex gap-3">
+                  <button className="px-4 py-2 bg-red-500 text-white rounded-lg">
+                    All Reviews
+                  </button>
+                  <button className="px-4 py-2 border rounded-lg">
+                    With Photo & Video
+                  </button>
+                  <button className="px-4 py-2 border rounded-lg">
+                    With Description
+                  </button>
                 </div>
-
-                <button
-                  onClick={() => setIsOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg"
-                >
-                  <Image src="/Edit Square.png" alt="Write a review" width={18} height={18} /> Write a review
-                </button>
               </div>
+              <button
+                onClick={() => setIsOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg"
+              >
+                <Image src="/Edit Square.png" alt="Write a review" width={18} height={18} />
+                Write a review
+              </button>
+            </div>
 
-              {/* Popup */}
-              {isOpen && <ReviewModal onClose={() => setIsOpen(false)} />}
-            </>
-
+            {isOpen && <ReviewModal onClose={() => setIsOpen(false)} />}
 
             {reviews.map((review) => (
-
               <div
                 key={review.id}
                 className="border-b border-[#E4E9EE] flex justify-between pb-6 space-y-3"
               >
-
-
                 <div className="flex flex-col gap-3">
                   <div className="flex gap-1">
                     {[1, 2, 3, 4, 5].map((i) => (
                       <Star
                         key={i}
-                        className={`w-4 h-4 ${i <= review.rating
-                          ? "fill-[#FFA133] text-[#FFA133]"
-                          : "text-gray-300"
-                          }`}
+                        className={`w-4 h-4 ${
+                          i <= review.rating
+                            ? "fill-[#FFA133] text-[#FFA133]"
+                            : "text-gray-300"
+                        }`}
                       />
                     ))}
                   </div>
-
                   <div>
                     <p className="text-sm text-gray-700">{review.text}</p>
                     <p className="text-xs text-gray-500">{review.date}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <img src={review.image} alt={review.name} className="w-8 h-8 object-cover rounded-full" />
+                    <img
+                      src={review.image}
+                      alt={review.name}
+                      className="w-8 h-8 object-cover rounded-full"
+                    />
                     <p className="font-semibold">{review.name}</p>
                   </div>
-
                 </div>
-
                 <div className="flex gap-1">
                   <button className="text-sm hover:bg-gray-100">
-                    <div className="flex items-center border p-2 border-[#d7d7d7] rounded-sm gap-1 ">
-                      <Image src="/like.png" alt="Like" width={18} height={18} /> {review.likes}
+                    <div className="flex items-center border p-2 border-[#d7d7d7] rounded-sm gap-1">
+                      <Image src="/like.png" alt="Like" width={18} height={18} />
+                      {review.likes}
                     </div>
                   </button>
-
                   <button className="text-sm hover:bg-gray-100">
-                    <div className="flex items-center border p-2 border-[#d7d7d7] rounded-sm gap-1 ">
-                      <Image src="/dislike.png" alt="Like" width={18} height={18} /> {review.dislikes}
+                    <div className="flex items-center border p-2 border-[#d7d7d7] rounded-sm gap-1">
+                      <Image src="/dislike.png" alt="Dislike" width={18} height={18} />
+                      {review.dislikes}
                     </div>
                   </button>
                 </div>
-
-
               </div>
             ))}
           </div>
         </div>
       </div>
-
     );
   }
 
@@ -775,7 +735,6 @@ function LocalProductCard({
 
   return (
     <div className="space-y-6">
-      {/* Description */}
       {product.description && (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -785,7 +744,6 @@ function LocalProductCard({
         </div>
       )}
 
-      {/* Specs */}
       {specs.length > 0 && (
         <div className="w-full">
           <h3 className="text-lg font-semibold text-gray-900 mb-3">
@@ -818,57 +776,38 @@ function ReviewModal({ onClose }: ReviewModalProps) {
   const [rating, setRating] = useState<number>(0);
   const [submitted, setSubmitted] = useState<boolean>(false);
 
-  // Auto-close 1 second after success
   useEffect(() => {
     if (submitted) {
       const timer = setTimeout(() => {
         onClose();
       }, 1000);
-
       return () => clearTimeout(timer);
     }
   }, [submitted, onClose]);
 
   const handleSubmit = () => {
-    // normally you'd submit to API here
     setSubmitted(true);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/50"
         onClick={!submitted ? onClose : undefined}
       />
-
-      {/* Modal */}
       <div className="relative bg-white rounded-xl p-4 w-full max-w-md z-10">
         {!submitted ? (
           <>
-            {/* Header */}
             <div className="flex justify-between mb-6">
               <h3 className="text-lg font-semibold">Review</h3>
               <button onClick={onClose}>
-                <Image
-                  src="/close-circle.png"
-                  alt="Close"
-                  width={22}
-                  height={22}
-                />
+                <Image src="/close-circle.png" alt="Close" width={22} height={22} />
               </button>
             </div>
-
-            {/* Rating */}
             <div className="mb-4">
               <h3 className="text-xs mb-1">Rating</h3>
-              <StarRating
-                value={rating}
-                onChange={(value) => setRating(value)}
-              />
+              <StarRating value={rating} onChange={(value) => setRating(value)} />
             </div>
-
-            {/* Comment */}
             <div className="grid gap-2">
               <label className="text-xs text-[#15171C]">
                 Leave your comments here for other customers
@@ -879,8 +818,6 @@ function ReviewModal({ onClose }: ReviewModalProps) {
                 placeholder="Comment"
               />
             </div>
-
-            {/* Submit */}
             <div className="flex justify-end mt-4">
               <button
                 onClick={handleSubmit}
@@ -892,17 +829,9 @@ function ReviewModal({ onClose }: ReviewModalProps) {
             </div>
           </>
         ) : (
-          /* Success state */
           <div className="flex flex-col items-center justify-center py-10 gap-4">
-            <Image
-              src="/tick-circle.png" // your success image
-              alt="Success"
-              width={80}
-              height={80}
-            />
-            <p className="text-sm font-medium text-gray-700">
-              Successful
-            </p>
+            <Image src="/tick-circle.png" alt="Success" width={80} height={80} />
+            <p className="text-sm font-medium text-gray-700">Successful</p>
           </div>
         )}
       </div>

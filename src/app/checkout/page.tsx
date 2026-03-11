@@ -6,7 +6,7 @@ import Image from "next/image";
 import PaymentScreens from "@/Components/payment/PaymentScreens";
 import { Plus } from "lucide-react";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { gql } from "@apollo/client";
 import Suscribe from "@/Components/Suscribe/Suscribe";
@@ -26,7 +26,9 @@ import {
 } from "@/graphql/queries";
 
 /* ------------------- Types ------------------- */
-type PaymentMethod = "bank" | "card" | "installment";
+
+// ✅ Use string so TypeScript never narrows it to a subset of the union
+type PaymentMethod = string;
 
 type ActiveOrderLine = {
   id: string;
@@ -62,23 +64,20 @@ type ShippingMethod = {
 type SetShippingAddressResponse = {
   setOrderShippingAddress:
   | ActiveOrder
-  | {
-    errorCode: string;
-    message: string;
-  };
+  | { errorCode: string; message: string };
 };
 
 type TransitionToStateResponse = {
   transitionOrderToState:
   | ActiveOrder
   | {
-    __typename: "OrderStateTransitionError";
-    errorCode: string;
-    message: string;
-    transitionError: string;
-    fromState: string;
-    toState: string;
-  };
+      __typename: "OrderStateTransitionError";
+      errorCode: string;
+      message: string;
+      transitionError: string;
+      fromState: string;
+      toState: string;
+    };
 };
 
 interface InfoRowProps {
@@ -94,10 +93,9 @@ const NGN = new Intl.NumberFormat("en-NG", {
   maximumFractionDigits: 0,
 });
 
-// Vendure stores prices in kobo — always divide by 100 before display
 const formatNaira = (kobo: number) => NGN.format(kobo / 100);
 
-/* ------------------- GraphQL Update Cart Mutation ------------------- */
+/* ------------------- GraphQL ------------------- */
 const UPDATE_CART = gql`
   mutation UpdateCart($lineId: ID!, $quantity: Int!) {
     adjustOrderLineQuantity(orderLineId: $lineId, quantity: $quantity) {
@@ -127,25 +125,35 @@ const UPDATE_CART = gql`
   }
 `;
 
+/* ------------------- Page ------------------- */
 const Page = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // ✅ Cast initial value so TS keeps the full union type
+  // ✅ Typed as string — avoids TS narrowing the union to a subset
   const [method, setMethod] = useState<PaymentMethod>("card");
+
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<string | null>(null);
   const [shippingAddress, setShippingAddress] = useState<any>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [installmentPlan, setInstallmentPlan] = useState<InstallmentPlan | null>(null);
 
-  /* ------------------- Active Order Query ------------------- */
+  // ✅ Pre-select installment if ?method=installment is in the URL (from Pay Later button)
+  useEffect(() => {
+    const methodParam = searchParams?.get("method");
+    if (methodParam === "installment" || methodParam === "card" || methodParam === "bank") {
+      setMethod(methodParam);
+    }
+  }, [searchParams]);
+
+  /* ------------------- Queries ------------------- */
   const { data: activeOrderData, refetch } = useQuery<{
     activeOrder: ActiveOrder;
   }>(GET_ACTIVE_ORDER);
 
   const activeOrder = activeOrderData?.activeOrder;
 
-  /* ------------------- Shipping Methods Query ------------------- */
   const { data: shippingMethodsData } = useQuery<{
     eligibleShippingMethods: ShippingMethod[];
   }>(GET_SHIPPING_METHODS, {
@@ -156,7 +164,6 @@ const Page = () => {
     (m) => !m.name.toLowerCase().includes("bnpl")
   );
 
-  /* ------------------- Auto-select first shipping method ------------------- */
   useEffect(() => {
     if (shippingMethods.length > 0 && !selectedShippingMethod) {
       setSelectedShippingMethod(shippingMethods[0].id);
@@ -171,22 +178,22 @@ const Page = () => {
   const [createPaystackIntent] = useMutation(PAYSTACK_INTENT);
   const [recreateFailedOrder] = useMutation(RECREATE_FAILED_ORDER);
 
-  /* ------------------- Update Quantity Handler ------------------- */
+  /* ------------------- Handlers ------------------- */
   const updateQuantity = async (lineId: string, qty: number) => {
     if (qty < 1) return;
     try {
       const res = await updateCartMutation({ variables: { lineId, quantity: qty } });
       const payload = res.data as {
         adjustOrderLineQuantity:
-        | {
-          __typename: "Order";
-          id: string;
-          totalQuantity: number;
-          lines: ActiveOrderLine[];
-          totalWithTax: number;
-          subTotalWithTax?: number;
-        }
-        | { __typename: "OrderModificationError"; message: string };
+          | {
+              __typename: "Order";
+              id: string;
+              totalQuantity: number;
+              lines: ActiveOrderLine[];
+              totalWithTax: number;
+              subTotalWithTax?: number;
+            }
+          | { __typename: "OrderModificationError"; message: string };
       };
       if (payload.adjustOrderLineQuantity.__typename === "Order") {
         await refetch();
@@ -199,7 +206,6 @@ const Page = () => {
     }
   };
 
-  /* ------------------- Handle Address Submission ------------------- */
   const handleAddressSubmit = async (addressData: any) => {
     try {
       const result = await setShippingAddressMutation({
@@ -230,13 +236,11 @@ const Page = () => {
     }
   };
 
-  /* ------------------- Installment Plan Confirmed ------------------- */
   const handleInstallmentConfirm = (plan: InstallmentPlan) => {
     setInstallmentPlan(plan);
     toast.success("Installment plan set. Proceed to checkout.");
   };
 
-  /* ------------------- Checkout + Paystack ------------------- */
   const handleCheckout = async () => {
     if (!activeOrder) { toast.error("No active order found."); return; }
     if (!activeOrder.shippingAddress && !shippingAddress) { toast.error("Please add a shipping address"); return; }
@@ -267,7 +271,6 @@ const Page = () => {
 
       await createPaystackIntent({ variables: { orderCode: activeOrder.code } });
 
-      // Installment: charge deposit amount (convert naira → kobo). Otherwise charge full order.
       const chargeAmount =
         method === "installment" && installmentPlan
           ? installmentPlan.depositAmount * 100
@@ -299,7 +302,7 @@ const Page = () => {
     }
   };
 
-  /* ------------------- Checkout button label ------------------- */
+  /* ------------------- Checkout label ------------------- */
   const checkoutLabel = useMemo(() => {
     if (isPaying) return "Processing...";
     if (method === "installment" && installmentPlan) {
@@ -308,6 +311,7 @@ const Page = () => {
     return "Checkout";
   }, [isPaying, method, installmentPlan]);
 
+  /* ------------------- Render ------------------- */
   return (
     <main className="min-h-screen bg-neutral-50">
       <Navbar />
@@ -317,6 +321,7 @@ const Page = () => {
         <p className="text-xs text-neutral-500">Showing your selected products</p>
 
         <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
+
           {/* ---------------- LEFT SIDE ---------------- */}
           <section className="space-y-6">
 
@@ -354,7 +359,7 @@ const Page = () => {
                     }
                   />
                   <RadioRow
-                    checked={(method as PaymentMethod) === "installment"}
+                    checked={method === "installment"}
                     onChange={() => setMethod("installment")}
                     label="Installment Payment"
                   />
@@ -455,10 +460,7 @@ const Page = () => {
                 {activeOrder?.lines?.map((ln) => (
                   <div key={ln.id} className="flex gap-3 items-start">
                     <Image
-                      src={
-                        ln.productVariant?.product?.featuredAsset?.preview ||
-                        "/placeholder.png"
-                      }
+                      src={ln.productVariant?.product?.featuredAsset?.preview || "/placeholder.png"}
                       alt="preview"
                       width={75}
                       height={75}
@@ -472,24 +474,17 @@ const Page = () => {
                           <button
                             className="w-4 h-4 border rounded-full text-xs"
                             onClick={() => updateQuantity(ln.id, ln.quantity - 1)}
-                          >
-                            –
-                          </button>
+                          >–</button>
                           <span className="text-xs">{ln.quantity}</span>
                           <button
                             className="w-4 h-4 border rounded-full text-xs"
                             onClick={() => updateQuantity(ln.id, ln.quantity + 1)}
-                          >
-                            +
-                          </button>
+                          >+</button>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-semibold">
-                            {formatNaira(ln.linePriceWithTax)}
-                          </p>
+                          <p className="text-sm font-semibold">{formatNaira(ln.linePriceWithTax)}</p>
                           <button className="text-xs text-red-500 flex items-center gap-1">
-                            Remove{" "}
-                            <Image src="/trash.png" alt="Remove" width={12} height={12} />
+                            Remove <Image src="/trash.png" alt="Remove" width={12} height={12} />
                           </button>
                         </div>
                       </div>
@@ -499,44 +494,31 @@ const Page = () => {
               </div>
 
               <div className="mt-4 border-t pt-4 space-y-2 text-sm">
-                <Row
-                  label="Subtotal"
-                  value={formatNaira(activeOrder?.subTotalWithTax ?? 0)}
-                />
+                <Row label="Subtotal" value={formatNaira(activeOrder?.subTotalWithTax ?? 0)} />
                 <Row label="Discount" value="- ₦0" />
                 <Row label="Shipping" value="₦0" />
                 {method === "installment" && installmentPlan && (
                   <>
-                    <Row
-                      label="Deposit (now)"
-                      value={NGN.format(installmentPlan.depositAmount)}
-                    />
+                    <Row label="Deposit (now)" value={NGN.format(installmentPlan.depositAmount)} />
                     <Row
                       label={`${installmentPlan.periods}× ${installmentPlan.frequency} repayments`}
                       value={NGN.format(installmentPlan.repaymentAmount)}
                     />
-                    <Row
-                      label="Insurance Fee (1%)"
-                      value={NGN.format(installmentPlan.insuranceFee)}
-                    />
+                    <Row label="Insurance Fee (1%)" value={NGN.format(installmentPlan.insuranceFee)} />
                   </>
                 )}
               </div>
 
               <div className="mt-3">
-                <Row
-                  big
-                  bold
-                  label="Grand Total"
-                  value={formatNaira(activeOrder?.totalWithTax ?? 0)}
-                />
+                <Row big bold label="Grand Total" value={formatNaira(activeOrder?.totalWithTax ?? 0)} />
               </div>
 
               <button
                 onClick={handleCheckout}
                 disabled={isPaying}
-                className={`mt-4 w-full py-3 rounded-full text-white text-sm font-medium ${isPaying ? "bg-red-300" : "bg-red-500 hover:bg-red-600"
-                  }`}
+                className={`mt-4 w-full py-3 rounded-full text-white text-sm font-medium ${
+                  isPaying ? "bg-red-300" : "bg-red-500 hover:bg-red-600"
+                }`}
               >
                 {checkoutLabel}
               </button>

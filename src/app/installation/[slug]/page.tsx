@@ -545,14 +545,14 @@ export default function InstallationListingPage() {
                   <button
                     onClick={handleAddToCart}
                     disabled={addingToCart || !activeVariant}
-                    className="w-full rounded-lg border-2 border-neutral-900 bg-white text-neutral-900 py-2 px-2 text-xs md:text-sm font-semibold hover:bg-neutral-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full rounded-lg border-2 border-neutral-900 bg-white text-neutral-900 py-2 px-2 text-xs font-semibold hover:bg-neutral-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {addingToCart ? "Adding…" : "Add to Cart"}
                   </button>
                   <button
                     onClick={handleBuyNow}
                     disabled={addingToCart || !activeVariant}
-                    className="w-full rounded-lg bg-neutral-900 text-white py-2 px-6 text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full rounded-lg bg-neutral-900 text-white py-2 px-6 text-xs font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Buy Now
                   </button>
@@ -560,7 +560,7 @@ export default function InstallationListingPage() {
                   <button
                     onClick={handleBuyNow}
                     disabled={addingToCart || !activeVariant}
-                    className="w-full rounded-lg bg-[#ff0000] text-white py-2 px-6 text-sm font-semibold hover:bg-transparent hover:text-[#ff0000] hover:border-2 border-[#ff0000] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full rounded-lg bg-[#ff0000] text-white py-2 px-6 text-xs font-semibold hover:bg-transparent hover:text-[#ff0000] hover:border-2 border-[#ff0000] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Pay Later
                   </button>
@@ -625,7 +625,7 @@ export default function InstallationListingPage() {
                     {activeVariant?.customFields?.packageCapacity && (
                       <div className="flex gap-4 justify-between py-3 border-b border-neutral-200">
                         <span className="text-sm text-neutral-600">Capacity</span>
-                        <span className="text-sm w-70 font-medium text-neutral-900">
+                        <span className="text-xs w-70 md:w-full pl-30 font-medium text-neutral-900">
                           {activeVariant.customFields.packageCapacity}
                         </span>
                       </div>
