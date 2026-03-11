@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, useEffect } from "react";
+import React, { Suspense, useMemo, useState, useEffect } from "react";
 import Navbar from "../../Components/Navbar/Navbar";
 import Footer from "../../Components/Footer/Footer";
 import Image from "next/image";
@@ -27,7 +27,6 @@ import {
 
 /* ------------------- Types ------------------- */
 
-// ✅ Use string so TypeScript never narrows it to a subset of the union
 type PaymentMethod = string;
 
 type ActiveOrderLine = {
@@ -125,14 +124,12 @@ const UPDATE_CART = gql`
   }
 `;
 
-/* ------------------- Page ------------------- */
-const Page = () => {
+/* ------------------- Inner Page (uses useSearchParams) ------------------- */
+function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // ✅ Typed as string — avoids TS narrowing the union to a subset
   const [method, setMethod] = useState<PaymentMethod>("card");
-
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<string | null>(null);
   const [shippingAddress, setShippingAddress] = useState<any>(null);
   const [showPayment, setShowPayment] = useState(false);
@@ -533,7 +530,30 @@ const Page = () => {
       {showPayment && <PaymentScreens onClose={() => setShowPayment(false)} />}
     </main>
   );
-};
+}
+
+/* ------------------- Default Export with Suspense ------------------- */
+// ✅ Required by Next.js 13+ when using useSearchParams() in a page
+export default function Page() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-neutral-50">
+          <div className="mx-auto max-w-6xl px-4 py-6 animate-pulse">
+            <div className="h-6 w-48 bg-neutral-200 rounded mb-2" />
+            <div className="h-4 w-64 bg-neutral-200 rounded" />
+            <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
+              <div className="h-96 bg-neutral-200 rounded-2xl" />
+              <div className="h-96 bg-neutral-200 rounded-2xl" />
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <CheckoutPage />
+    </Suspense>
+  );
+}
 
 /* ---------------- Helper Components ---------------- */
 function RadioRow({ checked, onChange, label, right }: any) {
@@ -568,5 +588,3 @@ function InfoRow({ icon, title, text }: InfoRowProps) {
     </div>
   );
 }
-
-export default Page;
