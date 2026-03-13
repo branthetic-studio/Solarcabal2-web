@@ -364,9 +364,16 @@ export default function InstallationListingPage() {
     addToCartMutation,
   ]);
 
+  // ── Buy Now handler ─────────────────────────────────────────────────────────
   const handleBuyNow = useCallback(async () => {
     await handleAddToCart();
     router.push("/checkout");
+  }, [handleAddToCart, router]);
+
+  // ── Pay Later handler — pre-selects installment on checkout ─────────────────
+  const handlePayLater = useCallback(async () => {
+    await handleAddToCart();
+    router.push("/checkout?method=installment");
   }, [handleAddToCart, router]);
 
   // ── Loading / error states ──────────────────────────────────────────────────
@@ -540,7 +547,7 @@ export default function InstallationListingPage() {
                   </div>
                 )}
 
-                {/* ✅ Add to Cart / Buy Now */}
+                {/* ✅ Add to Cart / Buy Now / Pay Later */}
                 <div className="mt-6 flex items-center justify-between w-100 gap-6 px-4">
                   <button
                     onClick={handleAddToCart}
@@ -557,8 +564,9 @@ export default function InstallationListingPage() {
                     Buy Now
                   </button>
 
+                  {/* Pay Later — routes to checkout with installment pre-selected */}
                   <button
-                    onClick={handleBuyNow}
+                    onClick={handlePayLater}
                     disabled={addingToCart || !activeVariant}
                     className="w-full rounded-lg bg-[#ff0000] text-white py-2 px-6 text-xs font-semibold hover:bg-transparent hover:text-[#ff0000] hover:border-2 border-[#ff0000] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
