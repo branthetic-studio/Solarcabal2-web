@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useQuery } from "@apollo/client/react";
 import { GET_PRODUCT_DETAILS } from "@/graphql/queries";
 import Navbar from "@/Components/Navbar/Navbar";
@@ -12,6 +12,8 @@ import { Star } from "lucide-react";
 import Image from "next/image";
 import StarRating from "../components/StarRating";
 import { useRouter } from "next/navigation";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 /* ===================== Types ===================== */
 
@@ -23,25 +25,15 @@ type ProductVariant = {
   currencyCode: string;
   price: number;
   priceWithTax: number;
-  featuredAsset?: {
-    id: string;
-    preview: string;
-  };
-  assets: {
-    id: string;
-    preview: string;
-  }[];
+  featuredAsset?: { id: string; preview: string };
+  assets: { id: string; preview: string }[];
 };
 
 type ProductDetails = {
   id: string;
   name: string;
   description: string;
-  collections: {
-    name: string;
-    id: string;
-    slug: string;
-  }[];
+  collections: { name: string; id: string; slug: string }[];
   customFields?: {
     powerOutput?: string;
     efficiency?: string;
@@ -54,40 +46,27 @@ type ProductDetails = {
       variants: Array<{
         id: string;
         name: string;
-        featuredAsset?: {
-          preview: string;
-        };
+        featuredAsset?: { preview: string };
         price: number;
         product: {
           id: string;
           name: string;
           slug: string;
           enabled: boolean;
-          assets: {
-            preview: string;
-          }[];
-          featuredAsset?: {
-            id: string;
-            preview: string;
-          };
+          assets: { preview: string }[];
+          featuredAsset?: { id: string; preview: string };
         };
       }>;
     };
   };
-  featuredAsset?: {
-    id: string;
-    preview: string;
-  };
-  assets: {
-    id: string;
-    preview: string;
-  }[];
+  featuredAsset?: { id: string; preview: string };
+  assets: { id: string; preview: string }[];
   variants: ProductVariant[];
 };
 
-type GetProductDetailsData = {
-  product: ProductDetails | null;
-};
+type GetProductDetailsData = { product: ProductDetails | null };
+
+/* ===================== Static data ===================== */
 
 const ratingData = [
   { stars: 5, count: 2823 },
@@ -130,186 +109,154 @@ const reviews = [
   },
 ];
 
-
 /* ===================== Page ===================== */
 
 const ProductDetailsPage = () => {
   const params = useParams();
   const slug = params?.slug as string;
-  const { addToCartMutation } = useCart();
-  const [isAdding, setIsAdding] = useState(false);
   const router = useRouter();
+  const { addToCartMutation } = useCart();
 
-  const handleAddToCart = async () => {
-    if (!selectedVariant) {
-      alert("Please select a variant");
-      return;
-    }
-    setIsAdding(true);
-    try {
-      await addToCartMutation({
-        productVariantId: selectedVariant.id,
-        quantity,
-      });
-    } catch (e) {
-      console.error(e);
-      alert("Could not add to cart");
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
-  const handleBuyNow = async () => {
-    if (!selectedVariant) {
-      alert("Please select a variant");
-      return;
-    }
-    setIsAdding(true);
-    try {
-      await addToCartMutation({
-        productVariantId: selectedVariant.id,
-        quantity,
-      });
-      router.push("/checkout");
-    } catch (e) {
-      console.error(e);
-      alert("Could not process Buy Now");
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
-  // ✅ Pay Later: adds to cart then navigates to /checkout?method=installment
-  // The checkout page reads this param and pre-selects the installment payment option
-  const handlePayLater = async () => {
-    if (!selectedVariant) {
-      alert("Please select a variant");
-      return;
-    }
-    setIsAdding(true);
-    try {
-      await addToCartMutation({
-        productVariantId: selectedVariant.id,
-        quantity,
-      });
-      router.push("/checkout?method=installment");
-    } catch (e) {
-      console.error(e);
-      alert("Could not process Pay Later");
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
+  const [isAdding, setIsAdding] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<
     "Product Detail" | "Reviews" | "Related Product"
   >("Product Detail");
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
-    null
-  );
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
   const { data, loading, error } = useQuery<GetProductDetailsData>(
     GET_PRODUCT_DETAILS,
-    {
-      variables: { slug },
-      skip: !slug,
-    }
+    { variables: { slug }, skip: !slug }
   );
 
-  React.useEffect(() => {
-    if (
-      data?.product?.variants &&
-      data.product.variants.length > 0 &&
-      !selectedVariant
-    ) {
-      setSelectedVariant(data.product.variants[0] as ProductVariant);
+  // Auto-select first valid variant whenever query data arrives
+  useEffect(() => {
+    if (data?.product?.variants?.length) {
+      const first = data.product.variants.find((v) => v?.id);
+      if (first) setSelectedVariant(first as ProductVariant);
     }
-  }, [data, selectedVariant]);
+  }, [data]);
 
   const product = data?.product ?? null;
 
-  /* ---------- Images (guarded) ---------- */
+  /* ---------- Images ---------- */
   const productImages = useMemo(() => {
     if (!product) return ["/api/placeholder/400/400"];
-    const images: string[] = [];
-    const featured = product.featuredAsset?.preview;
-    if (featured) images.push(featured);
+    const imgs: string[] = [];
+    if (product.featuredAsset?.preview) imgs.push(product.featuredAsset.preview);
     for (const a of product.assets ?? []) {
-      if (a?.preview && a.preview !== featured) {
-        images.push(a.preview);
-      }
+      if (a?.preview && a.preview !== product.featuredAsset?.preview)
+        imgs.push(a.preview);
     }
-    return images.length > 0 ? images : ["/api/placeholder/400/400"];
+    return imgs.length ? imgs : ["/api/placeholder/400/400"];
   }, [product]);
-  const mainImageSrc =
-    productImages[selectedImage] ?? "/api/placeholder/400/400";
 
-  /* ---------- Safe variants list ---------- */
+  const mainImageSrc = productImages[selectedImage] ?? "/api/placeholder/400/400";
+
+  /* ---------- Variants ---------- */
   const variants: ProductVariant[] = useMemo(
-    () =>
-      (product?.variants ?? []).filter((v): v is ProductVariant =>
-        Boolean(v && v.id)
-      ),
+    () => (product?.variants ?? []).filter((v): v is ProductVariant => Boolean(v?.id)),
     [product]
   );
 
-  /* ---------- Related products (guarded) ---------- */
+  /* ---------- Related products ---------- */
   const relatedProducts = useMemo(() => {
-    const relatedVariants =
-      product?.customFields?.relatedProducts?.variants ?? [];
-    return relatedVariants
-      .filter((variant) => variant && variant.product?.enabled)
+    return (product?.customFields?.relatedProducts?.variants ?? [])
+      .filter((v) => v?.product?.enabled)
       .slice(0, 4)
-      .map((variant) => ({
-        id: variant!.id,
-        name: variant!.product!.name,
-        price: `₦${variant!.price.toLocaleString()}`,
+      .map((v) => ({
+        id: v!.id,
+        name: v!.product!.name,
+        price: `₦${v!.price.toLocaleString()}`,
         image:
-          variant!.featuredAsset?.preview ||
-          variant!.product!.featuredAsset?.preview ||
+          v!.featuredAsset?.preview ||
+          v!.product!.featuredAsset?.preview ||
           "/api/placeholder/200/200",
         rating: 4.5,
-        slug: variant!.product!.slug,
+        slug: v!.product!.slug,
       }));
   }, [product]);
 
-  /* ---------- Price formatting ---------- */
-  const currentPrice =
-    selectedVariant?.priceWithTax ?? variants[0]?.priceWithTax ?? 0;
-  const currency =
-    selectedVariant?.currencyCode ?? variants[0]?.currencyCode ?? "NGN";
-  const currencySymbol =
-    currency === "NGN" ? "₦" : currency === "USD" ? "$" : currency;
-  const priceInNaira = currentPrice / 100;
-  const formattedPrice = priceInNaira.toLocaleString();
+  /* ---------- Price ---------- */
+  const currentPrice = selectedVariant?.priceWithTax ?? variants[0]?.priceWithTax ?? 0;
+  const currency = selectedVariant?.currencyCode ?? variants[0]?.currencyCode ?? "NGN";
+  const currencySymbol = currency === "NGN" ? "₦" : currency === "USD" ? "$" : currency;
+  const formattedPrice = (currentPrice / 100).toLocaleString();
 
-  /* ---------- Loading / Error states ---------- */
+  /* ---------- Core cart action ---------- */
+  const addVariantToCart = useCallback(async (): Promise<boolean> => {
+    if (!selectedVariant) {
+      toast.error("Please select a variant");
+      return false;
+    }
+
+    setIsAdding(true);
+    try {
+      const result = await addToCartMutation({
+        productVariantId: selectedVariant.id,
+        quantity,
+      });
+
+      // Vendure returns typed errors instead of throwing — handle them
+      if (result?.__typename === "InsufficientStockError") {
+        toast.error(`Only ${result.quantityAvailable} item(s) available in stock.`);
+        return false;
+      }
+      if (result?.errorCode) {
+        toast.error(`Could not add to cart: ${result.message ?? result.errorCode}`);
+        return false;
+      }
+
+      toast.success("Added to cart", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+
+      return true;
+    } catch (e: any) {
+      console.error("Add to cart error:", e);
+      toast.error(e?.message ?? "Could not add to cart. Please try again.");
+      return false;
+    } finally {
+      setIsAdding(false);
+    }
+  }, [selectedVariant, quantity, addToCartMutation]);
+
+  const handleAddToCart = () => addVariantToCart();
+  const handleBuyNow = async () => {
+    const ok = await addVariantToCart();
+    if (ok) router.push("/checkout");
+  };
+  const handlePayLater = async () => {
+    const ok = await addVariantToCart();
+    if (ok) router.push("/checkout?method=installment");
+  };
+
+  /* ---------- Loading ---------- */
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="animate-pulse">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <div className="bg-gray-200 rounded-lg aspect-square"></div>
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5, 6].map((i) => (
-                      <div
-                        key={i}
-                        className="w-16 h-16 bg-gray-200 rounded-lg"
-                      />
-                    ))}
-                  </div>
+          <div className="bg-white rounded-lg shadow-sm p-6 animate-pulse">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div className="bg-gray-200 rounded-lg aspect-square" />
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="w-16 h-16 bg-gray-200 rounded-lg" />
+                  ))}
                 </div>
-                <div className="space-y-6">
-                  <div className="h-8 bg-gray-200 rounded w-3/4"></div>
-                  <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-                  <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="h-8 bg-gray-200 rounded w-3/4" />
+                <div className="h-6 bg-gray-200 rounded w-1/2" />
+                <div className="h-8 bg-gray-200 rounded w-1/4" />
               </div>
             </div>
           </div>
@@ -319,17 +266,16 @@ const ProductDetailsPage = () => {
     );
   }
 
+  /* ---------- Error ---------- */
   if (error || !product) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">
-              Product Not Found
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Product Not Found</h1>
             <p className="text-gray-600">
-              The product you're looking for doesn't exist or has been removed.
+              The product you&apos;re looking for doesn&apos;t exist or has been removed.
             </p>
           </div>
         </div>
@@ -338,17 +284,21 @@ const ProductDetailsPage = () => {
     );
   }
 
+  /* ===================== Render ===================== */
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* ToastContainer renders all toasts — place once at the top of the page */}
+      <ToastContainer />
+
       <Navbar />
 
-      <div className="mx-auto px-6 py-">
-        {/* Product Section */}
+      <div className="mx-auto px-6 py-6">
+        {/* ── Product section ── */}
         <div className="mb-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left - Product Images */}
+
+            {/* Left — images */}
             <div className="space-y-8">
-              {/* Main Image */}
               <div className="w-full bg-gray-100 rounded-lg p-4 aspect-square flex items-center justify-center">
                 <img
                   src={mainImageSrc}
@@ -356,17 +306,13 @@ const ProductDetailsPage = () => {
                   className="max-w-full max-h-full object-contain"
                 />
               </div>
-
-              {/* Thumbnail Images */}
               <div className="flex gap-2 overflow-x-auto">
                 {productImages.map((image, index) => (
                   <button
                     key={index}
                     onClick={() => setSelectedImage(index)}
                     className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 p-2 ${
-                      selectedImage === index
-                        ? "border-[#00AAFF]"
-                        : "border-gray-200"
+                      selectedImage === index ? "border-[#00AAFF]" : "border-gray-200"
                     }`}
                   >
                     <img
@@ -379,20 +325,14 @@ const ProductDetailsPage = () => {
               </div>
             </div>
 
-            {/* Right - Product Info */}
-            <div className="space-y-6 align-center">
+            {/* Right — info */}
+            <div className="space-y-6">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  {product.name}
-                </h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
                 <div className="flex items-center gap-2 mb-4">
                   <div className="flex items-center">
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <svg
-                        key={star}
-                        className="w-5 h-5 fill-yellow-400"
-                        viewBox="0 0 20 20"
-                      >
+                      <svg key={star} className="w-5 h-5 fill-yellow-400" viewBox="0 0 20 20">
                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                       </svg>
                     ))}
@@ -400,12 +340,11 @@ const ProductDetailsPage = () => {
                   </div>
                 </div>
                 <div className="text-3xl font-bold text-gray-900 mb-6">
-                  {currencySymbol}
-                  {formattedPrice}
+                  {currencySymbol}{formattedPrice}
                 </div>
               </div>
 
-              {/* Variant Selection */}
+              {/* Variant selector */}
               {variants.length > 1 && (
                 <div className="space-y-3">
                   <label className="text-gray-700 font-medium">Variant:</label>
@@ -427,67 +366,80 @@ const ProductDetailsPage = () => {
                 </div>
               )}
 
-              {/* Stock Level */}
+              {/* Stock */}
               {selectedVariant && (
                 <div className="text-sm text-gray-600">
                   Stock: {selectedVariant.stockLevel}
                 </div>
               )}
 
-              <p>{product.description}</p>
+              <p className="text-gray-700">{product.description}</p>
 
-              {/* Action Buttons */}
-              <div className="space-y-4">
-                <div className="flex flex-col md:flex-row gap-2 md:gap-4">
-                  <button
-                    onClick={handleAddToCart}
-                    disabled={isAdding || !selectedVariant}
-                    className="flex-1 border-2 border-[#242425] text-[#242425] py-3 px-6 rounded-lg font-medium cursor-pointer transition-colors disabled:opacity-50"
-                  >
-                    {isAdding ? "Adding..." : "Add to Cart"}
-                  </button>
+              {/* Quantity */}
+              <div className="flex items-center gap-3">
+                <span className="text-gray-700 font-medium">Qty:</span>
+                <button
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 text-lg"
+                >
+                  −
+                </button>
+                <span className="w-8 text-center font-medium">{quantity}</span>
+                <button
+                  onClick={() => setQuantity((q) => q + 1)}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 text-lg"
+                >
+                  +
+                </button>
+              </div>
 
-                  <button
-                    onClick={handleBuyNow}
-                    disabled={isAdding || !selectedVariant}
-                    className="flex-1 px-6 py-3 bg-[#242425] text-[#ffffff] rounded-lg cursor-pointer transition-colors disabled:opacity-50"
-                  >
-                    {isAdding ? "Processing..." : "Buy Now"}
-                  </button>
+              {/* Action buttons */}
+              <div className="flex flex-col md:flex-row gap-2 md:gap-4">
+                <button
+                  onClick={handleAddToCart}
+                  disabled={isAdding || !selectedVariant}
+                  className="flex-1 border-2 border-[#242425] text-[#242425] py-3 px-6 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  {isAdding ? "Adding..." : "Add to Cart"}
+                </button>
 
-                  {/* ✅ FIXED: calls handlePayLater → /checkout?method=installment */}
-                  <button
-                    onClick={handlePayLater}
-                    disabled={isAdding || !selectedVariant}
-                    className="flex-1 bg-[#ff0000] text-white py-3 rounded-lg font-medium hover:bg-[#751c1c] transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    {isAdding ? "Processing..." : "Pay Later"}
-                  </button>
-                </div>
+                <button
+                  onClick={handleBuyNow}
+                  disabled={isAdding || !selectedVariant}
+                  className="flex-1 px-6 py-3 bg-[#242425] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800"
+                >
+                  {isAdding ? "Processing..." : "Buy Now"}
+                </button>
+
+                <button
+                  onClick={handlePayLater}
+                  disabled={isAdding || !selectedVariant}
+                  className="flex-1 bg-[#ff0000] text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#751c1c]"
+                >
+                  {isAdding ? "Processing..." : "Pay Later"}
+                </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tabs Section */}
-        <div className="">
+        {/* ── Tabs ── */}
+        <div>
           <div className="border-b border-gray-200">
             <nav className="flex">
-              {(["Product Detail", "Reviews", "Related Product"] as const).map(
-                (tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === tab
-                        ? "border-black text-black"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                )
-              )}
+              {(["Product Detail", "Reviews", "Related Product"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === tab
+                      ? "border-black text-black"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
             </nav>
           </div>
 
@@ -497,49 +449,39 @@ const ProductDetailsPage = () => {
                 <h3 className="text-xl font-bold mb-6">Related Products</h3>
                 {relatedProducts.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {relatedProducts.map((relatedProduct) => (
+                    {relatedProducts.map((rp) => (
                       <div
-                        key={relatedProduct.id}
-                        className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                        key={rp.id}
+                        className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                        onClick={() => router.push(`/products/${rp.slug}`)}
                       >
                         <div className="bg-gray-100 p-4 aspect-square flex items-center justify-center">
                           <img
-                            src={relatedProduct.image}
-                            alt={relatedProduct.name}
+                            src={rp.image}
+                            alt={rp.name}
                             className="max-w-full max-h-full object-contain"
                           />
                         </div>
                         <div className="p-4">
-                          <h4 className="font-medium text-gray-900 mb-2">
-                            {relatedProduct.name}
-                          </h4>
+                          <h4 className="font-medium text-gray-900 mb-2">{rp.name}</h4>
                           <div className="flex items-center justify-between">
-                            <span className="text-lg font-bold text-gray-900">
-                              {relatedProduct.price}
-                            </span>
+                            <span className="text-lg font-bold text-gray-900">{rp.price}</span>
                             <div className="flex items-center">
-                              <svg
-                                className="w-4 h-4 fill-yellow-400"
-                                viewBox="0 0 20 20"
-                              >
+                              <svg className="w-4 h-4 fill-yellow-400" viewBox="0 0 20 20">
                                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                               </svg>
-                              <span className="text-sm text-gray-600 ml-1">
-                                {relatedProduct.rating}
-                              </span>
+                              <span className="text-sm text-gray-600 ml-1">{rp.rating}</span>
                             </div>
                           </div>
                           <button className="w-full mt-3 bg-black text-white py-2 px-4 rounded-lg text-sm hover:bg-gray-800 transition-colors">
-                            Add to Cart
+                            View Product
                           </button>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-center py-8">
-                    No related products found
-                  </p>
+                  <p className="text-gray-500 text-center py-8">No related products found</p>
                 )}
               </div>
             ) : (
@@ -548,13 +490,14 @@ const ProductDetailsPage = () => {
           </div>
         </div>
       </div>
+
       <Suscribe />
       <Footer />
     </div>
   );
 };
 
-/* ===================== Local Product Card ===================== */
+/* ===================== LocalProductCard ===================== */
 
 function LocalProductCard({
   status,
@@ -566,22 +509,15 @@ function LocalProductCard({
   if (status === "Reviews") {
     const totalReviews = ratingData.reduce((a, b) => a + b.count, 0);
     const [isOpen, setIsOpen] = useState(false);
+
     return (
       <div className="space-y-8">
-
-        {/* ===== Rating Summary ===== */}
+        {/* Rating summary */}
         <div className="flex gap-10 border border-[#E4E9EE] rounded-xl p-6">
           <div className="flex gap-3 items-center min-w-40">
             <div className="relative w-20 h-20 flex items-center justify-center">
               <svg className="absolute inset-0" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  fill="none"
-                  stroke="#FFA133"
-                  strokeWidth="6"
-                />
+                <circle cx="50" cy="50" r="45" fill="none" stroke="#FFA133" strokeWidth="6" />
               </svg>
               <span className="text-3xl font-semibold text-gray-800">4.8</span>
             </div>
@@ -596,7 +532,6 @@ function LocalProductCard({
               </p>
             </div>
           </div>
-
           <div className="flex-1 space-y-2">
             {ratingData.map((r) => (
               <div key={r.stars} className="flex items-center gap-3">
@@ -610,15 +545,13 @@ function LocalProductCard({
                     style={{ width: `${(r.count / totalReviews) * 100}%` }}
                   />
                 </div>
-                <span className="w-12 text-sm text-right text-gray-500">
-                  {r.count}
-                </span>
+                <span className="w-12 text-sm text-right text-gray-500">{r.count}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ===== Reviews Section ===== */}
+        {/* Reviews list */}
         <div className="grid grid-cols-12 gap-8">
           <aside className="col-span-2 space-y-6 text-[#818B9C]">
             <div>
@@ -634,8 +567,7 @@ function LocalProductCard({
               <h3 className="text-black mb-3">Review Topics</h3>
               {["Product Quality", "Product Price", "Shipment"].map((t) => (
                 <label key={t} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" />
-                  {t}
+                  <input type="checkbox" /> {t}
                 </label>
               ))}
             </div>
@@ -646,15 +578,9 @@ function LocalProductCard({
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold">Review Lists</h2>
                 <div className="flex gap-3">
-                  <button className="px-4 py-2 bg-red-500 text-white rounded-lg">
-                    All Reviews
-                  </button>
-                  <button className="px-4 py-2 border rounded-lg">
-                    With Photo & Video
-                  </button>
-                  <button className="px-4 py-2 border rounded-lg">
-                    With Description
-                  </button>
+                  <button className="px-4 py-2 bg-red-500 text-white rounded-lg">All Reviews</button>
+                  <button className="px-4 py-2 border rounded-lg">With Photo & Video</button>
+                  <button className="px-4 py-2 border rounded-lg">With Description</button>
                 </div>
               </div>
               <button
@@ -721,9 +647,9 @@ function LocalProductCard({
     );
   }
 
-  // Product Detail
+  // Product Detail tab
   const cf = product.customFields ?? {};
-  const specs: Array<{ label: string; value?: string }> = [
+  const specs = [
     { label: "Power Output", value: cf.powerOutput },
     { label: "Efficiency", value: cf.efficiency },
     { label: "Voltage", value: cf.voltage },
@@ -737,24 +663,16 @@ function LocalProductCard({
     <div className="space-y-6">
       {product.description && (
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            {product.name}
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">{product.name}</h3>
           <p className="text-[#818B9C] leading-relaxed">{product.description}</p>
         </div>
       )}
-
       {specs.length > 0 && (
         <div className="w-full">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">
-            Specifications
-          </h3>
-          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 pr-60">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Specifications</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
             {specs.map((s, idx) => (
-              <div
-                key={idx}
-                className="w-80 flex flex-2 items-center mr-8 justify-between"
-              >
+              <div key={idx} className="flex items-center justify-between">
                 <span className="text-[#818B9C]">{s.label}</span>
                 <span className="font-medium text-[#141718]">{s.value}</span>
               </div>
@@ -768,26 +686,20 @@ function LocalProductCard({
 
 export default ProductDetailsPage;
 
-type ReviewModalProps = {
-  onClose: () => void;
-};
+/* ===================== ReviewModal ===================== */
+
+type ReviewModalProps = { onClose: () => void };
 
 function ReviewModal({ onClose }: ReviewModalProps) {
-  const [rating, setRating] = useState<number>(0);
-  const [submitted, setSubmitted] = useState<boolean>(false);
+  const [rating, setRating] = useState(0);
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     if (submitted) {
-      const timer = setTimeout(() => {
-        onClose();
-      }, 1000);
-      return () => clearTimeout(timer);
+      const t = setTimeout(onClose, 1000);
+      return () => clearTimeout(t);
     }
   }, [submitted, onClose]);
-
-  const handleSubmit = () => {
-    setSubmitted(true);
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -806,7 +718,7 @@ function ReviewModal({ onClose }: ReviewModalProps) {
             </div>
             <div className="mb-4">
               <h3 className="text-xs mb-1">Rating</h3>
-              <StarRating value={rating} onChange={(value) => setRating(value)} />
+              <StarRating value={rating} onChange={setRating} />
             </div>
             <div className="grid gap-2">
               <label className="text-xs text-[#15171C]">
@@ -820,7 +732,7 @@ function ReviewModal({ onClose }: ReviewModalProps) {
             </div>
             <div className="flex justify-end mt-4">
               <button
-                onClick={handleSubmit}
+                onClick={() => setSubmitted(true)}
                 disabled={rating === 0}
                 className="px-4 py-2 bg-red-500 text-white rounded-lg disabled:opacity-50"
               >

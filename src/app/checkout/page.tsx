@@ -3,8 +3,6 @@ import React, { Suspense, useMemo, useState, useEffect } from "react";
 import Navbar from "../../Components/Navbar/Navbar";
 import Footer from "../../Components/Footer/Footer";
 import Image from "next/image";
-import PaymentScreens from "@/Components/payment/PaymentScreens";
-import { Plus } from "lucide-react";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -19,7 +17,6 @@ import {
   GET_SHIPPING_METHODS,
   SET_SHIPPING_METHOD,
   SET_SHIPPING_ADDRESS,
-  GET_CUSTOMER_ORDERS,
   TRANSITION_TO_STATE,
   PAYSTACK_INTENT,
   RECREATE_FAILED_ORDER,
@@ -27,6 +24,8 @@ import {
 
 /* ------------------- Types ------------------- */
 
+// Using string to avoid TypeScript control-flow narrowing errors
+// when comparing method inside useMemo / async functions.
 type PaymentMethod = string;
 
 type ActiveOrderLine = {
@@ -62,27 +61,53 @@ type ShippingMethod = {
 
 type SetShippingAddressResponse = {
   setOrderShippingAddress:
-  | ActiveOrder
-  | { errorCode: string; message: string };
+    | ActiveOrder
+    | { errorCode: string; message: string };
 };
 
 type TransitionToStateResponse = {
   transitionOrderToState:
-  | ActiveOrder
-  | {
-      __typename: "OrderStateTransitionError";
-      errorCode: string;
-      message: string;
-      transitionError: string;
-      fromState: string;
-      toState: string;
-    };
+    | ActiveOrder
+    | {
+        __typename: "OrderStateTransitionError";
+        errorCode: string;
+        message: string;
+        transitionError: string;
+        fromState: string;
+        toState: string;
+      };
 };
 
 interface InfoRowProps {
   icon: string | StaticImageData;
   title: string;
   text: string;
+}
+
+/* ------------------- Helpers ------------------- */
+
+/**
+ * Extracts a human-readable message from anything that might be thrown.
+ * Handles: Error, GraphQL ApolloError, plain objects, strings.
+ */
+function extractErrorMessage(err: unknown): string {
+  if (!err) return "An unknown error occurred.";
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message;
+
+  // ApolloError / GraphQL errors
+  const e = err as any;
+  if (e?.graphQLErrors?.length) {
+    return e.graphQLErrors.map((g: any) => g.message).join(", ");
+  }
+  if (e?.networkError?.message) return `Network error: ${e.networkError.message}`;
+  if (e?.message) return e.message;
+
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return "An unknown error occurred.";
+  }
 }
 
 /* ------------------- Formatters ------------------- */
@@ -124,23 +149,22 @@ const UPDATE_CART = gql`
   }
 `;
 
-/* ------------------- Inner Page (uses useSearchParams) ------------------- */
+/* ------------------- Inner Page ------------------- */
 function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [method, setMethod] = useState<PaymentMethod>("card");
+  const [method, setMethod] = useState<PaymentMethod>("paystack" as PaymentMethod);
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<string | null>(null);
   const [shippingAddress, setShippingAddress] = useState<any>(null);
-  const [showPayment, setShowPayment] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [installmentPlan, setInstallmentPlan] = useState<InstallmentPlan | null>(null);
 
-  // ✅ Pre-select installment if ?method=installment is in the URL (from Pay Later button)
+  // Pre-select method from URL param (e.g. ?method=installment from Pay Later button)
   useEffect(() => {
     const methodParam = searchParams?.get("method");
-    if (methodParam === "installment" || methodParam === "card" || methodParam === "bank") {
-      setMethod(methodParam);
+    if (methodParam === "installment" || methodParam === "paystack" || methodParam === "bank") {
+      setMethod(methodParam as PaymentMethod);
     }
   }, [searchParams]);
 
@@ -169,7 +193,8 @@ function CheckoutPage() {
 
   /* ------------------- Mutations ------------------- */
   const [updateCartMutation] = useMutation(UPDATE_CART);
-  const [setShippingAddressMutation] = useMutation<SetShippingAddressResponse>(SET_SHIPPING_ADDRESS);
+  const [setShippingAddressMutation] =
+    useMutation<SetShippingAddressResponse>(SET_SHIPPING_ADDRESS);
   const [setShippingMethodMutation] = useMutation(SET_SHIPPING_METHOD);
   const [transitionToState] = useMutation<TransitionToStateResponse>(TRANSITION_TO_STATE);
   const [createPaystackIntent] = useMutation(PAYSTACK_INTENT);
@@ -198,7 +223,7 @@ function CheckoutPage() {
         toast.error(payload.adjustOrderLineQuantity.message);
       }
     } catch (err) {
-      console.error("Error updating cart:", err);
+      console.error("Error updating cart:", extractErrorMessage(err));
       toast.error("Failed to update cart.");
     }
   };
@@ -228,7 +253,7 @@ function CheckoutPage() {
         toast.error(response.message);
       }
     } catch (err) {
-      console.error("Error setting shipping address:", err);
+      console.error("Error setting shipping address:", extractErrorMessage(err));
       toast.error("Failed to set shipping address");
     }
   };
@@ -238,74 +263,156 @@ function CheckoutPage() {
     toast.success("Installment plan set. Proceed to checkout.");
   };
 
+  /* ------------------- Core checkout / Paystack launch ------------------- */
   const handleCheckout = async () => {
-    if (!activeOrder) { toast.error("No active order found."); return; }
-    if (!activeOrder.shippingAddress && !shippingAddress) { toast.error("Please add a shipping address"); return; }
-    if (!selectedShippingMethod) { toast.error("Please select a shipping method"); return; }
+    // ── Pre-flight guards ────────────────────────────────────────────────────
+    if (!activeOrder) {
+      toast.error("No active order found.");
+      return;
+    }
+
+    // Vendure rejects ArrangingPayment when the server order has no lines.
+    // This happens for guests whose local cart was never synced to the server.
+    if (!activeOrder.lines || activeOrder.lines.length === 0) {
+      toast.error("Your cart is empty. Please add items before checking out.");
+      router.push("/cart");
+      return;
+    }
+
+    if (!activeOrder.shippingAddress && !shippingAddress) {
+      toast.error("Please add a shipping address.");
+      return;
+    }
+    if (!selectedShippingMethod) {
+      toast.error("Please select a shipping method.");
+      return;
+    }
     if (method === "installment" && !installmentPlan) {
       toast.error("Please confirm your installment plan first.");
       return;
     }
 
-    try {
-      setIsPaying(true);
+    setIsPaying(true);
 
+    try {
+      // ── Step 1: Set shipping method ────────────────────────────────────────
       if (!activeOrder.shippingLines || activeOrder.shippingLines.length === 0) {
-        await setShippingMethodMutation({ variables: { id: [selectedShippingMethod] } });
+        try {
+          await setShippingMethodMutation({ variables: { id: [selectedShippingMethod] } });
+        } catch (err) {
+          console.error("[checkout] setShippingMethod failed:", extractErrorMessage(err));
+          toast.error("Failed to set shipping method. Please try again.");
+          return;
+        }
       }
 
-      const transitionResult = await transitionToState({ variables: { state: "ArrangingPayment" } });
-      const transitionResponse = transitionResult.data?.transitionOrderToState;
+      // ── Step 2: Transition to ArrangingPayment ─────────────────────────────
+      let transitionResponse: TransitionToStateResponse["transitionOrderToState"] | undefined;
+      try {
+        const transitionResult = await transitionToState({
+          variables: { state: "ArrangingPayment" },
+        });
+        transitionResponse = transitionResult.data?.transitionOrderToState;
+      } catch (err) {
+        console.error("[checkout] transitionToState failed:", extractErrorMessage(err));
+        toast.error("Could not prepare your order for payment. Please try again.");
+        return;
+      }
+
       if (
         transitionResponse &&
         "__typename" in transitionResponse &&
         transitionResponse.__typename === "OrderStateTransitionError"
       ) {
-        toast.error(`Cannot proceed: ${transitionResponse.transitionError}`);
-        setIsPaying(false);
+        const raw = transitionResponse.transitionError ?? transitionResponse.message ?? "";
+        console.error("[checkout] transition error:", raw);
+        const friendly = raw.includes("empty")
+          ? "Your cart is empty. Please add items before paying."
+          : raw.includes("address")
+          ? "Please complete your shipping address before paying."
+          : `Order error: ${raw}`;
+        toast.error(friendly);
         return;
       }
 
-      await createPaystackIntent({ variables: { orderCode: activeOrder.code } });
+      // ── Step 3: Create Paystack intent ────────────────────────────────────
+      try {
+        await createPaystackIntent({ variables: { orderCode: activeOrder.code } });
+      } catch (err) {
+        console.error("[checkout] createPaystackIntent failed:", extractErrorMessage(err));
+        toast.error("Could not initialise payment. Please check your connection and try again.");
+        return;
+      }
 
+      // ── Step 4: Launch Paystack popup ─────────────────────────────────────
       const chargeAmount =
         method === "installment" && installmentPlan
           ? installmentPlan.depositAmount * 100
           : activeOrder.totalWithTax;
 
-      const { default: PaystackPop } = await import("@paystack/inline-js");
+      let PaystackPop: any;
+      try {
+        const mod = await import("@paystack/inline-js");
+        PaystackPop = mod.default;
+      } catch (err) {
+        console.error("[checkout] Paystack SDK load failed:", extractErrorMessage(err));
+        toast.error("Could not load the payment SDK. Please refresh the page and try again.");
+        return;
+      }
+
       const paystack = new PaystackPop();
-      paystack.newTransaction({
+      (paystack.newTransaction as any)({
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
         amount: chargeAmount,
         email: activeOrder.customer?.emailAddress || "",
         reference: activeOrder.code,
+        channels:
+          method === "bank"
+            ? ["bank_transfer"]
+            : ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
+        metadata: {
+          order_id: activeOrder.id,
+          payment_method: method,
+          ...(method === "installment" && installmentPlan
+            ? {
+                installment_periods: installmentPlan.periods,
+                installment_frequency: installmentPlan.frequency,
+              }
+            : {}),
+        },
         onSuccess: () => {
           router.replace(
             `/main/checkout/paystack-redirect?reference=${activeOrder.id}&status=success&amount=${chargeAmount}`
           );
         },
         onCancel: async () => {
-          await recreateFailedOrder({ variables: { orderCode: activeOrder.code } });
-          toast.error("Payment cancelled");
+          try {
+            await recreateFailedOrder({ variables: { orderCode: activeOrder.code } });
+          } catch (e) {
+            console.error("[checkout] recreateFailedOrder failed:", extractErrorMessage(e));
+          }
+          toast.error("Payment cancelled.");
           router.replace("/cart");
         },
       });
     } catch (err) {
-      console.error(err);
-      toast.error("Payment failed.");
+      // Catch-all for anything unexpected
+      const msg = extractErrorMessage(err);
+      console.error("[checkout] unexpected error:", msg);
+      toast.error(`Payment failed: ${msg}`);
     } finally {
       setIsPaying(false);
     }
   };
 
-  /* ------------------- Checkout label ------------------- */
+  /* ------------------- Button label ------------------- */
   const checkoutLabel = useMemo(() => {
     if (isPaying) return "Processing...";
     if (method === "installment" && installmentPlan) {
       return `Pay Deposit — ${NGN.format(installmentPlan.depositAmount)}`;
     }
-    return "Checkout";
+    if (method === "bank") return "Continue to Bank Transfer";
+    return "Pay with Paystack";
   }, [isPaying, method, installmentPlan]);
 
   /* ------------------- Render ------------------- */
@@ -326,42 +433,126 @@ function CheckoutPage() {
               <InstallmentPayment
                 totalAmount={activeOrder?.totalWithTax ?? 0}
                 onConfirm={handleInstallmentConfirm}
-                onBack={() => setMethod("card")}
+                onBack={() => setMethod("paystack")}
               />
             ) : (
               <div className="rounded-2xl border border-[#d1d1d1] p-5">
                 <p className="mb-4 text-lg font-semibold">Payment</p>
 
                 <div className="flex flex-col gap-4">
-                  <RadioRow
-                    checked={method === "bank"}
-                    onChange={() => setMethod("bank")}
-                    label="Bank Transfer"
-                  />
-                  <RadioRow
-                    checked={method === "card"}
-                    onChange={() => setMethod("card")}
-                    label="Debit Cards"
-                    right={
-                      <div className="flex gap-2 items-center">
-                        <Image src="/master card.png" alt="Mastercard" width={36} height={36} />
-                        <Image src="/visapay.png" alt="Visa" width={36} height={36} />
-                        <button
-                          onClick={() => setShowPayment(true)}
-                          className="w-6 h-6 flex items-center justify-center border rounded-full"
-                        >
-                          <Plus size={14} />
-                        </button>
+
+                  {/* ── Paystack (card / USSD / mobile money) ── */}
+                  <label
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      method === "paystack"
+                        ? "border-[#ff0000] bg-[#f3f3f3]"
+                        : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
+                    }`}
+                  >
+                    <div className="flex gap-3 items-center">
+                      <input
+                        type="radio"
+                        checked={method === "paystack"}
+                        onChange={() => setMethod("paystack")}
+                        className="accent-[#ff0000]"
+                      />
+                      <div>
+                        <p className="font-medium text-sm">Card / USSD / Mobile Money</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          Pay securely via Paystack
+                        </p>
                       </div>
-                    }
-                  />
-                  <RadioRow
-                    checked={method === "installment"}
-                    onChange={() => setMethod("installment")}
-                    label="Installment Payment"
-                  />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1 items-center bg-white border border-neutral-200 rounded-lg px-2 py-1">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <rect width="24" height="24" rx="4" fill="#ff0000" />
+                          <path
+                            d="M4 8h16M4 12h10M4 16h7"
+                            stroke="white"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        <span className="text-xs font-bold text-[#333333]">Paystack</span>
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* ── Bank Transfer ── */}
+                  <label
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      method === "bank"
+                        ? "border-[#ff0000] bg-[#f3f3f3]"
+                        : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
+                    }`}
+                  >
+                    <div className="flex gap-3 items-center">
+                      <input
+                        type="radio"
+                        checked={method === "bank"}
+                        onChange={() => setMethod("bank")}
+                        className="accent-[#ff0000]"
+                      />
+                      <div>
+                        <p className="font-medium text-sm">Bank Transfer</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          Transfer directly from your bank
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 items-center bg-white border border-neutral-200 rounded-lg px-2 py-1">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M8 10v11M12 10v11M16 10v11M20 10v11"
+                          stroke="#6b7280"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <span className="text-xs font-medium text-neutral-600">Bank</span>
+                    </div>
+                  </label>
+
+                  {/* ── Installment Payment ── */}
+                  <label
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      method === "installment"
+                        ? "border-[#ff0000] bg-[#f3f3f3]"
+                        : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
+                    }`}
+                  >
+                    <div className="flex gap-3 items-center">
+                      <input
+                        type="radio"
+                        checked={method === "installment"}
+                        onChange={() => setMethod("installment")}
+                        className="accent-[#ff0000]"
+                      />
+                      <div>
+                        <p className="font-medium text-sm">Installment Payment</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          Split into manageable payments
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 items-center bg-white border border-neutral-200 rounded-lg px-2 py-1">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M12 2v20M2 12h20"
+                          stroke="#6b7280"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                        <circle cx="12" cy="12" r="9" stroke="#6b7280" strokeWidth="2" />
+                      </svg>
+                      <span className="text-xs font-medium text-neutral-600">Pay Later</span>
+                    </div>
+                  </label>
                 </div>
 
+                {/* ── Shipping Address ── */}
                 <div className="my-6">
                   <p className="mb-2 text-sm font-semibold">Billing Address</p>
 
@@ -373,7 +564,8 @@ function CheckoutPage() {
                           {activeOrder?.shippingAddress?.fullName || shippingAddress?.fullName}
                         </p>
                         <p className="text-xs text-neutral-600">
-                          {activeOrder?.shippingAddress?.streetLine1 || shippingAddress?.streetLine1}
+                          {activeOrder?.shippingAddress?.streetLine1 ||
+                            shippingAddress?.streetLine1}
                         </p>
                         <p className="text-xs text-neutral-600">
                           {activeOrder?.shippingAddress?.city || shippingAddress?.city}
@@ -399,6 +591,7 @@ function CheckoutPage() {
                     )}
                   </div>
 
+                  {/* ── Shipping Method ── */}
                   <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5 mt-6">
                     <p className="mb-4 text-lg font-semibold">Shipping Method</p>
                     <div className="space-y-3">
@@ -453,11 +646,28 @@ function CheckoutPage() {
             <div className="rounded-2xl border border-[#d1d1d1] bg-white p-6">
               <p className="text-sm font-semibold mb-3">Your Order</p>
 
+              {/* Empty cart warning shown inline in the summary panel */}
+              {(!activeOrder?.lines || activeOrder.lines.length === 0) && (
+                <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600">
+                  Your cart is empty. Please{" "}
+                  <button
+                    className="underline font-medium"
+                    onClick={() => router.push("/cart")}
+                  >
+                    go back to cart
+                  </button>{" "}
+                  and add items before checking out.
+                </div>
+              )}
+
               <div className="space-y-5">
                 {activeOrder?.lines?.map((ln) => (
                   <div key={ln.id} className="flex gap-3 items-start">
                     <Image
-                      src={ln.productVariant?.product?.featuredAsset?.preview || "/placeholder.png"}
+                      src={
+                        ln.productVariant?.product?.featuredAsset?.preview ||
+                        "/placeholder.png"
+                      }
                       alt="preview"
                       width={75}
                       height={75}
@@ -471,17 +681,24 @@ function CheckoutPage() {
                           <button
                             className="w-4 h-4 border rounded-full text-xs"
                             onClick={() => updateQuantity(ln.id, ln.quantity - 1)}
-                          >–</button>
+                          >
+                            –
+                          </button>
                           <span className="text-xs">{ln.quantity}</span>
                           <button
                             className="w-4 h-4 border rounded-full text-xs"
                             onClick={() => updateQuantity(ln.id, ln.quantity + 1)}
-                          >+</button>
+                          >
+                            +
+                          </button>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-semibold">{formatNaira(ln.linePriceWithTax)}</p>
+                          <p className="text-sm font-semibold">
+                            {formatNaira(ln.linePriceWithTax)}
+                          </p>
                           <button className="text-xs text-red-500 flex items-center gap-1">
-                            Remove <Image src="/trash.png" alt="Remove" width={12} height={12} />
+                            Remove{" "}
+                            <Image src="/trash.png" alt="Remove" width={12} height={12} />
                           </button>
                         </div>
                       </div>
@@ -496,29 +713,67 @@ function CheckoutPage() {
                 <Row label="Shipping" value="₦0" />
                 {method === "installment" && installmentPlan && (
                   <>
-                    <Row label="Deposit (now)" value={NGN.format(installmentPlan.depositAmount)} />
+                    <Row
+                      label="Deposit (now)"
+                      value={NGN.format(installmentPlan.depositAmount)}
+                    />
                     <Row
                       label={`${installmentPlan.periods}× ${installmentPlan.frequency} repayments`}
                       value={NGN.format(installmentPlan.repaymentAmount)}
                     />
-                    <Row label="Insurance Fee (1%)" value={NGN.format(installmentPlan.insuranceFee)} />
+                    <Row
+                      label="Insurance Fee (1%)"
+                      value={NGN.format(installmentPlan.insuranceFee)}
+                    />
                   </>
                 )}
               </div>
 
               <div className="mt-3">
-                <Row big bold label="Grand Total" value={formatNaira(activeOrder?.totalWithTax ?? 0)} />
+                <Row
+                  big
+                  bold
+                  label="Grand Total"
+                  value={formatNaira(activeOrder?.totalWithTax ?? 0)}
+                />
               </div>
 
+              {/* ── Paystack CTA button ── */}
               <button
                 onClick={handleCheckout}
-                disabled={isPaying}
-                className={`mt-4 w-full py-3 rounded-full text-white text-sm font-medium ${
-                  isPaying ? "bg-red-300" : "bg-red-500 hover:bg-red-600"
+                disabled={isPaying || !activeOrder?.lines?.length}
+                className={`mt-5 w-full py-3 rounded-full text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
+                  isPaying || !activeOrder?.lines?.length
+                    ? "bg-red-300 cursor-not-allowed opacity-70"
+                    : "bg-[#ff0000] hover:bg-red-700 active:scale-[0.98]"
                 }`}
               >
+                {!isPaying && (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z"
+                      fill="white"
+                      stroke="white"
+                      strokeWidth="1"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
                 {checkoutLabel}
               </button>
+
+              {/* Secured by Paystack note */}
+              <p className="mt-3 text-center text-[10px] text-neutral-400 flex items-center justify-center gap-1">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 2L4 6v6c0 5.5 3.5 10.7 8 12 4.5-1.3 8-6.5 8-12V6l-8-4z"
+                    stroke="#9ca3af"
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Secured by Paystack
+              </p>
             </div>
           </aside>
         </div>
@@ -526,14 +781,11 @@ function CheckoutPage() {
 
       <Suscribe />
       <Footer />
-
-      {showPayment && <PaymentScreens onClose={() => setShowPayment(false)} />}
     </main>
   );
 }
 
 /* ------------------- Default Export with Suspense ------------------- */
-// ✅ Required by Next.js 13+ when using useSearchParams() in a page
 export default function Page() {
   return (
     <Suspense
