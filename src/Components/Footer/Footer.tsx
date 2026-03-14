@@ -96,8 +96,8 @@ const Footer = () => {
 
           {/* Legal Links */}
 
-          <a href="#" className="text-xs underline hover:text-red-500">Privacy Policy</a>
-          <a href="#" className="text-xs underline hover:text-red-500">Terms of Use</a>
+          <a href="/privacy-policy" className="text-xs underline hover:text-red-500">Privacy Policy</a>
+          <a href="/terms-of-use" className="text-xs underline hover:text-red-500">Terms of Use</a>
 
         </div>
       </div>

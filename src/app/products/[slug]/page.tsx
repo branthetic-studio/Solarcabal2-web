@@ -7,6 +7,8 @@ import { GET_PRODUCT_DETAILS } from "@/graphql/queries";
 import Navbar from "@/Components/Navbar/Navbar";
 import Footer from "@/Components/Footer/Footer";
 import { useCart } from "@/context/CartContext";
+import { useLocalCart } from "@/context/LocalCartContext";
+import { useUser } from "@/context/UserContext";
 import Suscribe from "@/Components/Suscribe/Suscribe";
 import { Star } from "lucide-react";
 import Image from "next/image";
@@ -115,7 +117,10 @@ const ProductDetailsPage = () => {
   const params = useParams();
   const slug = params?.slug as string;
   const router = useRouter();
+
   const { addToCartMutation } = useCart();
+  const { customer } = useUser();
+  const { addItem: addLocalItem } = useLocalCart();
 
   const [isAdding, setIsAdding] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
@@ -193,22 +198,37 @@ const ProductDetailsPage = () => {
 
     setIsAdding(true);
     try {
-      const result = await addToCartMutation({
-        productVariantId: selectedVariant.id,
+      // Optimistic local cart add — instant feedback, works even when logged out
+      addLocalItem({
+        id: selectedVariant.id,
+        name: product?.name ?? selectedVariant.name,
+        slug: slug ?? "",
+        priceWithTax: selectedVariant.priceWithTax,
+        currencyCode: selectedVariant.currencyCode ?? "NGN",
+        image:
+          mainImageSrc !== "/api/placeholder/400/400" ? mainImageSrc : undefined,
         quantity,
       });
 
-      // Vendure returns typed errors instead of throwing — handle them
-      if (result?.__typename === "InsufficientStockError") {
-        toast.error(`Only ${result.quantityAvailable} item(s) available in stock.`);
-        return false;
-      }
-      if (result?.errorCode) {
-        toast.error(`Could not add to cart: ${result.message ?? result.errorCode}`);
-        return false;
+      // Only push to server if the user is logged in
+      if (customer) {
+        const result = await addToCartMutation({
+          productVariantId: selectedVariant.id,
+          quantity,
+        });
+
+        // Vendure returns typed errors instead of throwing — handle them
+        if (result?.__typename === "InsufficientStockError") {
+          toast.error(`Only ${result.quantityAvailable} item(s) available in stock.`);
+          return false;
+        }
+        if (result?.errorCode) {
+          toast.error(`Could not add to cart: ${result.message ?? result.errorCode}`);
+          return false;
+        }
       }
 
-      toast.success("Added to cart", {
+      toast.success("Added to cart!", {
         position: "top-right",
         autoClose: 3000,
         hideProgressBar: false,
@@ -225,7 +245,16 @@ const ProductDetailsPage = () => {
     } finally {
       setIsAdding(false);
     }
-  }, [selectedVariant, quantity, addToCartMutation]);
+  }, [
+    selectedVariant,
+    quantity,
+    product,
+    slug,
+    mainImageSrc,
+    customer,
+    addLocalItem,
+    addToCartMutation,
+  ]);
 
   const handleAddToCart = () => addVariantToCart();
   const handleBuyNow = async () => {
