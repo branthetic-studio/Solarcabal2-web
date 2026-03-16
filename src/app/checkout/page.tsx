@@ -6,11 +6,11 @@ import Image from "next/image";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { gql } from "@apollo/client";
-import Suscribe from "@/Components/Suscribe/Suscribe";
-import AddressModal from "@/Components/AddressModal";
-import InstallmentPayment, { InstallmentPlan } from "@/Components/Installmentpayment";
 import { StaticImageData } from "next/image";
+
+import { useCart } from "@/context/CartContext";
+import { useLocalCart } from "@/context/LocalCartContext";
+import { useUser } from "@/context/UserContext";
 
 import {
   GET_ACTIVE_ORDER,
@@ -22,10 +22,12 @@ import {
   RECREATE_FAILED_ORDER,
 } from "@/graphql/queries";
 
+import Suscribe from "@/Components/Suscribe/Suscribe";
+import AddressModal from "@/Components/AddressModal";
+import InstallmentPayment, { InstallmentPlan } from "@/Components/Installmentpayment";
+
 /* ------------------- Types ------------------- */
 
-// Using string to avoid TypeScript control-flow narrowing errors
-// when comparing method inside useMemo / async functions.
 type PaymentMethod = string;
 
 type ActiveOrderLine = {
@@ -33,6 +35,7 @@ type ActiveOrderLine = {
   quantity: number;
   linePriceWithTax: number;
   productVariant?: {
+    id?: string;
     name?: string;
     product?: {
       featuredAsset?: { preview?: string | null } | null;
@@ -61,21 +64,21 @@ type ShippingMethod = {
 
 type SetShippingAddressResponse = {
   setOrderShippingAddress:
-    | ActiveOrder
-    | { errorCode: string; message: string };
+  | ActiveOrder
+  | { errorCode: string; message: string };
 };
 
 type TransitionToStateResponse = {
   transitionOrderToState:
-    | ActiveOrder
-    | {
-        __typename: "OrderStateTransitionError";
-        errorCode: string;
-        message: string;
-        transitionError: string;
-        fromState: string;
-        toState: string;
-      };
+  | ActiveOrder
+  | {
+    __typename: "OrderStateTransitionError";
+    errorCode: string;
+    message: string;
+    transitionError: string;
+    fromState: string;
+    toState: string;
+  };
 };
 
 interface InfoRowProps {
@@ -86,23 +89,16 @@ interface InfoRowProps {
 
 /* ------------------- Helpers ------------------- */
 
-/**
- * Extracts a human-readable message from anything that might be thrown.
- * Handles: Error, GraphQL ApolloError, plain objects, strings.
- */
 function extractErrorMessage(err: unknown): string {
   if (!err) return "An unknown error occurred.";
   if (typeof err === "string") return err;
   if (err instanceof Error) return err.message;
-
-  // ApolloError / GraphQL errors
   const e = err as any;
   if (e?.graphQLErrors?.length) {
     return e.graphQLErrors.map((g: any) => g.message).join(", ");
   }
   if (e?.networkError?.message) return `Network error: ${e.networkError.message}`;
   if (e?.message) return e.message;
-
   try {
     return JSON.stringify(err);
   } catch {
@@ -119,40 +115,24 @@ const NGN = new Intl.NumberFormat("en-NG", {
 
 const formatNaira = (kobo: number) => NGN.format(kobo / 100);
 
-/* ------------------- GraphQL ------------------- */
-const UPDATE_CART = gql`
-  mutation UpdateCart($lineId: ID!, $quantity: Int!) {
-    adjustOrderLineQuantity(orderLineId: $lineId, quantity: $quantity) {
-      ... on Order {
-        id
-        totalQuantity
-        lines {
-          id
-          quantity
-          linePriceWithTax
-          productVariant {
-            name
-            product {
-              featuredAsset {
-                preview
-              }
-            }
-          }
-        }
-        totalWithTax
-        subTotalWithTax
-      }
-      ... on OrderModificationError {
-        message
-      }
-    }
-  }
-`;
-
 /* ------------------- Inner Page ------------------- */
 function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // ── User / cart contexts (same as ProductGrid) ──────────────────────────
+  const { customer } = useUser();
+  const {
+    cart,
+    handleAdjustQuantity,
+    removeFromCartMutation,
+    getOrderLineIdByVariantId,
+  } = useCart();
+  const {
+    items: localItems,
+    updateQuantity: updateLocalQuantity,
+    removeItem: removeLocalItem,
+  } = useLocalCart();
 
   const [method, setMethod] = useState<PaymentMethod>("paystack" as PaymentMethod);
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<string | null>(null);
@@ -160,7 +140,7 @@ function CheckoutPage() {
   const [isPaying, setIsPaying] = useState(false);
   const [installmentPlan, setInstallmentPlan] = useState<InstallmentPlan | null>(null);
 
-  // Pre-select method from URL param (e.g. ?method=installment from Pay Later button)
+  // Pre-select method from URL param
   useEffect(() => {
     const methodParam = searchParams?.get("method");
     if (methodParam === "installment" || methodParam === "paystack" || methodParam === "bank") {
@@ -169,7 +149,7 @@ function CheckoutPage() {
   }, [searchParams]);
 
   /* ------------------- Queries ------------------- */
-  const { data: activeOrderData, refetch } = useQuery<{
+  const { data: activeOrderData } = useQuery<{
     activeOrder: ActiveOrder;
   }>(GET_ACTIVE_ORDER);
 
@@ -192,7 +172,6 @@ function CheckoutPage() {
   }, [shippingMethods, selectedShippingMethod]);
 
   /* ------------------- Mutations ------------------- */
-  const [updateCartMutation] = useMutation(UPDATE_CART);
   const [setShippingAddressMutation] =
     useMutation<SetShippingAddressResponse>(SET_SHIPPING_ADDRESS);
   const [setShippingMethodMutation] = useMutation(SET_SHIPPING_METHOD);
@@ -200,31 +179,58 @@ function CheckoutPage() {
   const [createPaystackIntent] = useMutation(PAYSTACK_INTENT);
   const [recreateFailedOrder] = useMutation(RECREATE_FAILED_ORDER);
 
+  /* ------------------- Reactive quantity map (ProductGrid pattern) ------------------- */
+  // Derived from live context — no refetch() needed. Updates automatically when
+  // useCart or useLocalCart changes (e.g. after +/- buttons or cart page removes an item).
+  const quantityMap = useMemo<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    if (customer) {
+      (cart?.activeOrder?.lines ?? []).forEach((line: any) => {
+        const vid = line?.productVariant?.id;
+        if (vid && line.quantity > 0) map[vid] = line.quantity;
+      });
+    } else {
+      localItems.forEach((it) => {
+        if (it.quantity > 0) map[it.id] = it.quantity;
+      });
+    }
+    return map;
+  }, [customer, cart, localItems]);
+
   /* ------------------- Handlers ------------------- */
-  const updateQuantity = async (lineId: string, qty: number) => {
-    if (qty < 1) return;
-    try {
-      const res = await updateCartMutation({ variables: { lineId, quantity: qty } });
-      const payload = res.data as {
-        adjustOrderLineQuantity:
-          | {
-              __typename: "Order";
-              id: string;
-              totalQuantity: number;
-              lines: ActiveOrderLine[];
-              totalWithTax: number;
-              subTotalWithTax?: number;
-            }
-          | { __typename: "OrderModificationError"; message: string };
-      };
-      if (payload.adjustOrderLineQuantity.__typename === "Order") {
-        await refetch();
-      } else {
-        toast.error(payload.adjustOrderLineQuantity.message);
+
+  // Replaces the old updateCartMutation + refetch() approach.
+  // Routes through the same context methods ProductGrid uses so quantityMap
+  // updates reactively on the next render.
+  const updateQuantity = async (variantId: string, lineId: string, newQty: number) => {
+    if (newQty < 1) {
+      // Remove the item
+      removeLocalItem(variantId);
+      if (customer) {
+        const orderLineId = getOrderLineIdByVariantId(variantId) ?? lineId;
+        if (orderLineId) {
+          try {
+            await removeFromCartMutation(orderLineId);
+          } catch (e) {
+            console.error("[checkout] removeFromCart failed:", extractErrorMessage(e));
+          }
+        }
       }
-    } catch (err) {
-      console.error("Error updating cart:", extractErrorMessage(err));
-      toast.error("Failed to update cart.");
+      return;
+    }
+
+    // Adjust quantity
+    updateLocalQuantity(variantId, newQty);
+    if (customer) {
+      const orderLineId = getOrderLineIdByVariantId(variantId) ?? lineId;
+      if (orderLineId) {
+        try {
+          await handleAdjustQuantity(orderLineId, newQty);
+        } catch (e) {
+          console.error("[checkout] handleAdjustQuantity failed:", extractErrorMessage(e));
+          toast.error("Failed to update quantity.");
+        }
+      }
     }
   };
 
@@ -248,7 +254,6 @@ function CheckoutPage() {
       if (response && "id" in response) {
         setShippingAddress(addressData);
         toast.success("Shipping address saved");
-        await refetch();
       } else if (response && "errorCode" in response) {
         toast.error(response.message);
       }
@@ -265,14 +270,11 @@ function CheckoutPage() {
 
   /* ------------------- Core checkout / Paystack launch ------------------- */
   const handleCheckout = async () => {
-    // ── Pre-flight guards ────────────────────────────────────────────────────
     if (!activeOrder) {
       toast.error("No active order found.");
       return;
     }
 
-    // Vendure rejects ArrangingPayment when the server order has no lines.
-    // This happens for guests whose local cart was never synced to the server.
     if (!activeOrder.lines || activeOrder.lines.length === 0) {
       toast.error("Your cart is empty. Please add items before checking out.");
       router.push("/cart");
@@ -295,7 +297,7 @@ function CheckoutPage() {
     setIsPaying(true);
 
     try {
-      // ── Step 1: Set shipping method ────────────────────────────────────────
+      // Step 1: Set shipping method
       if (!activeOrder.shippingLines || activeOrder.shippingLines.length === 0) {
         try {
           await setShippingMethodMutation({ variables: { id: [selectedShippingMethod] } });
@@ -306,7 +308,7 @@ function CheckoutPage() {
         }
       }
 
-      // ── Step 2: Transition to ArrangingPayment ─────────────────────────────
+      // Step 2: Transition to ArrangingPayment
       let transitionResponse: TransitionToStateResponse["transitionOrderToState"] | undefined;
       try {
         const transitionResult = await transitionToState({
@@ -329,13 +331,13 @@ function CheckoutPage() {
         const friendly = raw.includes("empty")
           ? "Your cart is empty. Please add items before paying."
           : raw.includes("address")
-          ? "Please complete your shipping address before paying."
-          : `Order error: ${raw}`;
+            ? "Please complete your shipping address before paying."
+            : `Order error: ${raw}`;
         toast.error(friendly);
         return;
       }
 
-      // ── Step 3: Create Paystack intent ────────────────────────────────────
+      // Step 3: Create Paystack intent
       try {
         await createPaystackIntent({ variables: { orderCode: activeOrder.code } });
       } catch (err) {
@@ -344,7 +346,7 @@ function CheckoutPage() {
         return;
       }
 
-      // ── Step 4: Launch Paystack popup ─────────────────────────────────────
+      // Step 4: Launch Paystack popup
       const chargeAmount =
         method === "installment" && installmentPlan
           ? installmentPlan.depositAmount * 100
@@ -375,9 +377,9 @@ function CheckoutPage() {
           payment_method: method,
           ...(method === "installment" && installmentPlan
             ? {
-                installment_periods: installmentPlan.periods,
-                installment_frequency: installmentPlan.frequency,
-              }
+              installment_periods: installmentPlan.periods,
+              installment_frequency: installmentPlan.frequency,
+            }
             : {}),
         },
         onSuccess: () => {
@@ -396,7 +398,6 @@ function CheckoutPage() {
         },
       });
     } catch (err) {
-      // Catch-all for anything unexpected
       const msg = extractErrorMessage(err);
       console.error("[checkout] unexpected error:", msg);
       toast.error(`Payment failed: ${msg}`);
@@ -441,13 +442,12 @@ function CheckoutPage() {
 
                 <div className="flex flex-col gap-4">
 
-                  {/* ── Paystack (card / USSD / mobile money) ── */}
+                  {/* ── Paystack ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      method === "paystack"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "paystack"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                    }`}
+                      }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -481,11 +481,10 @@ function CheckoutPage() {
 
                   {/* ── Bank Transfer ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      method === "bank"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "bank"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                    }`}
+                      }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -515,13 +514,12 @@ function CheckoutPage() {
                     </div>
                   </label>
 
-                  {/* ── Installment Payment ── */}
+                  {/* ── Installment ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      method === "installment"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "installment"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                    }`}
+                      }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -646,7 +644,6 @@ function CheckoutPage() {
             <div className="rounded-2xl border border-[#d1d1d1] bg-white p-6">
               <p className="text-sm font-semibold mb-3">Your Order</p>
 
-              {/* Empty cart warning shown inline in the summary panel */}
               {(!activeOrder?.lines || activeOrder.lines.length === 0) && (
                 <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600">
                   Your cart is empty. Please{" "}
@@ -661,50 +658,60 @@ function CheckoutPage() {
               )}
 
               <div className="space-y-5">
-                {activeOrder?.lines?.map((ln) => (
-                  <div key={ln.id} className="flex gap-3 items-start">
-                    <Image
-                      src={
-                        ln.productVariant?.product?.featuredAsset?.preview ||
-                        "/placeholder.png"
-                      }
-                      alt="preview"
-                      width={75}
-                      height={75}
-                      className="rounded border bg-[#F3F5F7] p-4"
-                    />
-                    <div className="flex-1">
-                      <p className="text-xs font-semibold">{ln.productVariant?.name}</p>
-                      <p className="text-xs text-neutral-500">Category</p>
-                      <div className="flex justify-between">
-                        <div className="flex items-center gap-2 mt-2">
-                          <button
-                            className="w-4 h-4 border rounded-full text-xs"
-                            onClick={() => updateQuantity(ln.id, ln.quantity - 1)}
-                          >
-                            –
-                          </button>
-                          <span className="text-xs">{ln.quantity}</span>
-                          <button
-                            className="w-4 h-4 border rounded-full text-xs"
-                            onClick={() => updateQuantity(ln.id, ln.quantity + 1)}
-                          >
-                            +
-                          </button>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-semibold">
-                            {formatNaira(ln.linePriceWithTax)}
-                          </p>
-                          <button className="text-xs text-red-500 flex items-center gap-1">
-                            Remove{" "}
-                            <Image src="/trash.png" alt="Remove" width={12} height={12} />
-                          </button>
+                {activeOrder?.lines?.map((ln) => {
+                  const variantId = ln.productVariant?.id ?? "";
+                  // ── KEY CHANGE: read qty from reactive quantityMap first,
+                  //    fall back to the server value from activeOrder.
+                  const qty = (variantId ? quantityMap[variantId] : undefined) ?? ln.quantity;
+
+                  return (
+                    <div key={ln.id} className="flex gap-3 items-start">
+                      <Image
+                        src={
+                          ln.productVariant?.product?.featuredAsset?.preview ||
+                          "/placeholder.png"
+                        }
+                        alt="preview"
+                        width={75}
+                        height={75}
+                        className="rounded border bg-[#F3F5F7] p-4"
+                      />
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold">{ln.productVariant?.name}</p>
+                        <p className="text-xs text-neutral-500">Category</p>
+                        <div className="flex justify-between">
+                          <div className="flex items-center gap-2 mt-2">
+                            <button
+                              className="w-4 h-4 border rounded-full text-xs"
+                              onClick={() => updateQuantity(variantId, ln.id, qty - 1)}
+                            >
+                              –
+                            </button>
+                            <span className="text-xs">{qty}</span>
+                            <button
+                              className="w-4 h-4 border rounded-full text-xs"
+                              onClick={() => updateQuantity(variantId, ln.id, qty + 1)}
+                            >
+                              +
+                            </button>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold">
+                              {formatNaira(ln.linePriceWithTax)}
+                            </p>
+                            <button
+                              className="text-xs text-red-500 flex items-center gap-1"
+                              onClick={() => updateQuantity(variantId, ln.id, 0)}
+                            >
+                              Remove{" "}
+                              <Image src="/trash.png" alt="Remove" width={12} height={12} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="mt-4 border-t pt-4 space-y-2 text-sm">
@@ -738,15 +745,14 @@ function CheckoutPage() {
                 />
               </div>
 
-              {/* ── Paystack CTA button ── */}
+              {/* ── Paystack CTA ── */}
               <button
                 onClick={handleCheckout}
                 disabled={isPaying || !activeOrder?.lines?.length}
-                className={`mt-5 w-full py-3 rounded-full text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
-                  isPaying || !activeOrder?.lines?.length
+                className={`mt-5 w-full py-3 rounded-full text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all ${isPaying || !activeOrder?.lines?.length
                     ? "bg-red-300 cursor-not-allowed opacity-70"
                     : "bg-[#ff0000] hover:bg-red-700 active:scale-[0.98]"
-                }`}
+                  }`}
               >
                 {!isPaying && (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -762,7 +768,6 @@ function CheckoutPage() {
                 {checkoutLabel}
               </button>
 
-              {/* Secured by Paystack note */}
               <p className="mt-3 text-center text-[10px] text-neutral-400 flex items-center justify-center gap-1">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
                   <path
@@ -808,18 +813,6 @@ export default function Page() {
 }
 
 /* ---------------- Helper Components ---------------- */
-function RadioRow({ checked, onChange, label, right }: any) {
-  return (
-    <label className="flex justify-between items-center p-3 bg-neutral-100 rounded-lg cursor-pointer">
-      <div className="flex gap-3 items-center">
-        <input type="radio" checked={checked} onChange={onChange} className="accent-red-500" />
-        <span>{label}</span>
-      </div>
-      {right}
-    </label>
-  );
-}
-
 function Row({ label, value, bold, big }: any) {
   return (
     <div className="flex justify-between text-[#717171] font-xs">
