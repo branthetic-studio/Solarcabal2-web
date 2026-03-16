@@ -660,8 +660,6 @@ function CheckoutPage() {
               <div className="space-y-5">
                 {activeOrder?.lines?.map((ln) => {
                   const variantId = ln.productVariant?.id ?? "";
-                  // ── KEY CHANGE: read qty from reactive quantityMap first,
-                  //    fall back to the server value from activeOrder.
                   const qty = (variantId ? quantityMap[variantId] : undefined) ?? ln.quantity;
 
                   return (
