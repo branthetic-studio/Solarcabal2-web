@@ -15,7 +15,6 @@ import ProductGrid from "./components/ProductGrid";
 import Suscribe from "@/Components/Suscribe/Suscribe";
 import CartItems from "@/Components/CartItems";
 
-/* ── Docs: get top-level collections ── */
 const GET_TOP_LEVEL_COLLECTIONS = gql`
   query GetTopLevelCollections {
     collections(options: { topLevelOnly: true }) {
@@ -32,7 +31,6 @@ const GET_TOP_LEVEL_COLLECTIONS = gql`
   }
 `;
 
-/* ── Docs: fetch products under a collection to extract brand names ── */
 const GET_COLLECTION_BRANDS = gql`
   query GetCollectionBrands($slug: String!) {
     search(
@@ -68,7 +66,6 @@ type GetCollectionBrandsResponse = {
   };
 };
 
-/* ── Inner component that fetches brands for the selected category ── */
 function BrandsLoader({
   selectedSlug,
   children,
@@ -83,11 +80,9 @@ function BrandsLoader({
     skip: !selectedSlug,
   });
 
-  /* Build facetValueId → brand name map from storeFacets */
   const brands = useMemo(() => {
     if (!data || !storeFacets.length) return [];
 
-    /* storeFacets: Array<{ id, name, facet: { name } }> */
     const brandFacetMap: Record<string, string> = {};
     storeFacets.forEach((f: { id: string; name: string; facet?: { name: string } }) => {
       if (f.facet?.name?.toLowerCase() === "brand") {
@@ -108,7 +103,6 @@ function BrandsLoader({
   return <>{children(brands)}</>;
 }
 
-/* ── Inner page component that uses useSearchParams ── */
 function PageContent() {
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get("category");
@@ -120,9 +114,12 @@ function PageContent() {
   const [sortOrder, setSortOrder] = useState<string>("relevance");
   const facetValueIds = useBrandFacetIds(selectedBrand);
   const [condition, setCondition] = useState<string>("ANY");
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
 
-  /* ── Fetch real top-level collections ── */
+  const minPrice = 0;
+  const maxPrice = 100_000_000;
+
+  const [priceRange, setPriceRange] = useState<[number, number]>([minPrice, maxPrice]);
+
   const { data: collectionsData, loading: collectionsLoading } = useQuery<{
     collections: { items: TopLevelCollection[] };
   }>(GET_TOP_LEVEL_COLLECTIONS);
@@ -133,23 +130,18 @@ function PageContent() {
       !c.name.toLowerCase().includes("installation")
   );
 
-  /* Auto-select first category once loaded — only if nothing is selected yet */
   React.useEffect(() => {
     if (!selectedCategorySlug && collections.length > 0) {
       setSelectedCategorySlug(collections[0].slug);
     }
   }, [collections, selectedCategorySlug]);
 
-  /* When the URL param changes (e.g. user clicks a banner link), sync the state */
   React.useEffect(() => {
     if (categoryParam) {
       setSelectedCategorySlug(categoryParam);
       setSelectedBrand([]);
     }
   }, [categoryParam]);
-
-  const minPrice = 0;
-  const maxPrice = 10_000_000;
 
   if (collectionsLoading) {
     return (
@@ -173,11 +165,8 @@ function PageContent() {
         onSortChange={setSortOrder}
       />
 
-      {/* BrandsLoader fetches brands for the selected category, then renders layout */}
       <BrandsLoader selectedSlug={selectedCategorySlug}>
         {(brandsForCategory) => {
-          /* Build categoriesFromApi with real data — brands only for selected,
-             empty array for others (Sidebar only expands the selected one) */
           const categoriesFromApi: CategoryWithBrands[] = collections.map((c) => ({
             slug: c.slug,
             name: c.name,
@@ -236,7 +225,6 @@ function PageContent() {
   );
 }
 
-/* ── Main store page — wraps content in Suspense for useSearchParams ── */
 const Page = () => {
   return (
     <Suspense

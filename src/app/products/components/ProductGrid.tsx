@@ -75,12 +75,12 @@ interface GetAllFacetsResponse {
 }
 
 type GridItem = {
-  id: string; // slug — stable key
+  id: string;
   name: string;
   slug: string;
   image?: string;
   brand: string;
-  priceRaw?: number;
+  priceRaw?: number; // in cents
   currencyCode: string;
 };
 
@@ -108,9 +108,7 @@ export default function ProductGrid({
     updateQuantity: updateLocalQuantity,
   } = useLocalCart();
 
-  // Cached slug → variantId. A ref so it never triggers re-renders.
   const variantIdMap = useRef<Record<string, string>>({});
-
   const [openBrands, setOpenBrands] = useState<Record<string, boolean>>({});
 
   const [loadDetails] = useLazyQuery<GetProductDetailsResponse>(
@@ -133,12 +131,20 @@ export default function ProductGrid({
 
   const { data: facetsData } = useQuery<GetAllFacetsResponse>(GET_ALL_FACETS);
 
-  // ─── Brand buckets ──────────────────────────────────────────────────────────
+  // ─── Brand buckets with price filtering ───────────────────────────────────
   const brandBuckets = useMemo(() => {
     const items = data?.search?.items ?? [];
     const facetItems = facetsData?.facets?.items ?? [];
     if (!items.length) return [];
 
+    // priceRange is in display units (e.g. ₦1,500)
+    // priceRaw from the API is in cents (e.g. 150000 = ₦1,500)
+    // Multiply display range by 100 to compare correctly
+    const [minDisplay, maxDisplay] = priceRange;
+    const minCents = minDisplay * 100;
+    const maxCents = maxDisplay * 100;
+
+    // Build facetValueId → { name, facetName } map
     const facetValueMap: Record<string, { name: string; facetName: string }> = {};
     facetItems.forEach((facet) => {
       facet.values.forEach((val) => {
@@ -149,9 +155,13 @@ export default function ProductGrid({
       });
     });
 
-    const buckets: Record<string, { brandId: string; brandName: string; items: GridItem[] }> = {};
+    const buckets: Record<
+      string,
+      { brandId: string; brandName: string; items: GridItem[] }
+    > = {};
 
     items.forEach((it) => {
+      // Resolve brand name from facets
       let brandName = "Others";
       if (it.facetValueIds?.length) {
         for (const id of it.facetValueIds) {
@@ -161,6 +171,17 @@ export default function ProductGrid({
             break;
           }
         }
+      }
+
+      // Resolve raw price in cents
+      const priceRaw =
+        it.priceWithTax.__typename === "SinglePrice"
+          ? it.priceWithTax.value
+          : it.priceWithTax.min;
+
+      // ── Price filter: skip items outside the selected range ──
+      if (priceRaw !== undefined) {
+        if (priceRaw < minCents || priceRaw > maxCents) return;
       }
 
       if (!buckets[brandName]) {
@@ -173,29 +194,29 @@ export default function ProductGrid({
         slug: it.slug,
         image: it.productAsset?.preview,
         brand: brandName,
-        priceRaw:
-          it.priceWithTax.__typename === "SinglePrice"
-            ? it.priceWithTax.value
-            : it.priceWithTax.min,
+        priceRaw,
         currencyCode: it.currencyCode,
       });
     });
 
     const result = Object.values(buckets);
+
+    // Sort items within each bucket
     result.forEach((bucket) => {
       bucket.items.sort((a, b) => {
         switch (sort) {
-          case "priceAsc": return (a.priceRaw ?? 0) - (b.priceRaw ?? 0);
+          case "priceAsc":  return (a.priceRaw ?? 0) - (b.priceRaw ?? 0);
           case "priceDesc": return (b.priceRaw ?? 0) - (a.priceRaw ?? 0);
-          case "nameAsc": return a.name.localeCompare(b.name);
-          case "nameDesc": return b.name.localeCompare(a.name);
-          default: return 0;
+          case "nameAsc":   return a.name.localeCompare(b.name);
+          case "nameDesc":  return b.name.localeCompare(a.name);
+          default:          return 0;
         }
       });
     });
 
-    return result;
-  }, [data, facetsData, sort]);
+    // Remove buckets that are empty after price filtering
+    return result.filter((bucket) => bucket.items.length > 0);
+  }, [data, facetsData, sort, priceRange]); // ← priceRange is a dependency
 
   // Open all brand sections by default on first load
   useEffect(() => {
@@ -210,32 +231,24 @@ export default function ProductGrid({
     }
   }, [brandBuckets]);
 
-  // ─── quantityMap derived from live cart contexts ─────────────────────────────
-  // KEY FIX: no longer local state — computed from useCart / useLocalCart.
-  // When CartItems or CartPage removes an item, those contexts update,
-  // this memo re-runs, and the "Add to Cart" button reappears automatically.
+  // ─── quantityMap derived from live cart contexts ──────────────────────────
   const quantityMap = useMemo<Record<string, number>>(() => {
     const map: Record<string, number> = {};
     const slugToVariant = variantIdMap.current;
 
     if (customer) {
-      // variantId → qty from the live server order
       const serverQty: Record<string, number> = {};
       (cart?.activeOrder?.lines ?? []).forEach((line: any) => {
         const vid = line?.productVariant?.id;
         if (vid) serverQty[vid] = line.quantity ?? 0;
       });
-
-      // Translate back to slug keys
       Object.entries(slugToVariant).forEach(([slug, variantId]) => {
         const qty = serverQty[variantId];
         if (qty && qty > 0) map[slug] = qty;
       });
     } else {
-      // Guest: match localItems by their stored id (which is variantId)
       const localQty: Record<string, number> = {};
       localItems.forEach((it) => { localQty[it.id] = it.quantity; });
-
       Object.entries(slugToVariant).forEach(([slug, variantId]) => {
         const qty = localQty[variantId];
         if (qty && qty > 0) map[slug] = qty;
@@ -245,7 +258,7 @@ export default function ProductGrid({
     return map;
   }, [customer, cart, localItems]);
 
-  // ─── Resolve & cache variantId for an item ─────────────────────────────────
+  // ─── Resolve & cache variantId ─────────────────────────────────────────────
   const resolveVariant = useCallback(
     async (item: GridItem): Promise<string | null> => {
       if (variantIdMap.current[item.id]) return variantIdMap.current[item.id];
@@ -258,7 +271,7 @@ export default function ProductGrid({
     [loadDetails]
   );
 
-  // ─── Add to cart ─────────────────────────────────────────────────────────────
+  // ─── Add to cart ──────────────────────────────────────────────────────────
   const handleAddToCart = useCallback(
     async (item: GridItem) => {
       try {
@@ -278,7 +291,6 @@ export default function ProductGrid({
           pd?.product?.assets?.[0]?.preview ??
           undefined;
 
-        // Add to local cart → triggers quantityMap recompute via useMemo
         addLocalItem({
           id: variantId,
           name: item.name,
@@ -312,7 +324,6 @@ export default function ProductGrid({
       if (!variantId) return;
 
       if (newQty <= 0) {
-        // Remove → quantityMap drops this entry on next render
         removeLocalItem(variantId);
         if (customer) {
           const orderLineId = getOrderLineIdByVariantId(variantId);
@@ -323,7 +334,6 @@ export default function ProductGrid({
         return;
       }
 
-      // Update → quantityMap reflects new value on next render
       updateLocalQuantity(variantId, newQty);
       if (customer) {
         const orderLineId = getOrderLineIdByVariantId(variantId);
@@ -344,8 +354,16 @@ export default function ProductGrid({
   );
 
   if (loading) return <div className="text-center mx-auto">Loading products…</div>;
-  if (error) return <div>Failed to load products.</div>;
-  if (brandBuckets.length === 0) return <div className="text-center mx-auto">No products found.</div>;
+  if (error)   return <div>Failed to load products.</div>;
+
+  if (brandBuckets.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center w-full py-20 text-center">
+        <p className="text-neutral-500 text-sm">No products match the selected price range.</p>
+        <p className="text-neutral-400 text-xs mt-1">Try adjusting the price filter in the sidebar.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full space-y-4">
@@ -365,7 +383,11 @@ export default function ProductGrid({
               className="w-full flex items-center justify-between px-4 py-4 text-left"
             >
               <h2 className="text-sm font-semibold">{brandGroup.brandName}</h2>
-              <span className={`text-xl transition-transform duration-200 ${isOpen ? "rotate-180" : "rotate-0"}`}>
+              <span
+                className={`text-xl transition-transform duration-200 ${
+                  isOpen ? "rotate-180" : "rotate-0"
+                }`}
+              >
                 <ChevronDown />
               </span>
             </button>
@@ -418,7 +440,10 @@ export default function ProductGrid({
                           <p className="text-sm text-gray-500 mt-2">{item.brand}</p>
                           <p className="font-semibold text-sm">{item.name}</p>
                           <p className="text-md font-bold mt-4">
-                            {item.currencyCode} {item.priceRaw ? (item.priceRaw / 100).toLocaleString() : '0.0'}
+                            {item.currencyCode}{" "}
+                            {item.priceRaw
+                              ? (item.priceRaw / 100).toLocaleString()
+                              : "0.00"}
                           </p>
                         </div>
                       </div>
