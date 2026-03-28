@@ -120,7 +120,7 @@ function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // ── User / cart contexts (same as ProductGrid) ──────────────────────────
+  // ── User / cart contexts ──────────────────────────────────────────────────
   const { customer } = useUser();
   const {
     cart,
@@ -179,9 +179,10 @@ function CheckoutPage() {
   const [createPaystackIntent] = useMutation(PAYSTACK_INTENT);
   const [recreateFailedOrder] = useMutation(RECREATE_FAILED_ORDER);
 
-  /* ------------------- Reactive quantity map (ProductGrid pattern) ------------------- */
-  // Derived from live context — no refetch() needed. Updates automatically when
-  // useCart or useLocalCart changes (e.g. after +/- buttons or cart page removes an item).
+  /* ------------------- Reactive quantity map --------------------------------
+   * Derived from live context — no refetch() needed. Updates automatically
+   * when useCart or useLocalCart changes.
+   * -------------------------------------------------------------------------- */
   const quantityMap = useMemo<Record<string, number>>(() => {
     const map: Record<string, number> = {};
     if (customer) {
@@ -197,14 +198,47 @@ function CheckoutPage() {
     return map;
   }, [customer, cart, localItems]);
 
+  /* ------------------- Shipping cost derived from selected method -----------
+   * We read price directly from the shippingMethods list so the UI updates
+   * immediately as the user switches options — before the mutation fires.
+   * -------------------------------------------------------------------------- */
+  const selectedShippingCost = useMemo(() => {
+    if (!selectedShippingMethod) return 0;
+    return shippingMethods.find((m) => m.id === selectedShippingMethod)?.price ?? 0;
+  }, [selectedShippingMethod, shippingMethods]);
+
+  /* ------------------- Display totals --------------------------------------
+   * activeOrder.subTotalWithTax = items only (no shipping).
+   * We add selectedShippingCost so the user sees the correct live total
+   * before the mutation is called at checkout time.
+   *
+   * Edge-case: if the server has already applied a shipping line (e.g. the
+   * user came back to this page) we use totalWithTax directly and avoid
+   * double-counting by checking shippingLines.
+   * -------------------------------------------------------------------------- */
+  const serverAlreadyHasShipping =
+    (activeOrder?.shippingLines?.length ?? 0) > 0;
+
+  const displayTotal = useMemo(() => {
+    if (serverAlreadyHasShipping) {
+      // Server total already includes shipping — use it as-is, but swap in
+      // the newly selected shipping cost if the user changed the method.
+      const serverShippingCost =
+        activeOrder?.shippingLines?.reduce(
+          (acc: number, sl: any) => acc + (sl.priceWithTax ?? 0),
+          0
+        ) ?? 0;
+      const base = (activeOrder?.totalWithTax ?? 0) - serverShippingCost;
+      return base + selectedShippingCost;
+    }
+    // No shipping on the order yet — add it manually.
+    return (activeOrder?.subTotalWithTax ?? activeOrder?.totalWithTax ?? 0) + selectedShippingCost;
+  }, [activeOrder, selectedShippingCost, serverAlreadyHasShipping]);
+
   /* ------------------- Handlers ------------------- */
 
-  // Replaces the old updateCartMutation + refetch() approach.
-  // Routes through the same context methods ProductGrid uses so quantityMap
-  // updates reactively on the next render.
   const updateQuantity = async (variantId: string, lineId: string, newQty: number) => {
     if (newQty < 1) {
-      // Remove the item
       removeLocalItem(variantId);
       if (customer) {
         const orderLineId = getOrderLineIdByVariantId(variantId) ?? lineId;
@@ -219,7 +253,6 @@ function CheckoutPage() {
       return;
     }
 
-    // Adjust quantity
     updateLocalQuantity(variantId, newQty);
     if (customer) {
       const orderLineId = getOrderLineIdByVariantId(variantId) ?? lineId;
@@ -346,11 +379,13 @@ function CheckoutPage() {
         return;
       }
 
-      // Step 4: Launch Paystack popup
+      // Step 4: Determine charge amount
+      // Use displayTotal so Paystack always charges the correct amount
+      // inclusive of the selected shipping cost.
       const chargeAmount =
         method === "installment" && installmentPlan
           ? installmentPlan.depositAmount * 100
-          : activeOrder.totalWithTax;
+          : displayTotal;
 
       let PaystackPop: any;
       try {
@@ -362,6 +397,7 @@ function CheckoutPage() {
         return;
       }
 
+      // Step 5: Launch Paystack popup
       const paystack = new PaystackPop();
       (paystack.newTransaction as any)({
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
@@ -712,10 +748,18 @@ function CheckoutPage() {
                 })}
               </div>
 
+              {/* ── Order Summary ── */}
               <div className="mt-4 border-t pt-4 space-y-2 text-sm">
-                <Row label="Subtotal" value={formatNaira(activeOrder?.subTotalWithTax ?? 0)} />
+                <Row
+                  label="Subtotal"
+                  value={formatNaira(activeOrder?.subTotalWithTax ?? 0)}
+                />
                 <Row label="Discount" value="- ₦0" />
-                <Row label="Shipping" value="₦0" />
+                {/* Shipping cost now reflects the selected shipping method live */}
+                <Row
+                  label="Shipping"
+                  value={selectedShippingCost > 0 ? formatNaira(selectedShippingCost) : "₦0"}
+                />
                 {method === "installment" && installmentPlan && (
                   <>
                     <Row
@@ -734,12 +778,13 @@ function CheckoutPage() {
                 )}
               </div>
 
+              {/* Grand Total now includes shipping cost */}
               <div className="mt-3">
                 <Row
                   big
                   bold
                   label="Grand Total"
-                  value={formatNaira(activeOrder?.totalWithTax ?? 0)}
+                  value={formatNaira(displayTotal)}
                 />
               </div>
 

@@ -295,8 +295,11 @@ export default function ProductGrid({
           id: variantId,
           name: item.name,
           slug: item.slug,
-          priceWithTax: variant.priceWithTax,
-          currencyCode: variant.currencyCode,
+          // variant.priceWithTax from GET_PRODUCT_DETAILS is the most accurate
+          // source; fall back to item.priceRaw (from search results) if it is
+          // missing or zero so the cart never shows ₦0.
+          priceWithTax: variant.priceWithTax || item.priceRaw || 0,
+          currencyCode: variant.currencyCode || item.currencyCode,
           brand: item.brand,
           image,
           quantity: 1,

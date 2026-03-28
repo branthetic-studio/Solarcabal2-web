@@ -16,25 +16,26 @@ import { useQuery } from "@apollo/client/react";
 import { GET_ACCOUNT_DETAILS } from "@/graphql/queries";
 import AuthModal from "@/Components/AuthModal";
 
-/** NGN with no decimals */
-const money = (amount: number, currency = "NGN") =>
+/**
+ * Format a value in cents to a currency string.
+ * Vendure stores all prices in cents (e.g. 150000 = ₦1,500).
+ */
+const money = (amountInCents: number, currency = "NGN") =>
   new Intl.NumberFormat("en-NG", {
     style: "currency",
     currency,
     maximumFractionDigits: 0,
-  }).format(Math.max(0, (amount || 0) / 100));
+  }).format(Math.max(0, (amountInCents || 0) / 100));
 
 export default function CartPage() {
   const router = useRouter();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  // Contexts — same sources as CartItems
   const { cart, handleAdjustQuantity, removeFromCartMutation } = useCart();
   const { items: localItems, updateQuantity, removeItem } = useLocalCart();
   const u = useUser() as any;
   const isLoggedIn = !!(u?.me || u?.user || u?.activeCustomer || u?.customer);
 
-  // Server-cart derived — mirrors CartItems logic
   const order = cart?.activeOrder;
   const lines = isLoggedIn ? order?.lines ?? [] : [];
 
@@ -51,7 +52,7 @@ export default function CartPage() {
     order?.totalWithTax ?? serverSubtotal + serverShipping + serverTax;
   const serverCurrency = order?.currencyCode ?? "NGN";
 
-  // Local-cart derived
+  // Local cart totals — priceWithTax is stored in cents
   const localSubtotal = localItems.reduce(
     (s, it) => s + (it.priceWithTax ?? 0) * (it.quantity ?? 1),
     0
@@ -68,7 +69,7 @@ export default function CartPage() {
   const defaultShippingAddress =
     addresses.find((a: any) => a.defaultShippingAddress) ?? null;
 
-  // --- Empty states ---
+  // ── Empty state: guest ──────────────────────────────────────────────────────
   if (!isLoggedIn && localItems.length === 0) {
     return (
       <main className="px-4 sm:px-6 lg:px-8 py-10">
@@ -88,6 +89,7 @@ export default function CartPage() {
     );
   }
 
+  // ── Empty state: logged in ──────────────────────────────────────────────────
   if (isLoggedIn && lines.length === 0) {
     return (
       <main className="mx-auto">
@@ -115,230 +117,237 @@ export default function CartPage() {
     <main className="w-full">
       <Navbar />
       <div className="w-full px-18">
-        {/* Title row */}
+        {/* Title */}
         <div className="flex items-center justify-between">
           <h1 className="text-xl sm:text-2xl font-semibold">Shopping Cart</h1>
         </div>
 
         {/* Grid: Items + Summary */}
         <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-3">
-          {/* Items */}
+
+          {/* ── Items ─────────────────────────────────────────────────────── */}
           <section className="lg:col-span-2">
             <ul className="space-y-4">
+
+              {/* Logged-in: server cart lines */}
               {isLoggedIn
                 ? (lines as any[]).map((line: any) => {
-                  // Identical asset + name resolution as CartItems
-                  const asset =
-                    line?.featuredAsset?.preview ??
-                    line?.productVariant?.product?.featuredAsset?.preview ??
-                    line?.productVariant?.product?.assets?.[0]?.preview ??
-                    null;
+                    const asset =
+                      line?.featuredAsset?.preview ??
+                      line?.productVariant?.product?.featuredAsset?.preview ??
+                      line?.productVariant?.product?.assets?.[0]?.preview ??
+                      null;
 
-                  const name =
-                    line?.productVariant?.product?.name ??
-                    line?.productVariant?.name ??
-                    "Product";
+                    const name =
+                      line?.productVariant?.product?.name ??
+                      line?.productVariant?.name ??
+                      "Product";
 
-                  const brand =
-                    line?.productVariant?.product?.facetValues?.find?.(
-                      (fv: any) => /brand/i.test(fv?.facet?.name ?? "")
-                    )?.name ?? "—";
+                    const brand =
+                      line?.productVariant?.product?.facetValues?.find?.(
+                        (fv: any) => /brand/i.test(fv?.facet?.name ?? "")
+                      )?.name ?? "—";
 
-                  const unitPrice = line?.unitPriceWithTax ?? 0;
-                  const lineTotal =
-                    line?.linePriceWithTax ?? unitPrice * (line?.quantity ?? 1);
+                    const unitPrice = line?.unitPriceWithTax ?? 0;
+                    const lineTotal =
+                      line?.linePriceWithTax ?? unitPrice * (line?.quantity ?? 1);
 
-                  return (
-                    <li
-                      key={line.id}
-                      className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5"
-                    >
-                      <div className="flex items-start gap-4">
-                        {/* Image */}
-                        <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
-                          {asset ? (
-                            <Image
-                              src={asset}
-                              alt={name}
-                              width={80}
-                              height={80}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
-                              No Image
-                            </span>
-                          )}
-                        </div>
+                    return (
+                      <li
+                        key={line.id}
+                        className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5"
+                      >
+                        <div className="flex items-start gap-4">
+                          {/* Image */}
+                          <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
+                            {asset ? (
+                              <Image
+                                src={asset}
+                                alt={name}
+                                width={80}
+                                height={80}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
+                                No Image
+                              </span>
+                            )}
+                          </div>
 
-                        {/* Middle */}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
-                                {name}
-                              </p>
-                              <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
-                                {brand}
-                              </p>
-                              <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
-                                {money(unitPrice, serverCurrency)}{" "}
-                                <span className="text-[11px] font-normal text-neutral-500">
-                                  / pcs
-                                </span>
-                              </p>
+                          {/* Details */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
+                                  {name}
+                                </p>
+                                <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
+                                  {brand}
+                                </p>
+                                <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
+                                  {money(unitPrice, serverCurrency)}{" "}
+                                  <span className="text-[11px] font-normal text-neutral-500">
+                                    / pcs
+                                  </span>
+                                </p>
+                              </div>
+
+                              <div className="text-right">
+                                <button
+                                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
+                                  onClick={() => removeFromCartMutation(line.id)}
+                                  aria-label="Remove"
+                                >
+                                  Remove <Trash2 className="h-4 w-4" />
+                                </button>
+                                <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
+                                  <span className="mr-1">Total</span>
+                                  <span className="font-semibold text-neutral-900">
+                                    {money(lineTotal, serverCurrency)}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
 
-                            {/* Right: total + Remove */}
-                            <div className="text-right">
-                              <button
-                                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
-                                onClick={() => removeFromCartMutation(line.id)}
-                                aria-label="Remove"
-                              >
-                                Remove <Trash2 className="h-4 w-4" />
-                              </button>
-                              <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
-                                <span className="mr-1">Total</span>
-                                <span className="font-semibold text-neutral-900">
-                                  {money(lineTotal, serverCurrency)}
+                            {/* Qty */}
+                            <div className="mt-3 sm:mt-4 flex items-center gap-3">
+                              <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
+                                <button
+                                  onClick={() =>
+                                    handleAdjustQuantity(
+                                      line.id,
+                                      Math.max(0, (line.quantity ?? 1) - 1)
+                                    )
+                                  }
+                                  className="h-8 w-8 flex items-center justify-center"
+                                  aria-label="Decrease"
+                                >
+                                  −
+                                </button>
+                                <span className="w-8 text-center text-[13px] font-medium">
+                                  {line.quantity}
                                 </span>
+                                <button
+                                  onClick={() =>
+                                    handleAdjustQuantity(
+                                      line.id,
+                                      (line.quantity ?? 1) + 1
+                                    )
+                                  }
+                                  className="h-8 w-8 flex items-center justify-center"
+                                  aria-label="Increase"
+                                >
+                                  +
+                                </button>
                               </div>
                             </div>
                           </div>
+                        </div>
+                      </li>
+                    );
+                  })
 
-                          {/* Qty control */}
-                          <div className="mt-3 sm:mt-4 flex items-center gap-3">
-                            <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
-                              <button
-                                onClick={() =>
-                                  handleAdjustQuantity(
-                                    line.id,
-                                    Math.max(0, (line.quantity ?? 1) - 1)
-                                  )
-                                }
-                                className="h-8 w-8 flex items-center justify-center"
-                                aria-label="Decrease"
-                              >
-                                −
-                              </button>
-                              <span className="w-8 text-center text-[13px] font-medium">
-                                {line.quantity}
+                /* Guest: local cart items */
+                : localItems.map((line) => {
+                    // priceWithTax is stored in cents (e.g. 150000 = ₦1,500)
+                    // money() divides by 100, so pass the raw cent value directly
+                    const unitPrice = line.priceWithTax ?? 0;
+                    const lineTotal = unitPrice * (line.quantity ?? 1);
+
+                    return (
+                      <li
+                        key={line.id}
+                        className="border-b border-neutral-200 bg-white p-4 sm:p-5"
+                      >
+                        <div className="flex items-start gap-4">
+                          {/* Image */}
+                          <div className="h-20 w-20 p-2 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
+                            {line.image ? (
+                              <Image
+                                src={line.image}
+                                alt={line.name}
+                                width={80}
+                                height={80}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
+                                No Image
                               </span>
-                              <button
-                                onClick={() =>
-                                  handleAdjustQuantity(
-                                    line.id,
-                                    (line.quantity ?? 1) + 1
-                                  )
-                                }
-                                className="h-8 w-8 flex items-center justify-center"
-                                aria-label="Increase"
-                              >
-                                +
-                              </button>
+                            )}
+                          </div>
+
+                          {/* Details */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
+                                  {line.name}
+                                </p>
+                                <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
+                                  {line.brand ?? "—"}
+                                </p>
+                                {/* Unit price — stored in cents, money() divides by 100 */}
+                                <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
+                                  {money(unitPrice, localCurrency)}{" "}
+                                  <span className="text-[11px] font-normal text-neutral-500">
+                                    / pcs
+                                  </span>
+                                </p>
+                              </div>
+
+                              <div className="text-right">
+                                <button
+                                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
+                                  onClick={() => removeItem(line.id)}
+                                  aria-label="Remove"
+                                >
+                                  Remove <Trash2 className="h-4 w-4" />
+                                </button>
+                                <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
+                                  <span className="mr-1 text-xs">Total</span>
+                                  <span className="font-semibold text-neutral-900">
+                                    {money(lineTotal, localCurrency)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Qty */}
+                            <div className="mt-3 sm:mt-4 flex items-center gap-3">
+                              <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
+                                <button
+                                  onClick={() =>
+                                    updateQuantity(
+                                      line.id,
+                                      Math.max(0, (line.quantity ?? 1) - 1)
+                                    )
+                                  }
+                                  className="h-8 w-8 flex items-center justify-center"
+                                  aria-label="Decrease"
+                                >
+                                  −
+                                </button>
+                                <span className="w-8 text-center text-[13px] font-medium">
+                                  {line.quantity}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    updateQuantity(line.id, (line.quantity ?? 1) + 1)
+                                  }
+                                  className="h-8 w-8 flex items-center justify-center"
+                                  aria-label="Increase"
+                                >
+                                  +
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </li>
-                  );
-                })
-                : localItems.map((line) => (
-                  <li
-                    key={line.id}
-                    className="border-b border-neutral-200 bg-white p-4 sm:p-5"
-                  >
-                    <div className="flex items-start gap-4">
-                      {/* Image */}
-                      <div className="h-20 w-20 p-2 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
-                        {line.image ? (
-                          <Image
-                            src={line.image}
-                            alt={line.name}
-                            width={80}
-                            height={80}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
-                            No Image
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Middle */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
-                              {line.name}
-                            </p>
-                            <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
-                              {line.brand ?? "—"}
-                            </p>
-                            <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
-                              {money(line.priceWithTax ?? 0, localCurrency)}{" "}
-                              <span className="text-[11px] font-normal text-neutral-500">
-                                / pcs
-                              </span>
-                            </p>
-                          </div>
-
-                          {/* Right: total + Remove */}
-                          <div className="text-right">
-                            <button
-                              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
-                              onClick={() => removeItem(line.id)}
-                              aria-label="Remove"
-                            >
-                              Remove <Trash2 className="h-4 w-4" />
-                            </button>
-                            <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
-                              <span className="mr-1 text-xs">Total</span>
-                              <span className="font-semibold text-neutral-900">
-                                {money(
-                                  (line.priceWithTax ?? 0) * (line.quantity ?? 1),
-                                  localCurrency
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Qty control */}
-                        <div className="mt-3 sm:mt-4 flex items-center gap-3">
-                          <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
-                            <button
-                              onClick={() =>
-                                updateQuantity(
-                                  line.id,
-                                  Math.max(0, (line.quantity ?? 1) - 1)
-                                )
-                              }
-                              className="h-8 w-8 flex items-center justify-center"
-                              aria-label="Decrease"
-                            >
-                              −
-                            </button>
-                            <span className="w-8 text-center text-[13px] font-medium">
-                              {line.quantity}
-                            </span>
-                            <button
-                              onClick={() =>
-                                updateQuantity(line.id, (line.quantity ?? 1) + 1)
-                              }
-                              className="h-8 w-8 flex items-center justify-center"
-                              aria-label="Increase"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                ))}
+                      </li>
+                    );
+                  })}
             </ul>
 
             {/* Continue shopping */}
@@ -352,37 +361,28 @@ export default function CartPage() {
             </div>
           </section>
 
-          {/* Summary */}
+          {/* ── Order Summary ─────────────────────────────────────────────── */}
           <aside className="lg:sticky lg:top-6 h-max rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
             <h2 className="text-base sm:text-lg font-semibold">Order Summary</h2>
 
-            {/* Totals */}
             {isLoggedIn ? (
               <dl className="mt-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-neutral-600">Sub total products</dt>
-                  <dd className="font-semibold">
-                    {money(serverSubtotal, serverCurrency)}
-                  </dd>
+                  <dd className="font-semibold">{money(serverSubtotal, serverCurrency)}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-neutral-600">Delivery fee</dt>
-                  <dd className="font-semibold">
-                    {money(serverShipping, serverCurrency)}
-                  </dd>
+                  <dd className="font-semibold">{money(serverShipping, serverCurrency)}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-neutral-600">Tax</dt>
-                  <dd className="font-semibold">
-                    {money(serverTax, serverCurrency)}
-                  </dd>
+                  <dd className="font-semibold">{money(serverTax, serverCurrency)}</dd>
                 </div>
                 <div className="mt-3 border-t border-neutral-200 pt-3 text-base">
                   <div className="flex justify-between">
                     <dt className="font-semibold">Total</dt>
-                    <dd className="font-semibold">
-                      {money(serverTotal, serverCurrency)}
-                    </dd>
+                    <dd className="font-semibold">{money(serverTotal, serverCurrency)}</dd>
                   </div>
                 </div>
               </dl>
@@ -390,9 +390,7 @@ export default function CartPage() {
               <dl className="mt-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-neutral-600">Sub total products</dt>
-                  <dd className="font-semibold">
-                    {money(localSubtotal, localCurrency)}
-                  </dd>
+                  <dd className="font-semibold">{money(localSubtotal, localCurrency)}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-neutral-600">Delivery fee</dt>
@@ -405,9 +403,7 @@ export default function CartPage() {
                 <div className="mt-3 border-t border-neutral-200 pt-3 text-base">
                   <div className="flex justify-between">
                     <dt className="font-semibold">Total</dt>
-                    <dd className="font-semibold">
-                      {money(localSubtotal, localCurrency)}
-                    </dd>
+                    <dd className="font-semibold">{money(localSubtotal, localCurrency)}</dd>
                   </div>
                 </div>
               </dl>
@@ -439,9 +435,7 @@ export default function CartPage() {
                     <p className="font-medium">
                       {activeCustomer.firstName} {activeCustomer.lastName}
                     </p>
-                    <p className="mt-1 text-neutral-500">
-                      {activeCustomer.emailAddress}
-                    </p>
+                    <p className="mt-1 text-neutral-500">{activeCustomer.emailAddress}</p>
                     <p className="mt-1 text-neutral-500">
                       {defaultShippingAddress?.phoneNumber ?? "No phone number"}
                     </p>
@@ -456,7 +450,6 @@ export default function CartPage() {
             <div className="mt-4 rounded-xl border border-neutral-200 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold">Delivery Details</p>
-
                 <button
                   onClick={() => router.push("/Accounts")}
                   className="inline-flex items-center gap-1 text-xs hover:text-red-700"
@@ -477,9 +470,7 @@ export default function CartPage() {
                     <p>Door Delivery</p>
                     <p className="mt-1 text-neutral-500">
                       {defaultShippingAddress.streetLine1}
-                      {defaultShippingAddress.city
-                        ? `, ${defaultShippingAddress.city}`
-                        : ""}
+                      {defaultShippingAddress.city ? `, ${defaultShippingAddress.city}` : ""}
                     </p>
                     <p className="mt-1 text-neutral-500">
                       {defaultShippingAddress.country?.name ?? "Nigeria"}
@@ -501,10 +492,7 @@ export default function CartPage() {
               onClick={() => {
                 if (!isLoggedIn) {
                   toast.info("Please log in to checkout", {
-                    action: {
-                      label: "Log in",
-                      onClick: () => setIsAuthOpen(true),
-                    },
+                    action: { label: "Log in", onClick: () => setIsAuthOpen(true) },
                     duration: 4000,
                   });
                   setIsAuthOpen(true);
