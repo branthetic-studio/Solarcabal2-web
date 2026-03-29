@@ -219,6 +219,7 @@ export const GET_CUSTOMER_ORDERS = gql`
         code
         state
         totalWithTax
+        currencyCode
         createdAt
       }
     }
