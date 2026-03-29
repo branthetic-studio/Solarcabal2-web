@@ -275,15 +275,16 @@ export default function ProductGrid({
   const handleAddToCart = useCallback(
     async (item: GridItem) => {
       try {
+        // resolveVariant internally calls loadDetails and caches the variantId
         const variantId = await resolveVariant(item);
         if (!variantId) {
           toast.error("Could not load product details");
           return;
         }
 
-        const { data: pd } = await loadDetails({ variables: { slug: item.slug } });
-        const variant = pd?.product?.variants?.[0];
-        if (!variant) return;
+        // Use the cached result from resolveVariant — no second network call needed
+        const cached = await loadDetails({ variables: { slug: item.slug } });
+        const pd = cached?.data;
 
         const image =
           item.image ??
@@ -291,15 +292,17 @@ export default function ProductGrid({
           pd?.product?.assets?.[0]?.preview ??
           undefined;
 
+        // item.priceRaw comes from GET_COLLECTION_PRODUCTS (search results) and
+        // is always correct in cents. Use it directly instead of relying on
+        // GET_PRODUCT_DETAILS variant.priceWithTax which can return undefined.
+        const priceInCents = item.priceRaw ?? 0;
+
         addLocalItem({
           id: variantId,
           name: item.name,
           slug: item.slug,
-          // variant.priceWithTax from GET_PRODUCT_DETAILS is the most accurate
-          // source; fall back to item.priceRaw (from search results) if it is
-          // missing or zero so the cart never shows ₦0.
-          priceWithTax: variant.priceWithTax || item.priceRaw || 0,
-          currencyCode: variant.currencyCode || item.currencyCode,
+          priceWithTax: priceInCents,
+          currencyCode: item.currencyCode,
           brand: item.brand,
           image,
           quantity: 1,

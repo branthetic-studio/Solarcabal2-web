@@ -143,19 +143,41 @@ export const ACTIVE_ORDER_FRAGMENT = gql`
     totalWithTax
     subTotalWithTax
     shippingWithTax
+    taxSummary {
+      taxRate
+      taxTotal
+    }
     lines {
       id
       quantity
+      unitPriceWithTax
       linePriceWithTax
+      featuredAsset {
+        id
+        preview
+      }
       productVariant {
         id
         name
         sku
         product {
           id
+          name
           featuredAsset {
             id
             preview
+          }
+          assets {
+            id
+            preview
+          }
+          facetValues {
+            id
+            name
+            facet {
+              id
+              name
+            }
           }
         }
       }
@@ -269,7 +291,6 @@ export const TRANSITION_TO_STATE = gql`
   ${ACTIVE_ORDER_FRAGMENT}
 `;
 
-/** Custom resolver on your backend */
 export const PAYSTACK_INTENT = gql`
   mutation CreatePaystackIntent($orderCode: String!) {
     createPaystackPaymentIntent(orderCode: $orderCode) {
@@ -281,7 +302,6 @@ export const PAYSTACK_INTENT = gql`
   }
 `;
 
-/** Custom resolver to restore cart when payment fails/cancels */
 export const RECREATE_FAILED_ORDER = gql`
   mutation RecreateFailedOrder($orderCode: String!) {
     recreateFailedOrder(orderCode: $orderCode) {
@@ -291,7 +311,7 @@ export const RECREATE_FAILED_ORDER = gql`
   ${ACTIVE_ORDER_FRAGMENT}
 `;
 
-/* ------------CART------------------ */
+/* ------------------- Cart ------------------- */
 export const ADD_TO_CART = gql`
   mutation AddItemToOrder($productVariantId: ID!, $quantity: Int!) {
     addItemToOrder(productVariantId: $productVariantId, quantity: $quantity) {
@@ -451,7 +471,7 @@ export const GET_CATEGORIES_QUERY = gql`
   }
 `;
 
-/* ------------------- 🔍 Search Products ------------------- */
+/* ------------------- Search Products ------------------- */
 export const SEARCH_PRODUCTS = gql`
   query SearchProducts($input: SearchInput!) {
     search(input: $input) {
@@ -481,7 +501,7 @@ export const SEARCH_PRODUCTS = gql`
   }
 `;
 
-const MY_REFERRAL_EARNING = gql`
+export const MY_REFERRAL_EARNING = gql`
   query MyReferralEarnings {
     myReferralEarningsDetails {
       id
@@ -494,7 +514,6 @@ const MY_REFERRAL_EARNING = gql`
   }
 `;
 
-/** Ask server to send a reset email */
 export const REQUEST_PASSWORD_RESET = gql`
   mutation RequestPasswordReset($emailAddress: String!) {
     requestPasswordReset(emailAddress: $emailAddress) {
@@ -509,7 +528,6 @@ export const REQUEST_PASSWORD_RESET = gql`
   }
 `;
 
-/** Complete the reset with the token from email */
 export const RESET_PASSWORD = gql`
   mutation ResetPassword($token: String!, $password: String!) {
     resetPassword(token: $token, password: $password) {
@@ -555,7 +573,6 @@ export const REFRESH_CUSTOMER_VERIFICATION = gql`
   }
 `;
 
-/** Delete the current user’s account */
 export const DELETE_MY_ACCOUNT = gql`
   mutation DeleteMyAccount {
     deleteMyAccount {
