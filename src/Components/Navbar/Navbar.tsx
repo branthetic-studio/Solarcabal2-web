@@ -1,6 +1,5 @@
 "use client";
 
-
 import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
@@ -17,6 +16,7 @@ const Navbar = () => {
   const [open, setOpen] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false); // ← controls AuthModal
 
   const { cart } = useCart();
   const { items: localItems } = useLocalCart();
@@ -63,8 +63,8 @@ const Navbar = () => {
               <Link
                 href="/"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2 font-bold"
-                    : "text-gray-700"
+                  ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2 font-bold"
+                  : "text-gray-700"
                   }`}
               >
                 Home
@@ -74,8 +74,8 @@ const Navbar = () => {
               <Link
                 href="/products"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/products"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
-                    : "text-gray-700"
+                  ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
+                  : "text-gray-700"
                   }`}
               >
                 Products
@@ -85,8 +85,8 @@ const Navbar = () => {
               <Link
                 href="/installation"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/installation"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
-                    : "text-gray-700"
+                  ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
+                  : "text-gray-700"
                   }`}
               >
                 Installation
@@ -96,8 +96,8 @@ const Navbar = () => {
               <Link
                 href="/enquiries"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/enquiries"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
-                    : "text-gray-700"
+                  ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
+                  : "text-gray-700"
                   }`}
               >
                 Enquiries
@@ -107,8 +107,8 @@ const Navbar = () => {
               <Link
                 href="/referral"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/referral"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
-                    : "text-gray-700"
+                  ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
+                  : "text-gray-700"
                   }`}
               >
                 Referral Program
@@ -118,8 +118,8 @@ const Navbar = () => {
               <Link
                 href="/faq"
                 className={`text-sm font-medium transition-colors hover:text-[#FF0000] ${pathname === "/faq"
-                    ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
-                    : "text-gray-700"
+                  ? "text-[#FF0000] border-b-2 border-[#FF0000] pb-2"
+                  : "text-gray-700"
                   }`}
               >
                 FAQ
@@ -152,7 +152,6 @@ const Navbar = () => {
                   </span>
                 </button>
 
-                {/* Dropdown Menu */}
                 {showUserMenu && (
                   <>
                     <div
@@ -194,11 +193,15 @@ const Navbar = () => {
                 )}
               </div>
             ) : (
+              // ✅ open/onOpenChange now wired — modal will close after signup
               <AuthModal
+                open={authOpen}
+                onOpenChange={setAuthOpen}
                 trigger={
                   <button
                     aria-label="Account"
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    onClick={() => setAuthOpen(true)}
                   >
                     <Image
                       src="/profile.png"
@@ -277,8 +280,7 @@ const Navbar = () => {
           {customer && (
             <div className="p-6 border-b bg-gray-50">
               <p className="text-sm font-medium text-gray-900">
-                Hi, {customer.firstName || customer.emailAddress?.split("@")[0]}
-                ! 👋
+                Hi, {customer.firstName || customer.emailAddress?.split("@")[0]}! 👋
               </p>
               <p className="text-xs text-gray-500 truncate">
                 {customer.emailAddress}
@@ -292,8 +294,8 @@ const Navbar = () => {
               <Link
                 href="/"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/"
-                    ? "bg-orange-50 text-[#FF0000]"
-                    : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-orange-50 text-[#FF0000]"
+                  : "text-gray-700 hover:bg-gray-100"
                   }`}
                 onClick={() => setOpen(false)}
               >
@@ -304,8 +306,8 @@ const Navbar = () => {
               <Link
                 href="/products"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/products"
-                    ? "bg-orange-50 text-[#FF0000]"
-                    : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-orange-50 text-[#FF0000]"
+                  : "text-gray-700 hover:bg-gray-100"
                   }`}
                 onClick={() => setOpen(false)}
               >
@@ -316,8 +318,8 @@ const Navbar = () => {
               <Link
                 href="/installation"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/installation"
-                    ? "bg-orange-50 text-[#FF0000]"
-                    : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-orange-50 text-[#FF0000]"
+                  : "text-gray-700 hover:bg-gray-100"
                   }`}
                 onClick={() => setOpen(false)}
               >
@@ -328,8 +330,8 @@ const Navbar = () => {
               <Link
                 href="/enquiries"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/enquiries"
-                    ? "bg-orange-50 text-[#FF0000]"
-                    : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-orange-50 text-[#FF0000]"
+                  : "text-gray-700 hover:bg-gray-100"
                   }`}
                 onClick={() => setOpen(false)}
               >
@@ -340,8 +342,8 @@ const Navbar = () => {
               <Link
                 href="/referral"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/referral"
-                    ? "bg-orange-50 text-[#FF0000]"
-                    : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-orange-50 text-[#FF0000]"
+                  : "text-gray-700 hover:bg-gray-100"
                   }`}
                 onClick={() => setOpen(false)}
               >
@@ -352,8 +354,8 @@ const Navbar = () => {
               <Link
                 href="/faq"
                 className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${pathname === "/faq"
-                    ? "bg-orange-50 text-[#FF0000]"
-                    : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-orange-50 text-[#FF0000]"
+                  : "text-gray-700 hover:bg-gray-100"
                   }`}
                 onClick={() => setOpen(false)}
               >
@@ -412,12 +414,19 @@ const Navbar = () => {
                 <Search className="w-6 h-6 text-gray-700" />
               </button>
 
+              {/* ✅ Mobile AuthModal also wired to same authOpen state */}
               {!customer && (
                 <AuthModal
+                  open={authOpen}
+                  onOpenChange={setAuthOpen}
                   trigger={
                     <button
                       aria-label="Account"
                       className="p-3 hover:bg-gray-100 rounded-lg transition-colors"
+                      onClick={() => {
+                        setAuthOpen(true);
+                        setOpen(false); // close drawer when opening auth
+                      }}
                     >
                       <Image
                         src="/profile.png"

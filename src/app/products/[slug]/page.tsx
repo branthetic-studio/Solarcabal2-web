@@ -68,6 +68,9 @@ type ProductDetails = {
 
 type GetProductDetailsData = { product: ProductDetails | null };
 
+// ── Each button has its own identity ──────────────────────────────────────────
+type ActionKey = "cart" | "buy" | "later";
+
 /* ===================== Static data ===================== */
 
 const ratingData = [
@@ -122,7 +125,9 @@ const ProductDetailsPage = () => {
   const { customer } = useUser();
   const { addItem: addLocalItem } = useLocalCart();
 
-  const [isAdding, setIsAdding] = useState(false);
+  // ── One state tracks WHICH button is loading, not just whether any is ──────
+  const [loadingAction, setLoadingAction] = useState<ActionKey | null>(null);
+
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<
@@ -135,7 +140,6 @@ const ProductDetailsPage = () => {
     { variables: { slug }, skip: !slug }
   );
 
-  // Auto-select first valid variant whenever query data arrives
   useEffect(() => {
     if (data?.product?.variants?.length) {
       const first = data.product.variants.find((v) => v?.id);
@@ -190,83 +194,87 @@ const ProductDetailsPage = () => {
   const formattedPrice = (currentPrice / 100).toLocaleString();
 
   /* ---------- Core cart action ---------- */
-  const addVariantToCart = useCallback(async (): Promise<boolean> => {
-    if (!selectedVariant) {
-      toast.error("Please select a variant");
-      return false;
-    }
+  const addVariantToCart = useCallback(
+    async (action: ActionKey): Promise<boolean> => {
+      if (!selectedVariant) {
+        toast.error("Please select a variant");
+        return false;
+      }
 
-    setIsAdding(true);
-    try {
-      // Optimistic local cart add — instant feedback, works even when logged out
-      addLocalItem({
-        id: selectedVariant.id,
-        name: product?.name ?? selectedVariant.name,
-        slug: slug ?? "",
-        priceWithTax: selectedVariant.priceWithTax,
-        currencyCode: selectedVariant.currencyCode ?? "NGN",
-        image:
-          mainImageSrc !== "/api/placeholder/400/400" ? mainImageSrc : undefined,
-        quantity,
-      });
-
-      // Only push to server if the user is logged in
-      if (customer) {
-        const result = await addToCartMutation({
-          productVariantId: selectedVariant.id,
+      // Only THIS button shows a loading state
+      setLoadingAction(action);
+      try {
+        addLocalItem({
+          id: selectedVariant.id,
+          name: product?.name ?? selectedVariant.name,
+          slug: slug ?? "",
+          priceWithTax: selectedVariant.priceWithTax,
+          currencyCode: selectedVariant.currencyCode ?? "NGN",
+          image:
+            mainImageSrc !== "/api/placeholder/400/400" ? mainImageSrc : undefined,
           quantity,
         });
 
-        // Vendure returns typed errors instead of throwing — handle them
-        if (result?.__typename === "InsufficientStockError") {
-          toast.error(`Only ${result.quantityAvailable} item(s) available in stock.`);
-          return false;
+        if (customer) {
+          const result = await addToCartMutation({
+            productVariantId: selectedVariant.id,
+            quantity,
+          });
+
+          if (result?.__typename === "InsufficientStockError") {
+            toast.error(`Only ${result.quantityAvailable} item(s) available in stock.`);
+            return false;
+          }
+          if (result?.errorCode) {
+            toast.error(`Could not add to cart: ${result.message ?? result.errorCode}`);
+            return false;
+          }
         }
-        if (result?.errorCode) {
-          toast.error(`Could not add to cart: ${result.message ?? result.errorCode}`);
-          return false;
-        }
+
+        toast.success("Added to cart!", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+
+        return true;
+      } catch (e: any) {
+        console.error("Add to cart error:", e);
+        toast.error(e?.message ?? "Could not add to cart. Please try again.");
+        return false;
+      } finally {
+        setLoadingAction(null);
       }
+    },
+    [
+      selectedVariant,
+      quantity,
+      product,
+      slug,
+      mainImageSrc,
+      customer,
+      addLocalItem,
+      addToCartMutation,
+    ]
+  );
 
-      toast.success("Added to cart!", {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
-
-      return true;
-    } catch (e: any) {
-      console.error("Add to cart error:", e);
-      toast.error(e?.message ?? "Could not add to cart. Please try again.");
-      return false;
-    } finally {
-      setIsAdding(false);
-    }
-  }, [
-    selectedVariant,
-    quantity,
-    product,
-    slug,
-    mainImageSrc,
-    customer,
-    addLocalItem,
-    addToCartMutation,
-  ]);
-
-  const handleAddToCart = () => addVariantToCart();
+  const handleAddToCart = () => addVariantToCart("cart");
   const handleBuyNow = async () => {
-    const ok = await addVariantToCart();
+    const ok = await addVariantToCart("buy");
     if (ok) router.push("/checkout");
   };
   const handlePayLater = async () => {
-    const ok = await addVariantToCart();
+    const ok = await addVariantToCart("later");
     if (ok) router.push("/checkout?method=installment");
   };
 
-  /* ---------- Loading ---------- */
+  // Any action in progress? Disable all buttons but only label the active one
+  const anyLoading = loadingAction !== null;
+
+  /* ---------- Loading skeleton ---------- */
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -316,9 +324,7 @@ const ProductDetailsPage = () => {
   /* ===================== Render ===================== */
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* ToastContainer renders all toasts — place once at the top of the page */}
       <ToastContainer />
-
       <Navbar />
 
       <div className="mx-auto px-6 py-6">
@@ -409,44 +415,72 @@ const ProductDetailsPage = () => {
                 <span className="text-gray-700 font-medium">Qty:</span>
                 <button
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 text-lg"
+                  disabled={anyLoading}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 text-lg disabled:opacity-50"
                 >
                   −
                 </button>
                 <span className="w-8 text-center font-medium">{quantity}</span>
                 <button
                   onClick={() => setQuantity((q) => q + 1)}
-                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 text-lg"
+                  disabled={anyLoading}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 text-lg disabled:opacity-50"
                 >
                   +
                 </button>
               </div>
 
-              {/* Action buttons */}
+              {/* ── Action buttons — each shows its OWN loading state ── */}
               <div className="flex flex-col md:flex-row gap-2 md:gap-4">
+
+                {/* Add to Cart */}
                 <button
                   onClick={handleAddToCart}
-                  disabled={isAdding || !selectedVariant}
-                  className="flex-1 border-2 border-[#242425] text-[#242425] py-3 px-6 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  disabled={anyLoading || !selectedVariant}
+                  className="flex-1 border-2 border-[#242425] text-[#242425] py-3 px-6 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 flex items-center justify-center gap-2"
                 >
-                  {isAdding ? "Adding..." : "Add to Cart"}
+                  {loadingAction === "cart" ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#242425] border-t-transparent" />
+                      Adding...
+                    </>
+                  ) : (
+                    "Add to Cart"
+                  )}
                 </button>
 
+                {/* Buy Now */}
                 <button
                   onClick={handleBuyNow}
-                  disabled={isAdding || !selectedVariant}
-                  className="flex-1 px-6 py-3 bg-[#242425] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800"
+                  disabled={anyLoading || !selectedVariant}
+                  className="flex-1 px-6 py-3 bg-[#242425] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800 flex items-center justify-center gap-2"
                 >
-                  {isAdding ? "Processing..." : "Buy Now"}
+                  {loadingAction === "buy" ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Buy Now"
+                  )}
                 </button>
 
+                {/* Pay Later */}
                 <button
                   onClick={handlePayLater}
-                  disabled={isAdding || !selectedVariant}
-                  className="flex-1 bg-[#ff0000] text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#751c1c]"
+                  disabled={anyLoading || !selectedVariant}
+                  className="flex-1 bg-[#ff0000] text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#751c1c] flex items-center justify-center gap-2"
                 >
-                  {isAdding ? "Processing..." : "Pay Later"}
+                  {loadingAction === "later" ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Pay Later"
+                  )}
                 </button>
+
               </div>
             </div>
           </div>
@@ -541,7 +575,6 @@ function LocalProductCard({
 
     return (
       <div className="space-y-8">
-        {/* Rating summary */}
         <div className="flex gap-10 border border-[#E4E9EE] rounded-xl p-6">
           <div className="flex gap-3 items-center min-w-40">
             <div className="relative w-20 h-20 flex items-center justify-center">
@@ -580,7 +613,6 @@ function LocalProductCard({
           </div>
         </div>
 
-        {/* Reviews list */}
         <div className="grid grid-cols-12 gap-8">
           <aside className="col-span-2 space-y-6 text-[#818B9C]">
             <div>
@@ -676,7 +708,6 @@ function LocalProductCard({
     );
   }
 
-  // Product Detail tab
   const cf = product.customFields ?? {};
   const specs = [
     { label: "Power Output", value: cf.powerOutput },
