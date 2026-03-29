@@ -1,185 +1,143 @@
 "use client";
 
-import React, { useState, useMemo, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import React, { useState } from "react";
 import { useMutation } from "@apollo/client/react";
-import { RESET_PASSWORD } from "@/graphql/queries";
+import { REQUEST_PASSWORD_RESET } from "@/graphql/queries";
 import Navbar from "@/Components/Navbar/Navbar";
 import Footer from "@/Components/Footer/Footer";
+import Link from "next/link";
 
-/* ---------- Updated types to match actual API response ---------- */
-type CurrentUser = {
-  __typename: "CurrentUser";
-  id: string;
-  identifier: string;
-};
+const isValidEmail = (email: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
-type ErrorResult = {
-  __typename: "ErrorResult";
-  errorCode?: string | null;
-  message?: string | null;
-};
+export default function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
-type ResetPasswordPayload = CurrentUser | ErrorResult;
+  const [requestReset, { loading }] = useMutation(REQUEST_PASSWORD_RESET);
 
-type ResetPasswordResult = {
-  resetPassword: ResetPasswordPayload;
-};
-
-type ResetPasswordVars = {
-  token: string;
-  password: string;
-};
-/* ----------------------------------------------- */
-
-// Separate component that uses useSearchParams
-function ResetPasswordForm() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const token = useMemo(() => searchParams?.get("token") || "", [searchParams]);
-
-  const [form, setForm] = useState({ password: "", confirm: "" });
-
-  const [reset, { data, loading, error }] = useMutation<
-    ResetPasswordResult,
-    ResetPasswordVars
-  >(RESET_PASSWORD);
-
-  const payload = data?.resetPassword;
-  const isSuccess = payload?.__typename === "CurrentUser";
-  const successMsg = isSuccess
-    ? `Password updated successfully for ${payload.identifier}.`
-    : null;
-
-  const errMsg =
-    error?.message ||
-    (payload?.__typename === "ErrorResult"
-      ? payload.message || "Reset failed."
-      : null);
-
-  const passwordMismatch = form.password !== form.confirm;
-
-  const onSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
-    if (passwordMismatch) return;
-    await reset({ variables: { token, password: form.password } });
+    setEmailError("");
+
+    if (!email.trim()) {
+      setEmailError("Please enter your email address.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setEmailError("Please enter a valid email address (e.g. name@example.com).");
+      return;
+    }
+
+    try {
+      await requestReset({ variables: { emailAddress: email.trim() } });
+      // Always show success — don't reveal whether email exists (security best practice)
+      setSubmitted(true);
+    } catch (err) {
+      // Still show success to avoid email enumeration
+      setSubmitted(true);
+    }
   };
 
-  return (
-    <div className="mx-auto max-w-md px-4 py-12">
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-neutral-900">
-          Reset Password
-        </h1>
-
-        {!token && (
-          <p className="mt-2 text-sm text-neutral-600">
-            Missing reset token. Please open the link from your email.
-          </p>
-        )}
-
-        {token && (
-          <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <div>
-              <label className="text-sm text-neutral-700">New password</label>
-              <input
-                type="password"
-                required
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-2 text-sm focus:outline-none"
-                placeholder="Enter new password"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm text-neutral-700">
-                Confirm password
-              </label>
-              <input
-                type="password"
-                required
-                value={form.confirm}
-                onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-2 text-sm focus:outline-none"
-                placeholder="Re-enter new password"
-              />
-              {form.confirm.length > 0 && passwordMismatch && (
-                <p className="mt-1 text-xs text-red-600">
-                  Passwords do not match.
-                </p>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !token || passwordMismatch}
-              className="w-full rounded-full bg-red-600 py-3 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-60"
-            >
-              {loading ? "Updating…" : "Update password"}
-            </button>
-          </form>
-        )}
-
-        {errMsg && <p className="mt-3 text-sm text-red-600">⚠ {errMsg}</p>}
-        {isSuccess && (
-          <>
-            <p className="mt-3 text-sm text-green-700">✅ {successMsg}</p>
-            <div className="mt-5 flex gap-3">
-              <button
-                className="rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:opacity-95"
-                onClick={() => router.push("/login")}
-              >
-                Go to sign in
-              </button>
-              <button
-                className="rounded-full border border-neutral-300 px-5 py-2 text-sm font-semibold hover:bg-neutral-50"
-                onClick={() => router.push("/")}
-              >
-                Home
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Dev hint (optional) */}
-      <p className="mt-4 text-xs text-neutral-500">
-        Use the token you receive via email (e.g.{" "}
-        <code>/reset-password?token=ABC</code>).
-      </p>
-    </div>
-  );
-}
-
-// Loading fallback component
-function ResetPasswordLoading() {
-  return (
-    <div className="mx-auto max-w-md px-4 py-12">
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-neutral-900">
-          Reset Password
-        </h1>
-        <div className="mt-6 space-y-4">
-          <div className="h-10 bg-neutral-200 rounded-lg animate-pulse"></div>
-          <div className="h-10 bg-neutral-200 rounded-lg animate-pulse"></div>
-          <div className="h-10 bg-neutral-200 rounded-lg animate-pulse"></div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Main page component
-export default function ResetPasswordPage() {
   return (
     <main className="min-h-screen bg-neutral-50">
       <Navbar />
 
-      <Suspense fallback={<ResetPasswordLoading />}>
-        <ResetPasswordForm />
-      </Suspense>
+      <div className="mx-auto max-w-md px-4 py-16">
+        <div className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm">
+
+          {!submitted ? (
+            <>
+              {/* Header */}
+              <div className="mb-6">
+                <h1 className="text-xl font-semibold text-neutral-900">
+                  Forgot your password?
+                </h1>
+                <p className="mt-2 text-sm text-neutral-500">
+                  Enter the email address linked to your account and we'll send
+                  you a link to reset your password.
+                </p>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+                <div>
+                  <label
+                    htmlFor="email"
+                    className="block text-sm font-medium text-neutral-700 mb-1"
+                  >
+                    Email address
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (emailError) setEmailError("");
+                    }}
+                    placeholder="name@example.com"
+                    className={`w-full rounded-full border px-4 py-3 text-sm focus:outline-none transition-colors ${
+                      emailError
+                        ? "border-red-400 focus:border-red-500"
+                        : "border-neutral-300 focus:border-red-400"
+                    }`}
+                  />
+                  {emailError && (
+                    <p className="mt-1.5 text-xs text-red-500 pl-1">{emailError}</p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-full bg-red-600 py-3 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Sending…
+                    </span>
+                  ) : (
+                    "Send reset link"
+                  )}
+                </button>
+              </form>
+
+              <p className="mt-6 text-center text-sm text-neutral-500">
+                Remember your password?{" "}
+                <Link href="/login" className="text-red-600 font-medium hover:underline">
+                  Back to login
+                </Link>
+              </p>
+            </>
+          ) : (
+            /* Success state */
+            <div className="text-center py-4 flex flex-col items-center gap-4">
+              <div className="text-5xl">📧</div>
+              <h2 className="text-lg font-semibold text-neutral-900">
+                Check your inbox
+              </h2>
+              <p className="text-sm text-neutral-500 max-w-xs">
+                If an account exists for{" "}
+                <span className="font-medium text-neutral-700">{email}</span>,
+                we've sent a password reset link. Check your spam folder if you
+                don't see it.
+              </p>
+              <p className="text-xs text-neutral-400">
+                The link expires in 1 hour.
+              </p>
+              <Link
+                href="/login"
+                className="mt-2 rounded-full bg-red-600 px-8 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+              >
+                Back to login
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
 
       <Footer />
     </main>

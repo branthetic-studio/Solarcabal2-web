@@ -19,8 +19,8 @@ import { useSignIn, useClerk, useAuth } from "@clerk/nextjs";
 const REGISTER_MUTATION: TypedDocumentNode<
   {
     registerCustomerAccount:
-    | { __typename: "Success"; success: boolean }
-    | { __typename: "ErrorResult"; errorCode: string; message: string };
+      | { __typename: "Success"; success: boolean }
+      | { __typename: "ErrorResult"; errorCode: string; message: string };
   },
   {
     input: {
@@ -45,12 +45,55 @@ const REGISTER_MUTATION: TypedDocumentNode<
   }
 `;
 
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
+
+/** Only letters, spaces, hyphens, apostrophes — no digits or symbols */
+const isValidFullName = (name: string) =>
+  /^[a-zA-Z\s'\-]{2,}$/.test(name.trim()) && name.trim().split(/\s+/).length >= 2;
+
+/** Standard email format check */
+const isValidEmail = (email: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+/**
+ * Password must be:
+ * - At least 8 characters
+ * - At least one uppercase letter
+ * - At least one lowercase letter
+ * - At least one number
+ * - At least one special character
+ */
+const isValidPassword = (password: string) =>
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
+
+const getPasswordStrength = (password: string): { label: string; color: string; width: string } => {
+  if (!password) return { label: "", color: "", width: "0%" };
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[a-z]/.test(password)) score++;
+  if (/\d/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+
+  if (score <= 2) return { label: "Weak", color: "bg-red-500", width: "33%" };
+  if (score <= 3) return { label: "Fair", color: "bg-yellow-400", width: "66%" };
+  return { label: "Strong", color: "bg-green-500", width: "100%" };
+};
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 type AuthModalProps = {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 };
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 export default function AuthModal({
   trigger,
   open: controlledOpen,
@@ -82,8 +125,46 @@ export default function AuthModal({
     referCode: "",
   });
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
-  const [register, { loading: registerLoading, error: registerError, data: registerData }] =
+  const [registerErrors, setRegisterErrors] = useState<Record<string, string>>({});
+
+  const [register, { loading: registerLoading, data: registerData }] =
     useMutation(REGISTER_MUTATION);
+
+  const passwordStrength = getPasswordStrength(registerForm.password);
+
+  // ---------------------------------------------------------------------------
+  // Validation
+  // ---------------------------------------------------------------------------
+  const validateRegisterForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!registerForm.fullName.trim()) {
+      errors.fullName = "Full name is required.";
+    } else if (!isValidFullName(registerForm.fullName)) {
+      errors.fullName =
+        "Enter your first and last name using letters only (no numbers or symbols).";
+    }
+
+    if (!registerForm.email.trim()) {
+      errors.email = "Email is required.";
+    } else if (!isValidEmail(registerForm.email)) {
+      errors.email = "Please enter a valid email address (e.g. name@example.com).";
+    }
+
+    if (!registerForm.password) {
+      errors.password = "Password is required.";
+    } else if (!isValidPassword(registerForm.password)) {
+      errors.password =
+        "Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.";
+    }
+
+    if (!registerForm.agree) {
+      errors.agree = "You must agree to the Terms & Conditions.";
+    }
+
+    setRegisterErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -98,7 +179,7 @@ export default function AuthModal({
       await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
       onOpenChange?.(false);
     } catch (err: any) {
-      setLoginErr(err?.message ?? "Login failed");
+      setLoginErr(err?.message ?? "Login failed. Please check your credentials.");
     } finally {
       setLoginSubmitting(false);
     }
@@ -106,11 +187,13 @@ export default function AuthModal({
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateRegisterForm()) return;
+
     const [firstName, ...lastNameParts] = registerForm.fullName.trim().split(/\s+/);
-    await register({
+    const result = await register({
       variables: {
         input: {
-          emailAddress: registerForm.email,
+          emailAddress: registerForm.email.trim(),
           firstName: firstName ?? "",
           lastName: lastNameParts.join(" "),
           password: registerForm.password,
@@ -118,16 +201,28 @@ export default function AuthModal({
         },
       },
     });
+
+    // Handle server-side duplicate email or other errors
+    const outcome = result.data?.registerCustomerAccount;
+    if (outcome?.__typename === "ErrorResult") {
+      if (outcome.errorCode === "EMAIL_ADDRESS_CONFLICT") {
+        setRegisterErrors((prev) => ({
+          ...prev,
+          email: "This email address is already registered. Please log in instead.",
+        }));
+      } else {
+        setRegisterErrors((prev) => ({
+          ...prev,
+          general: outcome.message,
+        }));
+      }
+    }
   };
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      // If Clerk already has a session (e.g. Vendure verification failed last time),
-      // sign out of Clerk first so we can restart the OAuth flow cleanly.
-      if (isSignedIn) {
-        await signOut();
-      }
+      if (isSignedIn) await signOut();
 
       if (!signIn) {
         toast.error("Auth not ready, please try again.");
@@ -146,7 +241,6 @@ export default function AuthModal({
         toast.error("Google sign-in failed. Please try again.");
         setGoogleLoading(false);
       }
-      // On success the browser navigates away — don't reset googleLoading
     } catch (err: any) {
       console.error("Google OAuth error:", err);
       toast.error(err?.errors?.[0]?.message ?? err?.message ?? "Google sign-in failed.");
@@ -181,13 +275,16 @@ export default function AuthModal({
     </div>
   );
 
+  const FieldError = ({ msg }: { msg?: string }) =>
+    msg ? <p className="text-red-500 text-xs mt-1 pl-1">{msg}</p> : null;
+
   return (
     <Dialog.Root open={controlledOpen} onOpenChange={onOpenChange}>
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
 
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-8 shadow-xl">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-8 shadow-xl max-h-[90vh] overflow-y-auto">
           <VisuallyHidden>
             <Dialog.Title>Authentication</Dialog.Title>
             <Dialog.Description>Log in or create an account to continue.</Dialog.Description>
@@ -209,13 +306,13 @@ export default function AuthModal({
             </button>
             <button
               onClick={() => setActiveTab("register")}
-              className={`flex-1 py-2 text-center ${activeTab === "register" ? "border-b border-black font-light" : "text-gray-500"}`}
+              className={`flex-1 py-2 text-center ${activeTab === "register" ? "border-b border-black font-semibold" : "text-gray-500"}`}
             >
               Create Account
             </button>
           </div>
 
-          {/* LOGIN TAB */}
+          {/* ── LOGIN TAB ────────────────────────────────────────────────── */}
           {activeTab === "login" && (
             <div className="flex flex-col gap-4">
               {GoogleButton}
@@ -226,7 +323,7 @@ export default function AuthModal({
                   placeholder="Enter Email"
                   value={loginForm.email}
                   onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                  className="w-full rounded-full border px-4 py-3 focus:outline-none"
+                  className="w-full rounded-full border px-4 py-3 focus:outline-none focus:border-red-400"
                   required
                 />
                 <div className="relative">
@@ -235,7 +332,7 @@ export default function AuthModal({
                     placeholder="Password"
                     value={loginForm.password}
                     onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                    className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none"
+                    className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none focus:border-red-400"
                     required
                   />
                   <button
@@ -265,7 +362,7 @@ export default function AuthModal({
                 >
                   {loginSubmitting || userLoading ? "Logging in..." : "Sign in"}
                 </button>
-                {loginErr && <p className="text-red-500 text-sm">{loginErr}</p>}
+                {loginErr && <p className="text-red-500 text-sm text-center">{loginErr}</p>}
               </form>
               <p className="text-center text-sm">
                 Don't have an account?{" "}
@@ -276,96 +373,172 @@ export default function AuthModal({
             </div>
           )}
 
-          {/* REGISTER TAB */}
+          {/* ── REGISTER TAB ─────────────────────────────────────────────── */}
           {activeTab === "register" && (
             <div className="flex flex-col gap-3">
               {GoogleButton}
               {Divider}
-              <form onSubmit={handleRegister} className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-[#1C1C1C]">Full Name</label>
-                  <input
-                    type="text"
-                    placeholder="Enter Full Name"
-                    value={registerForm.fullName}
-                    onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })}
-                    className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
-                    required
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-[#1C1C1C]">Email</label>
-                  <input
-                    type="email"
-                    placeholder="Enter Email"
-                    value={registerForm.email}
-                    onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                    className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
-                    required
-                  />
-                </div>
-                <div className="relative flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-[#1C1C1C]">Password</label>
-                  <input
-                    type={showRegisterPassword ? "text" : "password"}
-                    placeholder="Password"
-                    value={registerForm.password}
-                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                    className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none"
-                    required
-                  />
+
+              {registerData?.registerCustomerAccount?.__typename === "Success" ? (
+                <div className="text-center py-6 flex flex-col items-center gap-3">
+                  <div className="text-4xl">📧</div>
+                  <p className="font-semibold text-neutral-800">Check your email</p>
+                  <p className="text-sm text-neutral-500">
+                    We sent a verification link to{" "}
+                    <span className="font-medium text-neutral-700">{registerForm.email}</span>.
+                    Please verify your account before logging in.
+                  </p>
                   <button
                     type="button"
-                    onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                    className="absolute right-3 bottom-2 text-gray-500"
+                    onClick={() => setActiveTab("login")}
+                    className="mt-2 rounded-full bg-red-600 px-6 py-2 text-sm text-white font-semibold"
                   >
-                    {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    Go to Login
                   </button>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-[#1C1C1C]">Referral Code (Optional)</label>
-                  <input
-                    type="text"
-                    placeholder="Enter Referral Code"
-                    value={registerForm.referCode}
-                    onChange={(e) => setRegisterForm({ ...registerForm, referCode: e.target.value })}
-                    className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
-                  />
-                </div>
-                <label className="flex items-center text-sm">
-                  <input
-                    type="checkbox"
-                    checked={registerForm.agree}
-                    onChange={(e) => setRegisterForm({ ...registerForm, agree: e.target.checked })}
-                    className="mr-2"
-                  />
-                  <span className="text-xs">I agree to all </span>
-                  <a href="#" className="underline font-medium ml-1 text-xs">Terms & Conditions</a>
-                </label>
-                <button
-                  type="submit"
-                  disabled={registerLoading || !registerForm.agree}
-                  className="w-full rounded-full bg-red-600 py-2 text-white text-sm font-semibold disabled:opacity-60"
-                >
-                  {registerLoading ? "Creating..." : "Create an Account"}
-                </button>
-                {registerError && <p className="text-red-500 text-sm">{registerError.message}</p>}
-                {registerData?.registerCustomerAccount?.__typename === "Success" && (
-                  <p className="text-green-600 text-sm">
-                    Registered! Please check your email to verify your account.
-                  </p>
-                )}
-              </form>
-              <p className="text-center text-sm mt-2">
-                Already have an account?{" "}
-                <button type="button" onClick={() => setActiveTab("login")} className="text-[#FF0000] font-medium">
-                  Sign in
-                </button>
-              </p>
+              ) : (
+                <form onSubmit={handleRegister} className="flex flex-col gap-3" noValidate>
+
+                  {/* Full Name */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold text-[#1C1C1C]">Full Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. John Doe"
+                      value={registerForm.fullName}
+                      onChange={(e) => {
+                        setRegisterForm({ ...registerForm, fullName: e.target.value });
+                        if (registerErrors.fullName) setRegisterErrors((p) => ({ ...p, fullName: "" }));
+                      }}
+                      className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
+                        registerErrors.fullName ? "border-red-400" : "border-[#E5E5E5]"
+                      }`}
+                    />
+                    <FieldError msg={registerErrors.fullName} />
+                  </div>
+
+                  {/* Email */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold text-[#1C1C1C]">Email</label>
+                    <input
+                      type="email"
+                      placeholder="name@example.com"
+                      value={registerForm.email}
+                      onChange={(e) => {
+                        setRegisterForm({ ...registerForm, email: e.target.value });
+                        if (registerErrors.email) setRegisterErrors((p) => ({ ...p, email: "" }));
+                      }}
+                      className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
+                        registerErrors.email ? "border-red-400" : "border-[#E5E5E5]"
+                      }`}
+                    />
+                    <FieldError msg={registerErrors.email} />
+                  </div>
+
+                  {/* Password */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold text-[#1C1C1C]">Password</label>
+                    <div className="relative">
+                      <input
+                        type={showRegisterPassword ? "text" : "password"}
+                        placeholder="Min 8 chars, upper, lower, number, symbol"
+                        value={registerForm.password}
+                        onChange={(e) => {
+                          setRegisterForm({ ...registerForm, password: e.target.value });
+                          if (registerErrors.password) setRegisterErrors((p) => ({ ...p, password: "" }));
+                        }}
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${
+                          registerErrors.password ? "border-red-400" : "border-[#E5E5E5]"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                        className="absolute right-3 top-2 text-gray-500"
+                      >
+                        {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+
+                    {/* Password strength bar */}
+                    {registerForm.password.length > 0 && (
+                      <div className="mt-1.5 space-y-1">
+                        <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${passwordStrength.color}`}
+                            style={{ width: passwordStrength.width }}
+                          />
+                        </div>
+                        <p className={`text-xs font-medium pl-1 ${
+                          passwordStrength.label === "Weak" ? "text-red-500" :
+                          passwordStrength.label === "Fair" ? "text-yellow-500" : "text-green-600"
+                        }`}>
+                          {passwordStrength.label} password
+                        </p>
+                      </div>
+                    )}
+
+                    <FieldError msg={registerErrors.password} />
+                  </div>
+
+                  {/* Referral Code */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold text-[#1C1C1C]">Referral Code (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="Enter Referral Code"
+                      value={registerForm.referCode}
+                      onChange={(e) => setRegisterForm({ ...registerForm, referCode: e.target.value })}
+                      className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Terms */}
+                  <div>
+                    <label className="flex items-start gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={registerForm.agree}
+                        onChange={(e) => {
+                          setRegisterForm({ ...registerForm, agree: e.target.checked });
+                          if (registerErrors.agree) setRegisterErrors((p) => ({ ...p, agree: "" }));
+                        }}
+                        className="mt-0.5 mr-1"
+                      />
+                      <span className="text-xs">
+                        I agree to all{" "}
+                        <a href="#" className="underline font-medium">Terms & Conditions</a>
+                      </span>
+                    </label>
+                    <FieldError msg={registerErrors.agree} />
+                  </div>
+
+                  {/* General server error */}
+                  {registerErrors.general && (
+                    <p className="text-red-500 text-xs text-center">{registerErrors.general}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={registerLoading}
+                    className="w-full rounded-full bg-red-600 py-2 text-white text-sm font-semibold disabled:opacity-60"
+                  >
+                    {registerLoading ? "Creating..." : "Create an Account"}
+                  </button>
+                </form>
+              )}
+
+              {registerData?.registerCustomerAccount?.__typename !== "Success" && (
+                <p className="text-center text-sm mt-2">
+                  Already have an account?{" "}
+                  <button type="button" onClick={() => setActiveTab("login")} className="text-[#FF0000] font-medium">
+                    Sign in
+                  </button>
+                </p>
+              )}
             </div>
           )}
 
-          {/* Required by Clerk for bot protection on custom flows */}
           <div id="clerk-captcha" />
         </Dialog.Content>
       </Dialog.Portal>
