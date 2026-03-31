@@ -13,7 +13,7 @@ type AddressForm = {
   streetLine1: string;
   streetLine2?: string; // used to store LGA
   city: string;
-  province?: string;   // stores selected State
+  province?: string; // stores selected State
   postalCode?: string;
   countryCode?: string;
   phoneNumber: string;
@@ -47,6 +47,11 @@ type GetCustomerAddressesData = {
   } | null;
 };
 
+type FormErrors = {
+  fullName?: string;
+  phoneNumber?: string;
+};
+
 const defaultForm: AddressForm = {
   fullName: "",
   phoneNumber: "",
@@ -78,10 +83,8 @@ const savedToForm = (a: SavedAddress): AddressForm => ({
   countryCode: a.country?.code ?? "NG",
 });
 
-// All Nigerian states
 const ALL_STATES: string[] = NaijaStates.states();
 
-// Get LGAs for a given state (returns [] if not found)
 const getLgas = (state: string): string[] => {
   if (!state) return [];
   try {
@@ -90,6 +93,18 @@ const getLgas = (state: string): string[] => {
     return [];
   }
 };
+
+const normalizeFullName = (value: string) => value.replace(/\s+/g, " ").trim();
+
+const isValidFullName = (value: string): boolean => {
+  const normalized = normalizeFullName(value);
+  const words = normalized.split(" ").filter(Boolean);
+  return words.length >= 2;
+};
+
+const sanitizePhoneNumber = (value: string): string => value.replace(/\D/g, "");
+
+const isValidPhoneNumber = (value: string): boolean => /^\d{11,}$/.test(value);
 
 export default function AddressModal({
   trigger,
@@ -104,6 +119,7 @@ export default function AddressModal({
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
 
   const open = isControlled ? (controlledOpen as boolean) : uncontrolledOpen;
+
   const setOpen = (next: boolean) => {
     if (!isControlled) setUncontrolledOpen(next);
     onOpenChange?.(next);
@@ -123,8 +139,8 @@ export default function AddressModal({
 
   const [selectedSavedId, setSelectedSavedId] = React.useState<string>("");
   const [form, setForm] = React.useState<AddressForm>(toForm(initialValue));
+  const [errors, setErrors] = React.useState<FormErrors>({});
 
-  // LGAs derived from selected state (province)
   const lgas = React.useMemo(() => getLgas(form.province ?? ""), [form.province]);
 
   React.useEffect(() => {
@@ -133,17 +149,20 @@ export default function AddressModal({
     if (initialValue && Object.keys(initialValue).length > 0) {
       setSelectedSavedId("");
       setForm(toForm(initialValue));
+      setErrors({});
       return;
     }
 
     if (defaultSaved) {
       setSelectedSavedId(defaultSaved.id);
       setForm(savedToForm(defaultSaved));
+      setErrors({});
       return;
     }
 
     setSelectedSavedId("");
     setForm(toForm(undefined));
+    setErrors({});
   }, [open, initialValue, defaultSaved?.id]);
 
   React.useEffect(() => {
@@ -151,7 +170,10 @@ export default function AddressModal({
     if (!selectedSavedId) return;
 
     const picked = savedAddresses.find((a) => a.id === selectedSavedId);
-    if (picked) setForm(savedToForm(picked));
+    if (picked) {
+      setForm(savedToForm(picked));
+      setErrors({});
+    }
   }, [selectedSavedId, savedAddresses, open]);
 
   const handleChange = (
@@ -160,35 +182,82 @@ export default function AddressModal({
     const { name, value } = e.target;
 
     setForm((prev) => {
-      const updated = { ...prev, [name]: value };
-      // Reset LGA whenever state changes
-      if (name === "province") {
+      const updated: AddressForm = { ...prev };
+
+      if (name === "phoneNumber") {
+        updated.phoneNumber = sanitizePhoneNumber(value);
+      } else if (name === "fullName") {
+        updated.fullName = value;
+      } else if (name === "province") {
+        updated.province = value;
         updated.streetLine2 = "";
+      } else if (name === "streetLine2") {
+        updated.streetLine2 = value;
+      } else if (name === "streetLine1") {
+        updated.streetLine1 = value;
+      } else if (name === "city") {
+        updated.city = value;
+      } else if (name === "postalCode") {
+        updated.postalCode = value;
+      } else if (name === "countryCode") {
+        updated.countryCode = value;
       }
+
       return updated;
     });
+
+    if (name === "fullName" || name === "phoneNumber") {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: undefined,
+      }));
+    }
   };
 
   const clearToManual = () => {
     setSelectedSavedId("");
     setForm(toForm(undefined));
+    setErrors({});
   };
 
   const useDefaultSaved = () => {
     if (!defaultSaved) return;
     setSelectedSavedId(defaultSaved.id);
     setForm(savedToForm(defaultSaved));
+    setErrors({});
+  };
+
+  const validateForm = (): boolean => {
+    const nextErrors: FormErrors = {};
+
+    if (!isValidFullName(form.fullName)) {
+      nextErrors.fullName = "Full name must contain at least 2 words.";
+    }
+
+    if (!isValidPhoneNumber(form.phoneNumber)) {
+      nextErrors.phoneNumber =
+        "Phone number must contain only numbers and be at least 11 digits.";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateForm()) return;
+
     onSubmit({
       ...form,
+      fullName: normalizeFullName(form.fullName),
+      phoneNumber: sanitizePhoneNumber(form.phoneNumber),
       streetLine2: form.streetLine2 || "",
       province: form.province || "",
-      postalCode: "",
+      postalCode: form.postalCode || "",
       countryCode: form.countryCode || "NG",
     });
+
     setOpen(false);
   };
 
@@ -220,7 +289,6 @@ export default function AddressModal({
             </Dialog.Close>
           </div>
 
-          {/* Saved address picker */}
           {customer?.id ? (
             <div className="mb-4 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
               <div className="flex items-center justify-between">
@@ -285,8 +353,7 @@ export default function AddressModal({
             </div>
           ) : null}
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            {/* Full Name */}
+          <form className="space-y-4" onSubmit={handleSubmit} noValidate>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Full Name <span className="text-red-500">*</span>
@@ -297,12 +364,20 @@ export default function AddressModal({
                 placeholder="e.g. John Doe"
                 value={form.fullName}
                 onChange={handleChange}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600"
+                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600 ${
+                  errors.fullName ? "border-red-500" : "border-neutral-300"
+                }`}
                 required
               />
+              {errors.fullName ? (
+                <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>
+              ) : (
+                <p className="mt-1 text-xs text-neutral-500">
+                  Enter at least first name and last name.
+                </p>
+              )}
             </div>
 
-            {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Phone Number <span className="text-red-500">*</span>
@@ -310,15 +385,27 @@ export default function AddressModal({
               <input
                 type="tel"
                 name="phoneNumber"
-                placeholder="e.g. +234 800 000 0000"
+                placeholder="e.g. 08000000000"
                 value={form.phoneNumber}
                 onChange={handleChange}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                minLength={11}
+                maxLength={15}
+                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600 ${
+                  errors.phoneNumber ? "border-red-500" : "border-neutral-300"
+                }`}
                 required
               />
+              {errors.phoneNumber ? (
+                <p className="mt-1 text-xs text-red-600">{errors.phoneNumber}</p>
+              ) : (
+                <p className="mt-1 text-xs text-neutral-500">
+                  Numbers only, minimum of 11 digits.
+                </p>
+              )}
             </div>
 
-            {/* Street Address */}
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Street Address <span className="text-red-500">*</span>
@@ -334,7 +421,6 @@ export default function AddressModal({
               />
             </div>
 
-            {/* City + State */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
@@ -372,7 +458,6 @@ export default function AddressModal({
               </div>
             </div>
 
-            {/* LGA + Country */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">

@@ -9,6 +9,7 @@ import Footer from "@/Components/Footer/Footer";
 import { useUser } from "@/context/UserContext";
 import Link from "next/link";
 import { Package, ChevronRight, ShoppingBag } from "lucide-react";
+import Suscribe from "@/Components/Suscribe/Suscribe";
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
 type Order = {
@@ -43,13 +44,13 @@ const formatDate = (iso: string) =>
   });
 
 const STATE_STYLES: Record<string, { label: string; classes: string }> = {
-  PaymentSettled:   { label: "Paid",       classes: "bg-green-100 text-green-700" },
-  PaymentAuthorized:{ label: "Authorized", classes: "bg-blue-100 text-blue-700" },
-  Shipped:          { label: "Shipped",    classes: "bg-indigo-100 text-indigo-700" },
-  Delivered:        { label: "Delivered",  classes: "bg-green-100 text-green-800" },
-  Cancelled:        { label: "Cancelled",  classes: "bg-red-100 text-red-700" },
-  AddingItems:      { label: "Draft",      classes: "bg-gray-100 text-gray-600" },
-  ArrangingPayment: { label: "Pending",    classes: "bg-yellow-100 text-yellow-700" },
+  PaymentSettled: { label: "Paid", classes: "bg-green-100 text-green-700" },
+  PaymentAuthorized: { label: "Authorized", classes: "bg-blue-100 text-blue-700" },
+  Shipped: { label: "Shipped", classes: "bg-indigo-100 text-indigo-700" },
+  Delivered: { label: "Delivered", classes: "bg-green-100 text-green-800" },
+  Cancelled: { label: "Cancelled", classes: "bg-red-100 text-red-700" },
+  AddingItems: { label: "Draft", classes: "bg-gray-100 text-gray-600" },
+  ArrangingPayment: { label: "Pending", classes: "bg-yellow-100 text-yellow-700" },
 };
 
 const getStateStyle = (state: string) =>
@@ -98,6 +99,7 @@ export default function OrdersPage() {
             Go to Home
           </Link>
         </div>
+        <Suscribe />
         <Footer />
       </main>
     );
@@ -128,6 +130,7 @@ export default function OrdersPage() {
             ))}
           </div>
         </div>
+        <Suscribe />
         <Footer />
       </main>
     );
@@ -141,6 +144,7 @@ export default function OrdersPage() {
         <div className="mx-auto max-w-3xl px-4 py-10 text-center">
           <p className="text-red-500 text-sm">Failed to load orders. Please try again later.</p>
         </div>
+        <Suscribe />
         <Footer />
       </main>
     );
@@ -167,6 +171,7 @@ export default function OrdersPage() {
             </Link>
           </div>
         </div>
+        <Suscribe />
         <Footer />
       </main>
     );
@@ -255,7 +260,7 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
-
+      <Suscribe />
       <Footer />
     </main>
   );

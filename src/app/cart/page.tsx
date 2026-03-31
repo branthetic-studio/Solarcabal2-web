@@ -72,19 +72,23 @@ export default function CartPage() {
   // ── Empty state: guest ──────────────────────────────────────────────────────
   if (!isLoggedIn && localItems.length === 0) {
     return (
-      <main className="px-4 sm:px-6 lg:px-8 py-10">
+      <main className="">
         <Navbar />
-        <h1 className="text-xl sm:text-2xl font-semibold">Shopping Cart</h1>
-        <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-neutral-200 bg-white p-10 text-center">
-          <div className="text-5xl mb-3">🛒</div>
-          <p className="text-neutral-600">Your cart is empty.</p>
-          <Link
-            href="/products"
-            className="mt-6 inline-flex items-center justify-center rounded-full bg-red-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-red-700"
-          >
-            Continue shopping
-          </Link>
+        <div className="px-4 sm:px-6 lg:px-8 py-10">
+          <h1 className="text-xl sm:text-2xl font-semibold">Shopping Cart</h1>
+          <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-neutral-200 bg-white p-10 text-center">
+            <div className="text-5xl mb-3">🛒</div>
+            <p className="text-neutral-600">Your cart is empty.</p>
+            <Link
+              href="/products"
+              className="mt-6 inline-flex items-center justify-center rounded-full bg-red-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-red-700"
+            >
+              Continue shopping
+            </Link>
+          </div>
         </div>
+        <Suscribe />
+        <Footer />
       </main>
     );
   }
@@ -132,222 +136,222 @@ export default function CartPage() {
               {/* Logged-in: server cart lines */}
               {isLoggedIn
                 ? (lines as any[]).map((line: any) => {
-                    const asset =
-                      line?.featuredAsset?.preview ??
-                      line?.productVariant?.product?.featuredAsset?.preview ??
-                      line?.productVariant?.product?.assets?.[0]?.preview ??
-                      null;
+                  const asset =
+                    line?.featuredAsset?.preview ??
+                    line?.productVariant?.product?.featuredAsset?.preview ??
+                    line?.productVariant?.product?.assets?.[0]?.preview ??
+                    null;
 
-                    const name =
-                      line?.productVariant?.product?.name ??
-                      line?.productVariant?.name ??
-                      "Product";
+                  const name =
+                    line?.productVariant?.product?.name ??
+                    line?.productVariant?.name ??
+                    "Product";
 
-                    const brand =
-                      line?.productVariant?.product?.facetValues?.find?.(
-                        (fv: any) => /brand/i.test(fv?.facet?.name ?? "")
-                      )?.name ?? "—";
+                  const brand =
+                    line?.productVariant?.product?.facetValues?.find?.(
+                      (fv: any) => /brand/i.test(fv?.facet?.name ?? "")
+                    )?.name ?? "—";
 
-                    const unitPrice = line?.unitPriceWithTax ?? 0;
-                    const lineTotal =
-                      line?.linePriceWithTax ?? unitPrice * (line?.quantity ?? 1);
+                  const unitPrice = line?.unitPriceWithTax ?? 0;
+                  const lineTotal =
+                    line?.linePriceWithTax ?? unitPrice * (line?.quantity ?? 1);
 
-                    return (
-                      <li
-                        key={line.id}
-                        className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5"
-                      >
-                        <div className="flex items-start gap-4">
-                          {/* Image */}
-                          <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
-                            {asset ? (
-                              <Image
-                                src={asset}
-                                alt={name}
-                                width={80}
-                                height={80}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
-                                No Image
-                              </span>
-                            )}
-                          </div>
+                  return (
+                    <li
+                      key={line.id}
+                      className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5"
+                    >
+                      <div className="flex items-start gap-4">
+                        {/* Image */}
+                        <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
+                          {asset ? (
+                            <Image
+                              src={asset}
+                              alt={name}
+                              width={80}
+                              height={80}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
+                              No Image
+                            </span>
+                          )}
+                        </div>
 
-                          {/* Details */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
-                                  {name}
-                                </p>
-                                <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
-                                  {brand}
-                                </p>
-                                <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
-                                  {money(unitPrice, serverCurrency)}{" "}
-                                  <span className="text-[11px] font-normal text-neutral-500">
-                                    / pcs
-                                  </span>
-                                </p>
-                              </div>
-
-                              <div className="text-right">
-                                <button
-                                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
-                                  onClick={() => removeFromCartMutation(line.id)}
-                                  aria-label="Remove"
-                                >
-                                  Remove <Trash2 className="h-4 w-4" />
-                                </button>
-                                <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
-                                  <span className="mr-1">Total</span>
-                                  <span className="font-semibold text-neutral-900">
-                                    {money(lineTotal, serverCurrency)}
-                                  </span>
-                                </div>
-                              </div>
+                        {/* Details */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
+                                {name}
+                              </p>
+                              <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
+                                {brand}
+                              </p>
+                              <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
+                                {money(unitPrice, serverCurrency)}{" "}
+                                <span className="text-[11px] font-normal text-neutral-500">
+                                  / pcs
+                                </span>
+                              </p>
                             </div>
 
-                            {/* Qty */}
-                            <div className="mt-3 sm:mt-4 flex items-center gap-3">
-                              <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
-                                <button
-                                  onClick={() =>
-                                    handleAdjustQuantity(
-                                      line.id,
-                                      Math.max(0, (line.quantity ?? 1) - 1)
-                                    )
-                                  }
-                                  className="h-8 w-8 flex items-center justify-center"
-                                  aria-label="Decrease"
-                                >
-                                  −
-                                </button>
-                                <span className="w-8 text-center text-[13px] font-medium">
-                                  {line.quantity}
+                            <div className="text-right">
+                              <button
+                                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
+                                onClick={() => removeFromCartMutation(line.id)}
+                                aria-label="Remove"
+                              >
+                                Remove <Trash2 className="h-4 w-4" />
+                              </button>
+                              <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
+                                <span className="mr-1">Total</span>
+                                <span className="font-semibold text-neutral-900">
+                                  {money(lineTotal, serverCurrency)}
                                 </span>
-                                <button
-                                  onClick={() =>
-                                    handleAdjustQuantity(
-                                      line.id,
-                                      (line.quantity ?? 1) + 1
-                                    )
-                                  }
-                                  className="h-8 w-8 flex items-center justify-center"
-                                  aria-label="Increase"
-                                >
-                                  +
-                                </button>
                               </div>
+                            </div>
+                          </div>
+
+                          {/* Qty */}
+                          <div className="mt-3 sm:mt-4 flex items-center gap-3">
+                            <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
+                              <button
+                                onClick={() =>
+                                  handleAdjustQuantity(
+                                    line.id,
+                                    Math.max(0, (line.quantity ?? 1) - 1)
+                                  )
+                                }
+                                className="h-8 w-8 flex items-center justify-center"
+                                aria-label="Decrease"
+                              >
+                                −
+                              </button>
+                              <span className="w-8 text-center text-[13px] font-medium">
+                                {line.quantity}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  handleAdjustQuantity(
+                                    line.id,
+                                    (line.quantity ?? 1) + 1
+                                  )
+                                }
+                                className="h-8 w-8 flex items-center justify-center"
+                                aria-label="Increase"
+                              >
+                                +
+                              </button>
                             </div>
                           </div>
                         </div>
-                      </li>
-                    );
-                  })
+                      </div>
+                    </li>
+                  );
+                })
 
                 /* Guest: local cart items */
                 : localItems.map((line) => {
-                    // priceWithTax is stored in cents (e.g. 150000 = ₦1,500)
-                    // money() divides by 100, so pass the raw cent value directly
-                    const unitPrice = line.priceWithTax ?? 0;
-                    const lineTotal = unitPrice * (line.quantity ?? 1);
+                  // priceWithTax is stored in cents (e.g. 150000 = ₦1,500)
+                  // money() divides by 100, so pass the raw cent value directly
+                  const unitPrice = line.priceWithTax ?? 0;
+                  const lineTotal = unitPrice * (line.quantity ?? 1);
 
-                    return (
-                      <li
-                        key={line.id}
-                        className="border-b border-neutral-200 bg-white p-4 sm:p-5"
-                      >
-                        <div className="flex items-start gap-4">
-                          {/* Image */}
-                          <div className="h-20 w-20 p-2 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
-                            {line.image ? (
-                              <Image
-                                src={line.image}
-                                alt={line.name}
-                                width={80}
-                                height={80}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
-                                No Image
-                              </span>
-                            )}
-                          </div>
+                  return (
+                    <li
+                      key={line.id}
+                      className="border-b border-neutral-200 bg-white p-4 sm:p-5"
+                    >
+                      <div className="flex items-start gap-4">
+                        {/* Image */}
+                        <div className="h-20 w-20 p-2 sm:h-20 sm:w-20 overflow-hidden rounded-lg bg-neutral-100 shrink-0">
+                          {line.image ? (
+                            <Image
+                              src={line.image}
+                              alt={line.name}
+                              width={80}
+                              height={80}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
+                              No Image
+                            </span>
+                          )}
+                        </div>
 
-                          {/* Details */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
-                                  {line.name}
-                                </p>
-                                <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
-                                  {line.brand ?? "—"}
-                                </p>
-                                {/* Unit price — stored in cents, money() divides by 100 */}
-                                <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
-                                  {money(unitPrice, localCurrency)}{" "}
-                                  <span className="text-[11px] font-normal text-neutral-500">
-                                    / pcs
-                                  </span>
-                                </p>
-                              </div>
-
-                              <div className="text-right">
-                                <button
-                                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
-                                  onClick={() => removeItem(line.id)}
-                                  aria-label="Remove"
-                                >
-                                  Remove <Trash2 className="h-4 w-4" />
-                                </button>
-                                <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
-                                  <span className="mr-1 text-xs">Total</span>
-                                  <span className="font-semibold text-neutral-900">
-                                    {money(lineTotal, localCurrency)}
-                                  </span>
-                                </div>
-                              </div>
+                        {/* Details */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-[15px] sm:text-base font-semibold text-neutral-900">
+                                {line.name}
+                              </p>
+                              <p className="mt-0.5 text-xs sm:text-[13px] text-neutral-500">
+                                {line.brand ?? "—"}
+                              </p>
+                              {/* Unit price — stored in cents, money() divides by 100 */}
+                              <p className="mt-2 text-[13px] sm:text-sm font-semibold text-neutral-900">
+                                {money(unitPrice, localCurrency)}{" "}
+                                <span className="text-[11px] font-normal text-neutral-500">
+                                  / pcs
+                                </span>
+                              </p>
                             </div>
 
-                            {/* Qty */}
-                            <div className="mt-3 sm:mt-4 flex items-center gap-3">
-                              <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
-                                <button
-                                  onClick={() =>
-                                    updateQuantity(
-                                      line.id,
-                                      Math.max(0, (line.quantity ?? 1) - 1)
-                                    )
-                                  }
-                                  className="h-8 w-8 flex items-center justify-center"
-                                  aria-label="Decrease"
-                                >
-                                  −
-                                </button>
-                                <span className="w-8 text-center text-[13px] font-medium">
-                                  {line.quantity}
+                            <div className="text-right">
+                              <button
+                                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-700"
+                                onClick={() => removeItem(line.id)}
+                                aria-label="Remove"
+                              >
+                                Remove <Trash2 className="h-4 w-4" />
+                              </button>
+                              <div className="mt-3 text-[12px] sm:text-sm text-neutral-500">
+                                <span className="mr-1 text-xs">Total</span>
+                                <span className="font-semibold text-neutral-900">
+                                  {money(lineTotal, localCurrency)}
                                 </span>
-                                <button
-                                  onClick={() =>
-                                    updateQuantity(line.id, (line.quantity ?? 1) + 1)
-                                  }
-                                  className="h-8 w-8 flex items-center justify-center"
-                                  aria-label="Increase"
-                                >
-                                  +
-                                </button>
                               </div>
+                            </div>
+                          </div>
+
+                          {/* Qty */}
+                          <div className="mt-3 sm:mt-4 flex items-center gap-3">
+                            <div className="flex items-center overflow-hidden rounded-full border border-neutral-200">
+                              <button
+                                onClick={() =>
+                                  updateQuantity(
+                                    line.id,
+                                    Math.max(0, (line.quantity ?? 1) - 1)
+                                  )
+                                }
+                                className="h-8 w-8 flex items-center justify-center"
+                                aria-label="Decrease"
+                              >
+                                −
+                              </button>
+                              <span className="w-8 text-center text-[13px] font-medium">
+                                {line.quantity}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  updateQuantity(line.id, (line.quantity ?? 1) + 1)
+                                }
+                                className="h-8 w-8 flex items-center justify-center"
+                                aria-label="Increase"
+                              >
+                                +
+                              </button>
                             </div>
                           </div>
                         </div>
-                      </li>
-                    );
-                  })}
+                      </div>
+                    </li>
+                  );
+                })}
             </ul>
 
             {/* Continue shopping */}

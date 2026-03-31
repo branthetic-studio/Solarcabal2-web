@@ -13,6 +13,14 @@ import { toast } from "sonner";
 import { FaGoogle } from "react-icons/fa";
 import { useSignIn, useClerk, useAuth } from "@clerk/nextjs";
 
+// ---------------------------------------------------------------------------
+// GraphQL — referral code goes in customFields.parentReferralCode (single r)
+// only when a code is provided; omit customFields entirely if no code entered.
+//
+// ⚠️  If you still get a 500 after this change, open your Vendure backend and
+//     check the exact spelling inside CustomerCustomFields config, then update
+//     the field name here and in the TypedDocumentNode below to match exactly.
+// ---------------------------------------------------------------------------
 const REGISTER_MUTATION: TypedDocumentNode<
   {
     registerCustomerAccount:
@@ -25,7 +33,9 @@ const REGISTER_MUTATION: TypedDocumentNode<
       firstName: string;
       lastName: string;
       password: string;
-      referCode?: string;
+      customFields?: {
+        parentReferralCode?: string; // ← fixed: single 'r' (was parrentReferralCode)
+      };
     };
   }
 > = gql`
@@ -42,6 +52,9 @@ const REGISTER_MUTATION: TypedDocumentNode<
   }
 `;
 
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
 const isValidFullName = (name: string) =>
   /^[a-zA-Z\s'\-]{2,}$/.test(name.trim()) && name.trim().split(/\s+/).length >= 2;
 
@@ -51,7 +64,9 @@ const isValidEmail = (email: string) =>
 const isValidPassword = (password: string) =>
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
 
-const getPasswordStrength = (password: string): { label: string; color: string; width: string } => {
+const getPasswordStrength = (
+  password: string
+): { label: string; color: string; width: string } => {
   if (!password) return { label: "", color: "", width: "0%" };
   let score = 0;
   if (password.length >= 8) score++;
@@ -64,12 +79,18 @@ const getPasswordStrength = (password: string): { label: string; color: string; 
   return { label: "Strong", color: "bg-green-500", width: "100%" };
 };
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 type AuthModalProps = {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 };
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 export default function AuthModal({
   trigger,
   open: controlledOpen,
@@ -106,12 +127,16 @@ export default function AuthModal({
 
   const passwordStrength = getPasswordStrength(registerForm.password);
 
+  // ---------------------------------------------------------------------------
+  // Validation
+  // ---------------------------------------------------------------------------
   const validateRegisterForm = (): boolean => {
     const errors: Record<string, string> = {};
     if (!registerForm.fullName.trim()) {
       errors.fullName = "Full name is required.";
     } else if (!isValidFullName(registerForm.fullName)) {
-      errors.fullName = "Enter your first and last name using letters only (no numbers or symbols).";
+      errors.fullName =
+        "Enter your first and last name using letters only (no numbers or symbols).";
     }
     if (!registerForm.email.trim()) {
       errors.email = "Email is required.";
@@ -131,6 +156,9 @@ export default function AuthModal({
     return Object.keys(errors).length === 0;
   };
 
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginErr(null);
@@ -152,39 +180,55 @@ export default function AuthModal({
     if (!validateRegisterForm()) return;
 
     const [firstName, ...lastNameParts] = registerForm.fullName.trim().split(/\s+/);
+    const trimmedReferCode = registerForm.referCode.trim();
 
-    const result = await register({
-      variables: {
-        input: {
-          emailAddress: registerForm.email.trim(),
-          firstName: firstName ?? "",
-          lastName: lastNameParts.join(" "),
-          password: registerForm.password,
-          referCode: registerForm.referCode || undefined,
+    try {
+      const result = await register({
+        variables: {
+          input: {
+            emailAddress: registerForm.email.trim(),
+            firstName: firstName ?? "",
+            lastName: lastNameParts.join(" "),
+            password: registerForm.password,
+            // Only send customFields when the user actually entered a referral code.
+            // Sending an empty/null value causes backend validation errors.
+            // Field name fixed: parentReferralCode (single 'r') not parrentReferralCode.
+            ...(trimmedReferCode
+              ? { customFields: { parentReferralCode: trimmedReferCode } }
+              : {}),
+          },
         },
-      },
-    });
-
-    const outcome = result.data?.registerCustomerAccount;
-
-    if (outcome?.__typename === "Success") {
-      // ✅ Close the modal immediately and notify via toast
-      onOpenChange?.(false);
-      toast.success("Account created! Please check your email to verify your account.", {
-        duration: 6000,
       });
-    } else if (outcome?.__typename === "ErrorResult") {
-      if (outcome.errorCode === "EMAIL_ADDRESS_CONFLICT") {
-        setRegisterErrors((prev) => ({
-          ...prev,
-          email: "This email address is already registered. Please log in instead.",
-        }));
-      } else {
-        setRegisterErrors((prev) => ({
-          ...prev,
-          general: outcome.message,
-        }));
+
+      const outcome = result.data?.registerCustomerAccount;
+
+      if (outcome?.__typename === "Success") {
+        onOpenChange?.(false);
+        toast.success(
+          "Account created! Please check your email to verify your account.",
+          { duration: 6000 }
+        );
+      } else if (outcome?.__typename === "ErrorResult") {
+        if (outcome.errorCode === "EMAIL_ADDRESS_CONFLICT") {
+          setRegisterErrors((prev) => ({
+            ...prev,
+            email: "This email address is already registered. Please log in instead.",
+          }));
+        } else {
+          setRegisterErrors((prev) => ({
+            ...prev,
+            general: outcome.message,
+          }));
+        }
       }
+    } catch (err: any) {
+      // Surface GraphQL / network errors in the form instead of crashing silently
+      const message =
+        err?.graphQLErrors?.[0]?.message ??
+        err?.networkError?.message ??
+        err?.message ??
+        "Registration failed. Please try again.";
+      setRegisterErrors((prev) => ({ ...prev, general: message }));
     }
   };
 
@@ -214,6 +258,9 @@ export default function AuthModal({
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Shared UI
+  // ---------------------------------------------------------------------------
   const GoogleButton = (
     <button
       type="button"
@@ -241,6 +288,9 @@ export default function AuthModal({
   const FieldError = ({ msg }: { msg?: string }) =>
     msg ? <p className="text-red-500 text-xs mt-1 pl-1">{msg}</p> : null;
 
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
     <Dialog.Root open={controlledOpen} onOpenChange={onOpenChange}>
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
@@ -254,7 +304,10 @@ export default function AuthModal({
           </VisuallyHidden>
 
           <Dialog.Close asChild>
-            <button className="absolute right-4 top-4 text-gray-400 hover:text-black" aria-label="Close">
+            <button
+              className="absolute right-4 top-4 text-gray-400 hover:text-black"
+              aria-label="Close"
+            >
               <X className="h-5 w-5" />
             </button>
           </Dialog.Close>
@@ -263,13 +316,21 @@ export default function AuthModal({
           <div className="flex mb-6 border-b">
             <button
               onClick={() => setActiveTab("login")}
-              className={`flex-1 py-2 text-center ${activeTab === "login" ? "border-b border-[#3C3C3C] font-semibold" : "text-gray-500"}`}
+              className={`flex-1 py-2 text-center ${
+                activeTab === "login"
+                  ? "border-b border-[#3C3C3C] font-semibold"
+                  : "text-gray-500"
+              }`}
             >
               Log in
             </button>
             <button
               onClick={() => setActiveTab("register")}
-              className={`flex-1 py-2 text-center ${activeTab === "register" ? "border-b border-black font-semibold" : "text-gray-500"}`}
+              className={`flex-1 py-2 text-center ${
+                activeTab === "register"
+                  ? "border-b border-black font-semibold"
+                  : "text-gray-500"
+              }`}
             >
               Create Account
             </button>
@@ -294,7 +355,9 @@ export default function AuthModal({
                     type={showLoginPassword ? "text" : "password"}
                     placeholder="Password"
                     value={loginForm.password}
-                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                    onChange={(e) =>
+                      setLoginForm({ ...loginForm, password: e.target.value })
+                    }
                     className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none focus:border-red-400"
                     required
                   />
@@ -303,7 +366,11 @@ export default function AuthModal({
                     onClick={() => setShowLoginPassword(!showLoginPassword)}
                     className="absolute right-3 top-3 text-gray-500"
                   >
-                    {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {showLoginPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
                   </button>
                 </div>
                 <label className="flex items-center text-sm">
@@ -315,7 +382,10 @@ export default function AuthModal({
                   />
                   Keep me logged in
                 </label>
-                <a href="/forgot-password" className="text-red-600 hover:underline font-medium text-sm">
+                <a
+                  href="/forgot-password"
+                  className="text-red-600 hover:underline font-medium text-sm"
+                >
                   Forgot password?
                 </a>
                 <button
@@ -325,11 +395,17 @@ export default function AuthModal({
                 >
                   {loginSubmitting || userLoading ? "Logging in..." : "Sign in"}
                 </button>
-                {loginErr && <p className="text-red-500 text-sm text-center">{loginErr}</p>}
+                {loginErr && (
+                  <p className="text-red-500 text-sm text-center">{loginErr}</p>
+                )}
               </form>
               <p className="text-center text-sm">
-                Don't have an account?{" "}
-                <button type="button" onClick={() => setActiveTab("register")} className="text-[#FF0000] font-medium">
+                Don&apos;t have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("register")}
+                  className="text-[#FF0000] font-medium"
+                >
                   Create one
                 </button>
               </p>
@@ -352,7 +428,8 @@ export default function AuthModal({
                     value={registerForm.fullName}
                     onChange={(e) => {
                       setRegisterForm({ ...registerForm, fullName: e.target.value });
-                      if (registerErrors.fullName) setRegisterErrors((p) => ({ ...p, fullName: "" }));
+                      if (registerErrors.fullName)
+                        setRegisterErrors((p) => ({ ...p, fullName: "" }));
                     }}
                     className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
                       registerErrors.fullName ? "border-red-400" : "border-[#E5E5E5]"
@@ -370,7 +447,8 @@ export default function AuthModal({
                     value={registerForm.email}
                     onChange={(e) => {
                       setRegisterForm({ ...registerForm, email: e.target.value });
-                      if (registerErrors.email) setRegisterErrors((p) => ({ ...p, email: "" }));
+                      if (registerErrors.email)
+                        setRegisterErrors((p) => ({ ...p, email: "" }));
                     }}
                     className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
                       registerErrors.email ? "border-red-400" : "border-[#E5E5E5]"
@@ -389,7 +467,8 @@ export default function AuthModal({
                       value={registerForm.password}
                       onChange={(e) => {
                         setRegisterForm({ ...registerForm, password: e.target.value });
-                        if (registerErrors.password) setRegisterErrors((p) => ({ ...p, password: "" }));
+                        if (registerErrors.password)
+                          setRegisterErrors((p) => ({ ...p, password: "" }));
                       }}
                       className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${
                         registerErrors.password ? "border-red-400" : "border-[#E5E5E5]"
@@ -400,7 +479,11 @@ export default function AuthModal({
                       onClick={() => setShowRegisterPassword(!showRegisterPassword)}
                       className="absolute right-3 top-2 text-gray-500"
                     >
-                      {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showRegisterPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
 
@@ -413,10 +496,15 @@ export default function AuthModal({
                           style={{ width: passwordStrength.width }}
                         />
                       </div>
-                      <p className={`text-xs font-medium pl-1 ${
-                        passwordStrength.label === "Weak" ? "text-red-500" :
-                        passwordStrength.label === "Fair" ? "text-yellow-500" : "text-green-600"
-                      }`}>
+                      <p
+                        className={`text-xs font-medium pl-1 ${
+                          passwordStrength.label === "Weak"
+                            ? "text-red-500"
+                            : passwordStrength.label === "Fair"
+                            ? "text-yellow-500"
+                            : "text-green-600"
+                        }`}
+                      >
                         {passwordStrength.label} password
                       </p>
                     </div>
@@ -426,12 +514,16 @@ export default function AuthModal({
 
                 {/* Referral Code */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-[#1C1C1C]">Referral Code (Optional)</label>
+                  <label className="text-xs font-semibold text-[#1C1C1C]">
+                    Referral Code (Optional)
+                  </label>
                   <input
                     type="text"
                     placeholder="Enter Referral Code"
                     value={registerForm.referCode}
-                    onChange={(e) => setRegisterForm({ ...registerForm, referCode: e.target.value })}
+                    onChange={(e) =>
+                      setRegisterForm({ ...registerForm, referCode: e.target.value })
+                    }
                     className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
                   />
                 </div>
@@ -444,13 +536,16 @@ export default function AuthModal({
                       checked={registerForm.agree}
                       onChange={(e) => {
                         setRegisterForm({ ...registerForm, agree: e.target.checked });
-                        if (registerErrors.agree) setRegisterErrors((p) => ({ ...p, agree: "" }));
+                        if (registerErrors.agree)
+                          setRegisterErrors((p) => ({ ...p, agree: "" }));
                       }}
                       className="mt-0.5 mr-1"
                     />
                     <span className="text-xs">
                       I agree to all{" "}
-                      <a href="#" className="underline font-medium">Terms & Conditions</a>
+                      <a href="#" className="underline font-medium">
+                        Terms & Conditions
+                      </a>
                     </span>
                   </label>
                   <FieldError msg={registerErrors.agree} />
@@ -472,7 +567,11 @@ export default function AuthModal({
 
               <p className="text-center text-sm mt-2">
                 Already have an account?{" "}
-                <button type="button" onClick={() => setActiveTab("login")} className="text-[#FF0000] font-medium">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("login")}
+                  className="text-[#FF0000] font-medium"
+                >
                   Sign in
                 </button>
               </p>

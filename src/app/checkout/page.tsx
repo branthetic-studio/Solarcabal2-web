@@ -7,12 +7,12 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { StaticImageData } from "next/image";
-
 import { useCart } from "@/context/CartContext";
 import { useLocalCart } from "@/context/LocalCartContext";
 import { useUser } from "@/context/UserContext";
 
 import {
+  ADD_TO_CART,
   GET_ACTIVE_ORDER,
   GET_SHIPPING_METHODS,
   SET_SHIPPING_METHOD,
@@ -64,21 +64,21 @@ type ShippingMethod = {
 
 type SetShippingAddressResponse = {
   setOrderShippingAddress:
-  | ActiveOrder
-  | { errorCode: string; message: string };
+    | ActiveOrder
+    | { errorCode: string; message: string };
 };
 
 type TransitionToStateResponse = {
   transitionOrderToState:
-  | ActiveOrder
-  | {
-    __typename: "OrderStateTransitionError";
-    errorCode: string;
-    message: string;
-    transitionError: string;
-    fromState: string;
-    toState: string;
-  };
+    | ActiveOrder
+    | {
+        __typename: "OrderStateTransitionError";
+        errorCode: string;
+        message: string;
+        transitionError: string;
+        fromState: string;
+        toState: string;
+      };
 };
 
 interface InfoRowProps {
@@ -120,7 +120,6 @@ function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // ── User / cart contexts ──────────────────────────────────────────────────
   const { customer } = useUser();
   const {
     cart,
@@ -134,26 +133,25 @@ function CheckoutPage() {
     removeItem: removeLocalItem,
   } = useLocalCart();
 
-  const [method, setMethod] = useState<PaymentMethod>("paystack" as PaymentMethod);
+  const [method, setMethod] = useState<PaymentMethod>("paystack");
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<string | null>(null);
   const [shippingAddress, setShippingAddress] = useState<any>(null);
   const [isPaying, setIsPaying] = useState(false);
   const [installmentPlan, setInstallmentPlan] = useState<InstallmentPlan | null>(null);
+  const [addItemToOrder] = useMutation(ADD_TO_CART);
 
-  // Pre-select method from URL param
+  const { data: activeOrderData, refetch: refetchActiveOrder } = useQuery<{
+    activeOrder: ActiveOrder;
+  }>(GET_ACTIVE_ORDER);
+
+  const activeOrder = activeOrderData?.activeOrder;
+
   useEffect(() => {
     const methodParam = searchParams?.get("method");
     if (methodParam === "installment" || methodParam === "paystack" || methodParam === "bank") {
       setMethod(methodParam as PaymentMethod);
     }
   }, [searchParams]);
-
-  /* ------------------- Queries ------------------- */
-  const { data: activeOrderData } = useQuery<{
-    activeOrder: ActiveOrder;
-  }>(GET_ACTIVE_ORDER);
-
-  const activeOrder = activeOrderData?.activeOrder;
 
   const { data: shippingMethodsData } = useQuery<{
     eligibleShippingMethods: ShippingMethod[];
@@ -171,7 +169,6 @@ function CheckoutPage() {
     }
   }, [shippingMethods, selectedShippingMethod]);
 
-  /* ------------------- Mutations ------------------- */
   const [setShippingAddressMutation] =
     useMutation<SetShippingAddressResponse>(SET_SHIPPING_ADDRESS);
   const [setShippingMethodMutation] = useMutation(SET_SHIPPING_METHOD);
@@ -179,10 +176,6 @@ function CheckoutPage() {
   const [createPaystackIntent] = useMutation(PAYSTACK_INTENT);
   const [recreateFailedOrder] = useMutation(RECREATE_FAILED_ORDER);
 
-  /* ------------------- Reactive quantity map --------------------------------
-   * Derived from live context — no refetch() needed. Updates automatically
-   * when useCart or useLocalCart changes.
-   * -------------------------------------------------------------------------- */
   const quantityMap = useMemo<Record<string, number>>(() => {
     const map: Record<string, number> = {};
     if (customer) {
@@ -198,31 +191,15 @@ function CheckoutPage() {
     return map;
   }, [customer, cart, localItems]);
 
-  /* ------------------- Shipping cost derived from selected method -----------
-   * We read price directly from the shippingMethods list so the UI updates
-   * immediately as the user switches options — before the mutation fires.
-   * -------------------------------------------------------------------------- */
   const selectedShippingCost = useMemo(() => {
     if (!selectedShippingMethod) return 0;
     return shippingMethods.find((m) => m.id === selectedShippingMethod)?.price ?? 0;
   }, [selectedShippingMethod, shippingMethods]);
 
-  /* ------------------- Display totals --------------------------------------
-   * activeOrder.subTotalWithTax = items only (no shipping).
-   * We add selectedShippingCost so the user sees the correct live total
-   * before the mutation is called at checkout time.
-   *
-   * Edge-case: if the server has already applied a shipping line (e.g. the
-   * user came back to this page) we use totalWithTax directly and avoid
-   * double-counting by checking shippingLines.
-   * -------------------------------------------------------------------------- */
-  const serverAlreadyHasShipping =
-    (activeOrder?.shippingLines?.length ?? 0) > 0;
+  const serverAlreadyHasShipping = (activeOrder?.shippingLines?.length ?? 0) > 0;
 
   const displayTotal = useMemo(() => {
     if (serverAlreadyHasShipping) {
-      // Server total already includes shipping — use it as-is, but swap in
-      // the newly selected shipping cost if the user changed the method.
       const serverShippingCost =
         activeOrder?.shippingLines?.reduce(
           (acc: number, sl: any) => acc + (sl.priceWithTax ?? 0),
@@ -231,7 +208,6 @@ function CheckoutPage() {
       const base = (activeOrder?.totalWithTax ?? 0) - serverShippingCost;
       return base + selectedShippingCost;
     }
-    // No shipping on the order yet — add it manually.
     return (activeOrder?.subTotalWithTax ?? activeOrder?.totalWithTax ?? 0) + selectedShippingCost;
   }, [activeOrder, selectedShippingCost, serverAlreadyHasShipping]);
 
@@ -252,7 +228,6 @@ function CheckoutPage() {
       }
       return;
     }
-
     updateLocalQuantity(variantId, newQty);
     if (customer) {
       const orderLineId = getOrderLineIdByVariantId(variantId) ?? lineId;
@@ -301,58 +276,76 @@ function CheckoutPage() {
     toast.success("Installment plan set. Proceed to checkout.");
   };
 
+  const syncLocalCartToServer = async () => {
+    if (!localItems.length) return false;
+    try {
+      for (const item of localItems) {
+        await addItemToOrder({
+          variables: { productVariantId: item.id, quantity: item.quantity },
+        });
+      }
+      await refetchActiveOrder();
+      return true;
+    } catch (err) {
+      console.error("[checkout] cart sync failed:", extractErrorMessage(err));
+      toast.error("Failed to sync cart.");
+      return false;
+    }
+  };
+
   /* ------------------- Core checkout / Paystack launch ------------------- */
   const handleCheckout = async () => {
-    if (!activeOrder) {
-      toast.error("No active order found.");
-      return;
-    }
-
-    if (!activeOrder.lines || activeOrder.lines.length === 0) {
-      toast.error("Your cart is empty. Please add items before checking out.");
-      router.push("/cart");
-      return;
-    }
-
-    if (!activeOrder.shippingAddress && !shippingAddress) {
-      toast.error("Please add a shipping address.");
-      return;
-    }
-    if (!selectedShippingMethod) {
-      toast.error("Please select a shipping method.");
-      return;
-    }
-    if (method === "installment" && !installmentPlan) {
-      toast.error("Please confirm your installment plan first.");
-      return;
-    }
-
     setIsPaying(true);
 
     try {
-      // Step 1: Set shipping method
-      if (!activeOrder.shippingLines || activeOrder.shippingLines.length === 0) {
-        try {
-          await setShippingMethodMutation({ variables: { id: [selectedShippingMethod] } });
-        } catch (err) {
-          console.error("[checkout] setShippingMethod failed:", extractErrorMessage(err));
-          toast.error("Failed to set shipping method. Please try again.");
-          return;
-        }
+      // STEP 0: Get freshest order state
+      const freshResult = await refetchActiveOrder();
+      let order = freshResult.data?.activeOrder;
+
+      // STEP 0b: Sync local cart to server if order is empty
+      if ((!order?.lines || order.lines.length === 0) && localItems.length > 0) {
+        const synced = await syncLocalCartToServer();
+        if (!synced) return;
+        const refreshed = await refetchActiveOrder();
+        order = refreshed.data?.activeOrder;
       }
 
-      // Step 2: Transition to ArrangingPayment
-      let transitionResponse: TransitionToStateResponse["transitionOrderToState"] | undefined;
-      try {
-        const transitionResult = await transitionToState({
-          variables: { state: "ArrangingPayment" },
-        });
-        transitionResponse = transitionResult.data?.transitionOrderToState;
-      } catch (err) {
-        console.error("[checkout] transitionToState failed:", extractErrorMessage(err));
-        toast.error("Could not prepare your order for payment. Please try again.");
+      if (!order?.lines || order.lines.length === 0) {
+        toast.error("Your cart is empty.");
+        router.push("/cart");
         return;
       }
+
+      if (!order.shippingAddress && !shippingAddress) {
+        toast.error("Please add a shipping address.");
+        return;
+      }
+
+      if (!selectedShippingMethod) {
+        toast.error("Please select a shipping method.");
+        return;
+      }
+
+      // STEP 1: Set shipping method
+      await setShippingMethodMutation({
+        variables: { id: [selectedShippingMethod] },
+      });
+
+      // STEP 2: Refetch after shipping — get the server-confirmed total with shipping included
+      const afterShipping = await refetchActiveOrder();
+      order = afterShipping.data?.activeOrder;
+
+      if (!order?.lines || order.lines.length === 0) {
+        toast.error("Order became empty after setting shipping. Please try again.");
+        return;
+      }
+
+      // STEP 3: Transition to ArrangingPayment
+      const transitionResult = await transitionToState({
+        variables: { state: "ArrangingPayment" },
+      });
+
+      const transitionResponse = transitionResult.data?.transitionOrderToState;
 
       if (
         transitionResponse &&
@@ -360,77 +353,108 @@ function CheckoutPage() {
         transitionResponse.__typename === "OrderStateTransitionError"
       ) {
         const raw = transitionResponse.transitionError ?? transitionResponse.message ?? "";
-        console.error("[checkout] transition error:", raw);
         const friendly = raw.includes("empty")
           ? "Your cart is empty. Please add items before paying."
           : raw.includes("address")
-            ? "Please complete your shipping address before paying."
-            : `Order error: ${raw}`;
+          ? "Please complete your shipping address."
+          : raw;
         toast.error(friendly);
         return;
       }
 
-      // Step 3: Create Paystack intent
-      try {
-        await createPaystackIntent({ variables: { orderCode: activeOrder.code } });
-      } catch (err) {
-        console.error("[checkout] createPaystackIntent failed:", extractErrorMessage(err));
-        toast.error("Could not initialise payment. Please check your connection and try again.");
-        return;
-      }
+      // STEP 4: Create Paystack intent
+      await createPaystackIntent({ variables: { orderCode: order.code } });
 
-      // Step 4: Determine charge amount
-      // Use displayTotal so Paystack always charges the correct amount
-      // inclusive of the selected shipping cost.
+      // ─────────────────────────────────────────────────────────────────────
+      // STEP 5: Determine charge amount
+      //
+      // After setShippingMethod + refetch, order.totalWithTax is now the
+      // server-confirmed total (items + shipping) in kobo. We use this
+      // directly to avoid any client-side mismatch.
+      //
+      // For installment: depositAmount comes in as Naira from InstallmentPlan,
+      // so we multiply by 100 to convert to kobo for Paystack.
+      // ─────────────────────────────────────────────────────────────────────
+      const serverTotal = order.totalWithTax; // kobo, confirmed by server
+
       const chargeAmount =
         method === "installment" && installmentPlan
-          ? installmentPlan.depositAmount * 100
-          : displayTotal;
+          ? Math.round(installmentPlan.depositAmount * 100) // naira → kobo
+          : serverTotal;
 
-      let PaystackPop: any;
-      try {
-        const mod = await import("@paystack/inline-js");
-        PaystackPop = mod.default;
-      } catch (err) {
-        console.error("[checkout] Paystack SDK load failed:", extractErrorMessage(err));
-        toast.error("Could not load the payment SDK. Please refresh the page and try again.");
+      // STEP 5b: Validate all Paystack params before launching.
+      // This catches "Invalid transaction parameters" before Paystack sees them.
+      const email = order.customer?.emailAddress ?? "";
+
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        toast.error("A valid email address is required to complete payment. Please log in.");
         return;
       }
 
-      // Step 5: Launch Paystack popup
+      if (!chargeAmount || chargeAmount <= 0 || !Number.isFinite(chargeAmount)) {
+        toast.error("Invalid payment amount. Please refresh and try again.");
+        console.error("[checkout] invalid chargeAmount:", chargeAmount, "| serverTotal:", serverTotal);
+        return;
+      }
+
+      if (!order.code) {
+        toast.error("Order reference is missing. Please refresh and try again.");
+        return;
+      }
+
+      if (!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) {
+        toast.error("Payment configuration error. Please contact support.");
+        console.error("[checkout] NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY is not set");
+        return;
+      }
+
+      // Make reference unique per attempt — prevents Paystack's
+      // "duplicate reference" rejection on retries
+      const uniqueReference = `${order.code}-${Date.now()}`;
+
+      console.log("[checkout] Paystack params →", {
+        amount: chargeAmount,
+        email,
+        reference: uniqueReference,
+        serverTotal,
+        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY?.slice(0, 10) + "...",
+      });
+
+      // STEP 6: Load and launch Paystack popup
+      const PaystackPop = (await import("@paystack/inline-js")).default;
       const paystack = new PaystackPop();
-      (paystack.newTransaction as any)({
+
+      paystack.newTransaction({
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
         amount: chargeAmount,
-        email: activeOrder.customer?.emailAddress || "",
-        reference: activeOrder.code,
+        email,
+        reference: uniqueReference,
+
         channels:
           method === "bank"
             ? ["bank_transfer"]
             : ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
+
         metadata: {
-          order_id: activeOrder.id,
+          order_id: order.id,
+          order_code: order.code,   // keep original code in metadata for webhook lookup
           payment_method: method,
-          ...(method === "installment" && installmentPlan
-            ? {
-              installment_periods: installmentPlan.periods,
-              installment_frequency: installmentPlan.frequency,
-            }
-            : {}),
         },
+
         onSuccess: () => {
           router.replace(
-            `/main/checkout/paystack-redirect?reference=${activeOrder.id}&status=success&amount=${chargeAmount}`
+            `/main/checkout/paystack-redirect?reference=${order!.id}&status=success&amount=${chargeAmount}`
           );
         },
+
         onCancel: async () => {
           try {
-            await recreateFailedOrder({ variables: { orderCode: activeOrder.code } });
+            await recreateFailedOrder({ variables: { orderCode: order!.code } });
           } catch (e) {
             console.error("[checkout] recreateFailedOrder failed:", extractErrorMessage(e));
           }
           toast.error("Payment cancelled.");
-          router.replace("/cart");
+          router.push("/cart");
         },
       });
     } catch (err) {
@@ -477,13 +501,13 @@ function CheckoutPage() {
                 <p className="mb-4 text-lg font-semibold">Payment</p>
 
                 <div className="flex flex-col gap-4">
-
                   {/* ── Paystack ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "paystack"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      method === "paystack"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                      }`}
+                    }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -494,21 +518,14 @@ function CheckoutPage() {
                       />
                       <div>
                         <p className="font-medium text-sm">Card / USSD / Mobile Money</p>
-                        <p className="text-xs text-neutral-500 mt-0.5">
-                          Pay securely via Paystack
-                        </p>
+                        <p className="text-xs text-neutral-500 mt-0.5">Pay securely via Paystack</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="flex gap-1 items-center bg-white border border-neutral-200 rounded-lg px-2 py-1">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                           <rect width="24" height="24" rx="4" fill="#ff0000" />
-                          <path
-                            d="M4 8h16M4 12h10M4 16h7"
-                            stroke="white"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                          />
+                          <path d="M4 8h16M4 12h10M4 16h7" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                         </svg>
                         <span className="text-xs font-bold text-[#333333]">Paystack</span>
                       </div>
@@ -517,10 +534,11 @@ function CheckoutPage() {
 
                   {/* ── Bank Transfer ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "bank"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      method === "bank"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                      }`}
+                    }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -531,19 +549,14 @@ function CheckoutPage() {
                       />
                       <div>
                         <p className="font-medium text-sm">Bank Transfer</p>
-                        <p className="text-xs text-neutral-500 mt-0.5">
-                          Transfer directly from your bank
-                        </p>
+                        <p className="text-xs text-neutral-500 mt-0.5">Transfer directly from your bank</p>
                       </div>
                     </div>
                     <div className="flex gap-1 items-center bg-white border border-neutral-200 rounded-lg px-2 py-1">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                         <path
                           d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M8 10v11M12 10v11M16 10v11M20 10v11"
-                          stroke="#6b7280"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                          stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                         />
                       </svg>
                       <span className="text-xs font-medium text-neutral-600">Bank</span>
@@ -552,10 +565,11 @@ function CheckoutPage() {
 
                   {/* ── Installment ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "installment"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      method === "installment"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                      }`}
+                    }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -566,19 +580,12 @@ function CheckoutPage() {
                       />
                       <div>
                         <p className="font-medium text-sm">Installment Payment</p>
-                        <p className="text-xs text-neutral-500 mt-0.5">
-                          Split into manageable payments
-                        </p>
+                        <p className="text-xs text-neutral-500 mt-0.5">Split into manageable payments</p>
                       </div>
                     </div>
                     <div className="flex gap-1 items-center bg-white border border-neutral-200 rounded-lg px-2 py-1">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <path
-                          d="M12 2v20M2 12h20"
-                          stroke="#6b7280"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                        />
+                        <path d="M12 2v20M2 12h20" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" />
                         <circle cx="12" cy="12" r="9" stroke="#6b7280" strokeWidth="2" />
                       </svg>
                       <span className="text-xs font-medium text-neutral-600">Pay Later</span>
@@ -598,8 +605,7 @@ function CheckoutPage() {
                           {activeOrder?.shippingAddress?.fullName || shippingAddress?.fullName}
                         </p>
                         <p className="text-xs text-neutral-600">
-                          {activeOrder?.shippingAddress?.streetLine1 ||
-                            shippingAddress?.streetLine1}
+                          {activeOrder?.shippingAddress?.streetLine1 || shippingAddress?.streetLine1}
                         </p>
                         <p className="text-xs text-neutral-600">
                           {activeOrder?.shippingAddress?.city || shippingAddress?.city}
@@ -683,10 +689,7 @@ function CheckoutPage() {
               {(!activeOrder?.lines || activeOrder.lines.length === 0) && (
                 <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600">
                   Your cart is empty. Please{" "}
-                  <button
-                    className="underline font-medium"
-                    onClick={() => router.push("/cart")}
-                  >
+                  <button className="underline font-medium" onClick={() => router.push("/cart")}>
                     go back to cart
                   </button>{" "}
                   and add items before checking out.
@@ -701,10 +704,7 @@ function CheckoutPage() {
                   return (
                     <div key={ln.id} className="flex gap-3 items-start">
                       <Image
-                        src={
-                          ln.productVariant?.product?.featuredAsset?.preview ||
-                          "/placeholder.png"
-                        }
+                        src={ln.productVariant?.product?.featuredAsset?.preview || "/placeholder.png"}
                         alt="preview"
                         width={75}
                         height={75}
@@ -718,27 +718,20 @@ function CheckoutPage() {
                             <button
                               className="w-4 h-4 border rounded-full text-xs"
                               onClick={() => updateQuantity(variantId, ln.id, qty - 1)}
-                            >
-                              –
-                            </button>
+                            >–</button>
                             <span className="text-xs">{qty}</span>
                             <button
                               className="w-4 h-4 border rounded-full text-xs"
                               onClick={() => updateQuantity(variantId, ln.id, qty + 1)}
-                            >
-                              +
-                            </button>
+                            >+</button>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-semibold">
-                              {formatNaira(ln.linePriceWithTax)}
-                            </p>
+                            <p className="text-sm font-semibold">{formatNaira(ln.linePriceWithTax)}</p>
                             <button
                               className="text-xs text-red-500 flex items-center gap-1"
                               onClick={() => updateQuantity(variantId, ln.id, 0)}
                             >
-                              Remove{" "}
-                              <Image src="/trash.png" alt="Remove" width={12} height={12} />
+                              Remove <Image src="/trash.png" alt="Remove" width={12} height={12} />
                             </button>
                           </div>
                         </div>
@@ -750,61 +743,43 @@ function CheckoutPage() {
 
               {/* ── Order Summary ── */}
               <div className="mt-4 border-t pt-4 space-y-2 text-sm">
-                <Row
-                  label="Subtotal"
-                  value={formatNaira(activeOrder?.subTotalWithTax ?? 0)}
-                />
+                <Row label="Subtotal" value={formatNaira(activeOrder?.subTotalWithTax ?? 0)} />
                 <Row label="Discount" value="- ₦0" />
-                {/* Shipping cost now reflects the selected shipping method live */}
                 <Row
                   label="Shipping"
                   value={selectedShippingCost > 0 ? formatNaira(selectedShippingCost) : "₦0"}
                 />
                 {method === "installment" && installmentPlan && (
                   <>
-                    <Row
-                      label="Deposit (now)"
-                      value={NGN.format(installmentPlan.depositAmount)}
-                    />
+                    <Row label="Deposit (now)" value={NGN.format(installmentPlan.depositAmount)} />
                     <Row
                       label={`${installmentPlan.periods}× ${installmentPlan.frequency} repayments`}
                       value={NGN.format(installmentPlan.repaymentAmount)}
                     />
-                    <Row
-                      label="Insurance Fee (1%)"
-                      value={NGN.format(installmentPlan.insuranceFee)}
-                    />
+                    <Row label="Insurance Fee (1%)" value={NGN.format(installmentPlan.insuranceFee)} />
                   </>
                 )}
               </div>
 
-              {/* Grand Total now includes shipping cost */}
               <div className="mt-3">
-                <Row
-                  big
-                  bold
-                  label="Grand Total"
-                  value={formatNaira(displayTotal)}
-                />
+                <Row big bold label="Grand Total" value={formatNaira(displayTotal)} />
               </div>
 
               {/* ── Paystack CTA ── */}
               <button
                 onClick={handleCheckout}
                 disabled={isPaying || !activeOrder?.lines?.length}
-                className={`mt-5 w-full py-3 rounded-full text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all ${isPaying || !activeOrder?.lines?.length
+                className={`mt-5 w-full py-3 rounded-full text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
+                  isPaying || !activeOrder?.lines?.length
                     ? "bg-red-300 cursor-not-allowed opacity-70"
                     : "bg-[#ff0000] hover:bg-red-700 active:scale-[0.98]"
-                  }`}
+                }`}
               >
                 {!isPaying && (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <path
                       d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z"
-                      fill="white"
-                      stroke="white"
-                      strokeWidth="1"
-                      strokeLinejoin="round"
+                      fill="white" stroke="white" strokeWidth="1" strokeLinejoin="round"
                     />
                   </svg>
                 )}
@@ -815,9 +790,7 @@ function CheckoutPage() {
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
                   <path
                     d="M12 2L4 6v6c0 5.5 3.5 10.7 8 12 4.5-1.3 8-6.5 8-12V6l-8-4z"
-                    stroke="#9ca3af"
-                    strokeWidth="2"
-                    strokeLinejoin="round"
+                    stroke="#9ca3af" strokeWidth="2" strokeLinejoin="round"
                   />
                 </svg>
                 Secured by Paystack
