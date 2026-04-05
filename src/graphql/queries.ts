@@ -409,29 +409,33 @@ export const LOGOUT = gql`
   }
 `;
 
+
 export const REGISTER_CUSTOMER = gql`
-  mutation RegisterCustomer(
-    $emailAddress: String!
-    $password: String!
-    $firstName: String
-    $lastName: String
-  ) {
-    registerCustomerAccount(
-      input: {
-        emailAddress: $emailAddress
-        password: $password
-        firstName: $firstName
-        lastName: $lastName
-      }
-    ) {
-      __typename
+  mutation Register($input: RegisterCustomerInput!) {
+    registerCustomerAccount(input: $input) {
       ... on Success {
         success
       }
-      ... on MissingPasswordError {
+      ... on ErrorResult {
+        errorCode
         message
       }
-      ... on NativeAuthStrategyError {
+    }
+  }
+`;
+
+
+// queries.ts
+
+export const CLERK_AUTHENTICATE = gql`
+  mutation Authenticate($input: ClerkAuthInput!) {
+    authenticate(input: { clerk: $input }) {
+      ... on CurrentUser {
+        id
+        identifier
+      }
+      ... on ErrorResult {
+        errorCode
         message
       }
     }

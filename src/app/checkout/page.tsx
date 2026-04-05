@@ -64,21 +64,21 @@ type ShippingMethod = {
 
 type SetShippingAddressResponse = {
   setOrderShippingAddress:
-    | ActiveOrder
-    | { errorCode: string; message: string };
+  | ActiveOrder
+  | { errorCode: string; message: string };
 };
 
 type TransitionToStateResponse = {
   transitionOrderToState:
-    | ActiveOrder
-    | {
-        __typename: "OrderStateTransitionError";
-        errorCode: string;
-        message: string;
-        transitionError: string;
-        fromState: string;
-        toState: string;
-      };
+  | ActiveOrder
+  | {
+    __typename: "OrderStateTransitionError";
+    errorCode: string;
+    message: string;
+    transitionError: string;
+    fromState: string;
+    toState: string;
+  };
 };
 
 interface InfoRowProps {
@@ -86,6 +86,18 @@ interface InfoRowProps {
   title: string;
   text: string;
 }
+
+/* ------------------- Extended Paystack type ------------------- */
+type PaystackTransactionConfig = {
+  key: string;
+  email: string;
+  amount: number;
+  reference: string;
+  channels?: string[];
+  metadata?: Record<string, unknown>;
+  onSuccess?: (transaction: any) => void;
+  onCancel?: () => void;
+};
 
 /* ------------------- Helpers ------------------- */
 
@@ -356,8 +368,8 @@ function CheckoutPage() {
         const friendly = raw.includes("empty")
           ? "Your cart is empty. Please add items before paying."
           : raw.includes("address")
-          ? "Please complete your shipping address."
-          : raw;
+            ? "Please complete your shipping address."
+            : raw;
         toast.error(friendly);
         return;
       }
@@ -424,7 +436,7 @@ function CheckoutPage() {
       const PaystackPop = (await import("@paystack/inline-js")).default;
       const paystack = new PaystackPop();
 
-      paystack.newTransaction({
+      const transactionConfig: PaystackTransactionConfig = {
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
         amount: chargeAmount,
         email,
@@ -456,7 +468,9 @@ function CheckoutPage() {
           toast.error("Payment cancelled.");
           router.push("/cart");
         },
-      });
+      };
+
+      paystack.newTransaction(transactionConfig);
     } catch (err) {
       const msg = extractErrorMessage(err);
       console.error("[checkout] unexpected error:", msg);
@@ -503,11 +517,10 @@ function CheckoutPage() {
                 <div className="flex flex-col gap-4">
                   {/* ── Paystack ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      method === "paystack"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "paystack"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                    }`}
+                      }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -534,11 +547,10 @@ function CheckoutPage() {
 
                   {/* ── Bank Transfer ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      method === "bank"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "bank"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                    }`}
+                      }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -565,11 +577,10 @@ function CheckoutPage() {
 
                   {/* ── Installment ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      method === "installment"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "installment"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                    }`}
+                      }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -769,11 +780,10 @@ function CheckoutPage() {
               <button
                 onClick={handleCheckout}
                 disabled={isPaying || !activeOrder?.lines?.length}
-                className={`mt-5 w-full py-3 rounded-full text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
-                  isPaying || !activeOrder?.lines?.length
+                className={`mt-5 w-full py-3 rounded-full text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all ${isPaying || !activeOrder?.lines?.length
                     ? "bg-red-300 cursor-not-allowed opacity-70"
                     : "bg-[#ff0000] hover:bg-red-700 active:scale-[0.98]"
-                }`}
+                  }`}
               >
                 {!isPaying && (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">

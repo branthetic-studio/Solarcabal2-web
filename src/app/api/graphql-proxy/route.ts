@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// app/api/graphql/route.ts
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // ✅ Get cookies + auth from the incoming request
     const cookies = request.headers.get("cookie") ?? "";
     const auth = request.headers.get("authorization");
 
-    // ✅ Build headers safely (no nulls)
     const headers = new Headers();
     headers.set("Content-Type", "application/json");
     if (cookies) headers.set("Cookie", cookies);
@@ -18,15 +18,28 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers,
       body: JSON.stringify(body),
-      // ✅ NOTE: credentials: "include" removed (server-to-server fetch doesn’t use it)
     });
 
-    const data = await response.json();
+    // ✅ Always try to parse and forward the real Vendure response,
+    //    even on 4xx/5xx — this exposes the actual error message
+    let data: unknown;
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      data = await response.json();
+    } else {
+      // Non-JSON body (rare) — capture as text so you can read it
+      const text = await response.text();
+      console.error("Vendure non-JSON response:", text);
+      data = { errors: [{ message: text || "Upstream error" }] };
+    }
 
-    // ✅ Create response
+    // ✅ Log when Vendure itself returns an error status
+    if (!response.ok) {
+      console.error("Vendure error status:", response.status, JSON.stringify(data));
+    }
+
     const nextResponse = NextResponse.json(data, { status: response.status });
 
-    // ✅ Forward Set-Cookie headers back to client
     const setCookieHeader = response.headers.get("set-cookie");
     if (setCookieHeader) {
       nextResponse.headers.set("Set-Cookie", setCookieHeader);
@@ -34,11 +47,10 @@ export async function POST(request: NextRequest) {
 
     return nextResponse;
   } catch (error) {
+    // ✅ Log the full error so you can actually debug it
     console.error("GraphQL Proxy Error:", error);
     return NextResponse.json(
-      {
-        errors: [{ message: "Failed to fetch from GraphQL endpoint" }],
-      },
+      { errors: [{ message: "Failed to fetch from GraphQL endpoint" }] },
       { status: 500 }
     );
   }
