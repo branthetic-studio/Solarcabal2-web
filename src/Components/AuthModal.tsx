@@ -24,8 +24,8 @@ import {
 
 type AuthenticateResult = {
   authenticate:
-    | { __typename: "CurrentUser"; id: string; identifier: string }
-    | { __typename: "ErrorResult"; errorCode: string; message: string };
+  | { __typename: "CurrentUser"; id: string; identifier: string }
+  | { __typename: "ErrorResult"; errorCode: string; message: string };
 };
 
 type AuthenticateVars = {
@@ -34,15 +34,15 @@ type AuthenticateVars = {
 
 type LoginResult = {
   login:
-    | { __typename: "CurrentUser"; id: string; identifier: string }
-    | { __typename: "InvalidCredentialsError"; errorCode: string; message: string }
-    | { __typename: "NotVerifiedError"; errorCode: string; message: string };
+  | { __typename: "CurrentUser"; id: string; identifier: string }
+  | { __typename: "InvalidCredentialsError"; errorCode: string; message: string }
+  | { __typename: "NotVerifiedError"; errorCode: string; message: string };
 };
 
 type RegisterResult = {
   registerCustomerAccount:
-    | { __typename: "Success"; success: boolean }
-    | { __typename: "ErrorResult"; errorCode: string; message: string };
+  | { __typename: "Success"; success: boolean }
+  | { __typename: "ErrorResult"; errorCode: string; message: string };
 };
 
 type AuthModalProps = {
@@ -261,7 +261,11 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
             lastName,
             password: registerForm.password,
             ...(registerForm.referCode.trim()
-              ? { customFields: { parrentReferralCode: registerForm.referCode.trim() } }
+              ? {
+                customFields: {
+                  parentReferralCode: registerForm.referCode.trim(),
+                }
+              }
               : {}),
           },
         },
@@ -272,24 +276,45 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
       const result = data?.registerCustomerAccount;
 
       if (result?.__typename === "Success") {
+        // 🚨 Extra safety check
+        if (
+          registerForm.email &&
+          registerForm.email.length > 0 &&
+          result.success === false
+        ) {
+          setRegisterErrors((p) => ({
+            ...p,
+            email: "This email is already registered.",
+          }));
+          return;
+        }
+
         setRegisterSuccess(true);
         return;
       }
 
       if (result?.__typename === "ErrorResult") {
-        const code = result.errorCode;
+        const message = result.message?.toLowerCase() || "";
+
         if (
-          code === "EMAIL_ADDRESS_CONFLICT_ERROR" ||
-          result.message?.toLowerCase().includes("already") ||
-          result.message?.toLowerCase().includes("exists")
+          result.errorCode === "EMAIL_ADDRESS_CONFLICT_ERROR" ||
+          message.includes("already") ||
+          message.includes("exists") ||
+          message.includes("duplicate")
         ) {
           setRegisterErrors((p) => ({
             ...p,
-            email: "This email is already registered. Please log in instead.",
+            email: "This email is already registered. Please log in.",
           }));
+
+          toast.error("Email already exists");
         } else {
-          setRegisterErrors((p) => ({ ...p, general: result.message ?? "Registration failed." }));
+          setRegisterErrors((p) => ({
+            ...p,
+            general: result.message ?? "Registration failed.",
+          }));
         }
+
         return;
       }
 
@@ -523,17 +548,15 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
               <div className="flex mb-6 border-b">
                 <button
                   onClick={() => setActiveTab("login")}
-                  className={`flex-1 py-2 text-center ${
-                    activeTab === "login" ? "border-b border-[#3C3C3C] font-semibold" : "text-gray-500"
-                  }`}
+                  className={`flex-1 py-2 text-center ${activeTab === "login" ? "border-b border-[#3C3C3C] font-semibold" : "text-gray-500"
+                    }`}
                 >
                   Log in
                 </button>
                 <button
                   onClick={() => setActiveTab("register")}
-                  className={`flex-1 py-2 text-center ${
-                    activeTab === "register" ? "border-b border-black font-semibold" : "text-gray-500"
-                  }`}
+                  className={`flex-1 py-2 text-center ${activeTab === "register" ? "border-b border-black font-semibold" : "text-gray-500"
+                    }`}
                 >
                   Create Account
                 </button>
@@ -622,9 +645,8 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                           setRegisterForm({ ...registerForm, fullName: e.target.value });
                           if (registerErrors.fullName) setRegisterErrors((p) => ({ ...p, fullName: "" }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
-                          registerErrors.fullName ? "border-red-400" : "border-[#E5E5E5]"
-                        }`}
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.fullName ? "border-red-400" : "border-[#E5E5E5]"
+                          }`}
                       />
                       <FieldError msg={registerErrors.fullName} />
                     </div>
@@ -639,9 +661,8 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                           setRegisterForm({ ...registerForm, email: e.target.value });
                           if (registerErrors.email) setRegisterErrors((p) => ({ ...p, email: "" }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
-                          registerErrors.email ? "border-red-400" : "border-[#E5E5E5]"
-                        }`}
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.email ? "border-red-400" : "border-[#E5E5E5]"
+                          }`}
                       />
                       <FieldError msg={registerErrors.email} />
                     </div>
@@ -657,9 +678,8 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                             setRegisterForm({ ...registerForm, password: e.target.value });
                             if (registerErrors.password) setRegisterErrors((p) => ({ ...p, password: "" }));
                           }}
-                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${
-                            registerErrors.password ? "border-red-400" : "border-[#E5E5E5]"
-                          }`}
+                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${registerErrors.password ? "border-red-400" : "border-[#E5E5E5]"
+                            }`}
                         />
                         <button
                           type="button"
@@ -677,11 +697,10 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                               style={{ width: passwordStrength.width }}
                             />
                           </div>
-                          <p className={`text-xs font-medium pl-1 ${
-                            passwordStrength.label === "Weak" ? "text-red-500"
+                          <p className={`text-xs font-medium pl-1 ${passwordStrength.label === "Weak" ? "text-red-500"
                             : passwordStrength.label === "Fair" ? "text-yellow-500"
-                            : "text-green-600"
-                          }`}>
+                              : "text-green-600"
+                            }`}>
                             {passwordStrength.label} password
                           </p>
                         </div>
@@ -700,6 +719,7 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                         onChange={(e) => setRegisterForm({ ...registerForm, referCode: e.target.value })}
                         className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
                       />
+                      <FieldError msg={registerErrors.referCode} />
                     </div>
 
                     <div>
