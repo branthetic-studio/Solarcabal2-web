@@ -3,33 +3,20 @@
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useApolloClient, useMutation } from "@apollo/client/react";
-import { gql } from "@apollo/client";
 import { X, Eye, EyeOff, Mail, ArrowLeft } from "lucide-react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useUser } from "@/context/UserContext";
-import { GET_ACTIVE_ORDER } from "@/graphql/queries";
 import { toast } from "sonner";
 import { FaGoogle } from "react-icons/fa";
-import { useSignIn, useSignUp, useClerk, useAuth } from "@clerk/nextjs";
+import { useClerk, useAuth } from "@clerk/nextjs";
 
-// ---------------------------------------------------------------------------
-// GraphQL
-// ---------------------------------------------------------------------------
-
-const CLERK_AUTHENTICATE = gql`
-  mutation Authenticate($input: ClerkAuthInput!) {
-    authenticate(input: { clerk: $input }) {
-      ... on CurrentUser {
-        id
-        identifier
-      }
-      ... on ErrorResult {
-        errorCode
-        message
-      }
-    }
-  }
-`;
+import {
+  GET_ACTIVE_ORDER,
+  CLERK_AUTHENTICATE,
+  REGISTER_CUSTOMER,
+  LOGIN,
+  REQUEST_PASSWORD_RESET,
+} from "@/graphql/queries";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,12 +24,25 @@ const CLERK_AUTHENTICATE = gql`
 
 type AuthenticateResult = {
   authenticate:
-  | { __typename: "CurrentUser"; id: string; identifier: string }
-  | { __typename: "ErrorResult"; errorCode: string; message: string };
+    | { __typename: "CurrentUser"; id: string; identifier: string }
+    | { __typename: "ErrorResult"; errorCode: string; message: string };
 };
 
 type AuthenticateVars = {
   input: { token: string; referralCode?: string };
+};
+
+type LoginResult = {
+  login:
+    | { __typename: "CurrentUser"; id: string; identifier: string }
+    | { __typename: "InvalidCredentialsError"; errorCode: string; message: string }
+    | { __typename: "NotVerifiedError"; errorCode: string; message: string };
+};
+
+type RegisterResult = {
+  registerCustomerAccount:
+    | { __typename: "Success"; success: boolean }
+    | { __typename: "ErrorResult"; errorCode: string; message: string };
 };
 
 type AuthModalProps = {
@@ -64,9 +64,7 @@ const isValidEmail = (email: string) =>
 const isValidPassword = (password: string) =>
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
 
-const getPasswordStrength = (
-  password: string
-): { label: string; color: string; width: string } => {
+const getPasswordStrength = (password: string): { label: string; color: string; width: string } => {
   if (!password) return { label: "", color: "", width: "0%" };
   let score = 0;
   if (password.length >= 8) score++;
@@ -83,19 +81,11 @@ const getPasswordStrength = (
 // Component
 // ---------------------------------------------------------------------------
 
-export default function AuthModal({
-  trigger,
-  open: controlledOpen,
-  onOpenChange,
-}: AuthModalProps) {
+export default function AuthModal({ trigger, open: controlledOpen, onOpenChange }: AuthModalProps) {
   const apollo = useApolloClient();
   const { refetchUser } = useUser();
-
-  // Cast to any to avoid Clerk version type conflicts
-  const signIn = useSignIn().signIn as any;
-  const signUp = useSignUp().signUp as any;
-  const { signOut } = useClerk();
-  const { isSignedIn, getToken } = useAuth();
+  const clerk = useClerk();
+  const { getToken } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -117,30 +107,36 @@ export default function AuthModal({
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [registerErrors, setRegisterErrors] = useState<Record<string, string>>({});
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
 
-  // ── OTP verification state (after Clerk signup) ──
-  const [verifyStep, setVerifyStep] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-  const [otpError, setOtpError] = useState<string | null>(null);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
+  // ── Forgot password state ──
+  const [forgotStep, setForgotStep] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
 
+  // ── Mutations — all imported from queries.ts ──
   const [authenticate] = useMutation<AuthenticateResult, AuthenticateVars>(CLERK_AUTHENTICATE);
+  const [loginMutation] = useMutation<LoginResult>(LOGIN);
+  const [registerMutation] = useMutation<RegisterResult>(REGISTER_CUSTOMER);
+  const [requestPasswordResetMutation] = useMutation(REQUEST_PASSWORD_RESET);
 
   const passwordStrength = getPasswordStrength(registerForm.password);
 
   // ---------------------------------------------------------------------------
-  // Core: exchange Clerk JWT for Vendure session, with optional referral code
+  // Core: exchange Clerk JWT for Vendure session (Google SSO only)
   // ---------------------------------------------------------------------------
   const authenticateWithVendure = async (referralCode?: string) => {
     const token = await getToken();
     if (!token) throw new Error("No Clerk token available");
 
+    const trimmedReferral = referralCode?.trim() || undefined;
+
     const { data } = await authenticate({
       variables: {
         input: {
           token,
-          ...(referralCode ? { referralCode } : {}),
+          ...(trimmedReferral ? { referralCode: trimmedReferral } : {}),
         },
       },
     });
@@ -162,8 +158,7 @@ export default function AuthModal({
     if (!registerForm.fullName.trim()) {
       errors.fullName = "Full name is required.";
     } else if (!isValidFullName(registerForm.fullName)) {
-      errors.fullName =
-        "Enter your first and last name using letters only (no numbers or symbols).";
+      errors.fullName = "Enter your first and last name using letters only (no numbers or symbols).";
     }
     if (!registerForm.email.trim()) {
       errors.email = "Email is required.";
@@ -173,8 +168,7 @@ export default function AuthModal({
     if (!registerForm.password) {
       errors.password = "Password is required.";
     } else if (!isValidPassword(registerForm.password)) {
-      errors.password =
-        "Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.";
+      errors.password = "Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.";
     }
     if (!registerForm.agree) {
       errors.agree = "You must agree to the Terms & Conditions.";
@@ -184,7 +178,7 @@ export default function AuthModal({
   };
 
   // ---------------------------------------------------------------------------
-  // LOGIN — Clerk email/password → authenticate with Vendure
+  // LOGIN — uses LOGIN from queries.ts which expects $username, $password, $rememberMe
   // ---------------------------------------------------------------------------
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,24 +186,52 @@ export default function AuthModal({
     setLoginSubmitting(true);
 
     try {
-      if (!signIn) throw new Error("Auth not ready");
-
-      const result = await signIn.create({
-        identifier: loginForm.email,
-        password: loginForm.password,
+      const { data } = await loginMutation({
+        variables: {
+          username: loginForm.email.trim(), // matches $username in LOGIN query
+          password: loginForm.password,
+          rememberMe: true,
+        },
       });
 
-      if (result.status !== "complete") {
-        throw new Error("Login incomplete. Please try again.");
+      console.log("[login] response:", JSON.stringify(data, null, 2));
+
+      const result = data?.login;
+
+      if (!result) {
+        setLoginErr("No response from server. Please try again.");
+        return;
       }
 
-      // No referral code on login
-      await authenticateWithVendure();
-      toast.success("Welcome back!");
-      onOpenChange?.(false);
+      if (result.__typename === "CurrentUser") {
+        await refetchUser();
+        await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
+        toast.success("Welcome back!");
+        onOpenChange?.(false);
+        return;
+      }
+
+      if (
+        result.__typename === "InvalidCredentialsError" ||
+        result.__typename === "NotVerifiedError"
+      ) {
+        const code = result.errorCode;
+        if (code === "INVALID_CREDENTIALS_ERROR") {
+          setLoginErr("Incorrect email or password. Please try again.");
+        } else if (code === "NOT_VERIFIED_ERROR") {
+          setLoginErr("Please verify your email before logging in. Check your inbox.");
+        } else {
+          setLoginErr(result.message ?? "Login failed. Please try again.");
+        }
+        return;
+      }
+
+      setLoginErr("Login failed. Please try again.");
     } catch (err: any) {
+      console.error("[login] error:", err);
       setLoginErr(
-        err?.errors?.[0]?.longMessage ??
+        err?.graphQLErrors?.[0]?.message ??
+        err?.networkError?.message ??
         err?.message ??
         "Login failed. Please check your credentials."
       );
@@ -219,7 +241,7 @@ export default function AuthModal({
   };
 
   // ---------------------------------------------------------------------------
-  // REGISTER — Clerk signUp → triggers OTP email verification
+  // REGISTER — Vendure native registration
   // ---------------------------------------------------------------------------
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -231,43 +253,52 @@ export default function AuthModal({
     const lastName = nameParts.slice(1).join(" ");
 
     try {
-      if (!signUp) throw new Error("Auth not ready");
-
-      const result = await signUp.create({
-        emailAddress: registerForm.email.trim(),
-        password: registerForm.password,
-        firstName,
-        lastName,
+      const { data } = await registerMutation({
+        variables: {
+          input: {
+            emailAddress: registerForm.email.trim(),
+            firstName,
+            lastName,
+            password: registerForm.password,
+            ...(registerForm.referCode.trim()
+              ? { customFields: { parrentReferralCode: registerForm.referCode.trim() } }
+              : {}),
+          },
+        },
       });
 
-      // Expected normal path — Clerk requires email verification
-      if (result.status === "missing_requirements") {
-        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-        setVerifyStep(true);
-        toast.info("Check your email for a 6-digit verification code.");
+      console.log("[register] response:", JSON.stringify(data, null, 2));
+
+      const result = data?.registerCustomerAccount;
+
+      if (result?.__typename === "Success") {
+        setRegisterSuccess(true);
         return;
       }
 
-      // Edge case: completed without verification step
-      if (result.status === "complete") {
-        await authenticateWithVendure(registerForm.referCode.trim() || undefined);
-        toast.success("Account created! Welcome 🎉", { duration: 5000 });
-        onOpenChange?.(false);
+      if (result?.__typename === "ErrorResult") {
+        const code = result.errorCode;
+        if (
+          code === "EMAIL_ADDRESS_CONFLICT_ERROR" ||
+          result.message?.toLowerCase().includes("already") ||
+          result.message?.toLowerCase().includes("exists")
+        ) {
+          setRegisterErrors((p) => ({
+            ...p,
+            email: "This email is already registered. Please log in instead.",
+          }));
+        } else {
+          setRegisterErrors((p) => ({ ...p, general: result.message ?? "Registration failed." }));
+        }
         return;
       }
 
-      throw new Error("Registration incomplete. Please try again.");
+      setRegisterErrors((p) => ({ ...p, general: "Registration failed. Please try again." }));
     } catch (err: any) {
-      const message =
-        err?.errors?.[0]?.longMessage ??
-        err?.message ??
-        "Registration failed. Please try again.";
-
+      console.error("[register] error:", err);
+      const message = err?.graphQLErrors?.[0]?.message ?? err?.message ?? "Registration failed.";
       if (
-        err?.errors?.[0]?.code === "form_identifier_exists" ||
-        err?.errors?.[0]?.code === "duplicate_record" ||
         message.toLowerCase().includes("already") ||
-        message.toLowerCase().includes("taken") ||
         message.toLowerCase().includes("exists") ||
         message.toLowerCase().includes("in use")
       ) {
@@ -284,70 +315,31 @@ export default function AuthModal({
   };
 
   // ---------------------------------------------------------------------------
-  // OTP VERIFY — attempt code → authenticate with Vendure passing referral code
+  // FORGOT PASSWORD — uses REQUEST_PASSWORD_RESET from queries.ts
+  // which expects $emailAddress (not $email)
   // ---------------------------------------------------------------------------
-  const handleVerify = async (e: React.FormEvent) => {
+  const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setOtpLoading(true);
-    setOtpError(null);
-
+    setForgotLoading(true);
     try {
-      if (!signUp) throw new Error("Auth not ready");
-
-      const result = await signUp.attemptEmailAddressVerification({ code: otpCode });
-
-      if (result.status !== "complete") {
-        throw new Error("Verification incomplete. Please try again.");
-      }
-
-      // Pass referral code here — this is where it gets applied on signup
-      await authenticateWithVendure(registerForm.referCode);
-
-      toast.success("Account created! Welcome 🎉", { duration: 5000 });
-      onOpenChange?.(false);
-    } catch (err: any) {
-      setOtpError(
-        err?.errors?.[0]?.longMessage ??
-        err?.message ??
-        "Invalid code. Please check and try again."
-      );
+      await requestPasswordResetMutation({
+        variables: { emailAddress: forgotEmail.trim() }, // matches $emailAddress in queries.ts
+      });
+      setForgotSent(true);
+    } catch (err) {
+      // Always show success to avoid email enumeration
+      setForgotSent(true);
     } finally {
-      setOtpLoading(false);
+      setForgotLoading(false);
     }
   };
 
   // ---------------------------------------------------------------------------
-  // Resend OTP
-  // ---------------------------------------------------------------------------
-  const handleResendCode = async () => {
-    setResendLoading(true);
-    setOtpError(null);
-    try {
-      if (!signUp) throw new Error("Auth not ready");
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      setOtpCode("");
-      toast.info("A new code has been sent to your email.");
-    } catch (err: any) {
-      toast.error(err?.message ?? "Failed to resend. Please try again.");
-    } finally {
-      setResendLoading(false);
-    }
-  };
-
-  // ---------------------------------------------------------------------------
-  // GOOGLE SSO — referral code stored in sessionStorage, read back in /sso-callback
+  // GOOGLE SSO — Clerk OAuth → Vendure authenticate mutation
   // ---------------------------------------------------------------------------
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      if (isSignedIn) await signOut();
-      if (!signIn) {
-        toast.error("Auth not ready, please try again.");
-        setGoogleLoading(false);
-        return;
-      }
-
-      // Persist referral code across the OAuth redirect
       const trimmedReferCode = registerForm.referCode.trim();
       if (trimmedReferCode) {
         sessionStorage.setItem("pendingReferralCode", trimmedReferCode);
@@ -355,13 +347,16 @@ export default function AuthModal({
         sessionStorage.removeItem("pendingReferralCode");
       }
 
-      await signIn.authenticateWithRedirect({
-        strategy: "oauth_google",
+      await (clerk as any).openSignIn?.({
         redirectUrl: "/sso-callback",
-        redirectUrlComplete: "/",
+        appearance: { elements: { rootBox: "hidden" } },
       });
+
+      if (!(clerk as any).openSignIn) {
+        await (clerk as any).redirectToSignIn?.({ redirectUrl: "/sso-callback" });
+      }
     } catch (err: any) {
-      toast.error(err?.errors?.[0]?.message ?? err?.message ?? "Google sign-in failed.");
+      toast.error(err?.message ?? "Google sign-in failed. Please try again.");
       setGoogleLoading(false);
     }
   };
@@ -378,12 +373,10 @@ export default function AuthModal({
       setRegisterForm({ fullName: "", email: "", password: "", agree: false, referCode: "" });
       setRegisterErrors({});
       setShowRegisterPassword(false);
-      setVerifyStep(false);
-      setOtpCode("");
-      setOtpError(null);
-        setForgotStep(false);
-    setForgotEmail("");
-    setForgotSent(false);  
+      setRegisterSuccess(false);
+      setForgotStep(false);
+      setForgotEmail("");
+      setForgotSent(false);
     }
     onOpenChange?.(open);
   };
@@ -418,12 +411,6 @@ export default function AuthModal({
     </div>
   );
 
-
-  const [forgotStep, setForgotStep] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState("");
-  const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotSent, setForgotSent] = useState(false);
-
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -440,186 +427,113 @@ export default function AuthModal({
           </VisuallyHidden>
 
           <Dialog.Close asChild>
-            <button
-              className="absolute right-4 top-4 text-gray-400 hover:text-black"
-              aria-label="Close"
-            >
+            <button className="absolute right-4 top-4 text-gray-400 hover:text-black" aria-label="Close">
               <X className="h-5 w-5" />
             </button>
           </Dialog.Close>
 
-          {/* ── OTP VERIFY STEP ── */}
+          {/* ── FORGOT PASSWORD STEP ── */}
           {forgotStep ? (
-  <div className="flex flex-col gap-5">
-    {forgotSent ? (
-      <div className="flex flex-col items-center gap-3 text-center">
-        <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
-          <Mail className="h-6 w-6 text-red-600" />
-        </div>
-        <h2 className="font-semibold text-lg">Check your email</h2>
-        <p className="text-sm text-gray-500">
-          Password reset instructions have been sent to{" "}
-          <span className="font-semibold text-neutral-800">{forgotEmail}</span>
-        </p>
-        <button
-          type="button"
-          onClick={() => { setForgotStep(false); setForgotSent(false); setForgotEmail(""); }}
-          className="flex items-center gap-1 text-sm text-red-600 font-medium"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to login
-        </button>
-      </div>
-    ) : (
-      <>
-        <div className="flex flex-col items-center gap-2 text-center">
-          <h2 className="font-semibold text-lg">Reset your password</h2>
-          <p className="text-sm text-gray-500">
-            Enter your email and we&apos;ll send you reset instructions.
-          </p>
-        </div>
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setForgotLoading(true);
-            try {
-              await signIn.create({ strategy: "reset_password_email_code", identifier: forgotEmail });
-              setForgotSent(true);
-            } catch (err: any) {
-              toast.error(err?.errors?.[0]?.longMessage ?? err?.message ?? "Failed to send reset email.");
-            } finally {
-              setForgotLoading(false);
-            }
-          }}
-          className="flex flex-col gap-4"
-        >
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={forgotEmail}
-            onChange={(e) => setForgotEmail(e.target.value)}
-            className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-3 focus:outline-none focus:border-red-400"
-            required
-          />
-          <button
-            type="submit"
-            disabled={forgotLoading}
-            className="w-full rounded-full bg-red-600 py-3 text-white font-semibold disabled:opacity-60"
-          >
-            {forgotLoading ? "Sending..." : "Send Reset Instructions"}
-          </button>
-        </form>
-        <button
-          type="button"
-          onClick={() => { setForgotStep(false); setForgotEmail(""); }}
-          className="flex items-center justify-center gap-1 text-sm text-gray-400 hover:text-gray-600"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to login
-        </button>
-      </>
-    )}
-  </div>
-) : verifyStep ? (
             <div className="flex flex-col gap-5">
-              <div className="flex flex-col items-center gap-3 text-center">
-                <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
-                  <Mail className="h-6 w-6 text-red-600" />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-[#1C1C1C] text-lg">Check your email</h2>
-                  <p className="text-gray-500 text-sm mt-1">
-                    We sent a 6-digit code to
+              {forgotSent ? (
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
+                    <Mail className="h-6 w-6 text-red-600" />
+                  </div>
+                  <h2 className="font-semibold text-lg">Check your inbox</h2>
+                  <p className="text-sm text-gray-500">
+                    If an account exists for{" "}
+                    <span className="font-semibold text-neutral-800">{forgotEmail}</span>,
+                    we've sent a password reset link. Check your spam folder too.
                   </p>
-                  <p className="font-semibold text-sm text-[#1C1C1C] mt-0.5">
-                    {registerForm.email}
-                  </p>
-                </div>
-              </div>
-
-              <form onSubmit={handleVerify} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-[#1C1C1C]">
-                    Verification Code
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="000000"
-                    value={otpCode}
-                    autoFocus
-                    onChange={(e) => {
-                      setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6));
-                      if (otpError) setOtpError(null);
-                    }}
-                    className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-3 text-center text-xl font-bold tracking-[0.4em] focus:outline-none ${otpError ? "border-red-400" : "border-[#E5E5E5]"
-                      }`}
-                  />
-                  {otpError && (
-                    <p className="text-red-500 text-xs mt-1 text-center">{otpError}</p>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={otpLoading || otpCode.length < 6}
-                  className="w-full rounded-full bg-red-600 py-3 text-white font-semibold disabled:opacity-60 transition-opacity"
-                >
-                  {otpLoading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Verifying...
-                    </span>
-                  ) : (
-                    "Verify & Create Account"
-                  )}
-                </button>
-              </form>
-
-              <div className="flex flex-col items-center gap-2">
-                <p className="text-sm text-gray-500">
-                  Didn&apos;t receive it?{" "}
+                  <p className="text-xs text-gray-400">The link expires in 1 hour.</p>
                   <button
                     type="button"
-                    onClick={handleResendCode}
-                    disabled={resendLoading}
-                    className="text-[#FF0000] font-medium disabled:opacity-60"
+                    onClick={() => { setForgotStep(false); setForgotSent(false); setForgotEmail(""); }}
+                    className="flex items-center gap-1 text-sm text-red-600 font-medium mt-2"
                   >
-                    {resendLoading ? "Sending..." : "Resend code"}
+                    <ArrowLeft className="h-4 w-4" /> Back to login
                   </button>
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setVerifyStep(false);
-                    setOtpCode("");
-                    setOtpError(null);
-                  }}
-                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <ArrowLeft className="h-3 w-3" />
-                  Back to registration
-                </button>
-              </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <h2 className="font-semibold text-lg">Reset your password</h2>
+                    <p className="text-sm text-gray-500">
+                      Enter your email and we&apos;ll send you a reset link.
+                    </p>
+                  </div>
+                  <form onSubmit={handleForgotPassword} className="flex flex-col gap-4">
+                    <input
+                      type="email"
+                      placeholder="Enter your email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-3 focus:outline-none focus:border-red-400"
+                      required
+                    />
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="w-full rounded-full bg-red-600 py-3 text-white font-semibold disabled:opacity-60"
+                    >
+                      {forgotLoading ? "Sending..." : "Send Reset Link"}
+                    </button>
+                  </form>
+                  <button
+                    type="button"
+                    onClick={() => { setForgotStep(false); setForgotEmail(""); }}
+                    className="flex items-center justify-center gap-1 text-sm text-gray-400 hover:text-gray-600"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Back to login
+                  </button>
+                </>
+              )}
             </div>
+
+          ) : registerSuccess ? (
+            /* ── REGISTER SUCCESS — awaiting email verification ── */
+            <div className="flex flex-col items-center gap-4 text-center py-4">
+              <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
+                <Mail className="h-6 w-6 text-red-600" />
+              </div>
+              <h2 className="font-semibold text-lg text-[#1C1C1C]">Verify your email</h2>
+              <p className="text-sm text-gray-500 max-w-xs">
+                We sent a verification link to{" "}
+                <span className="font-semibold text-neutral-800">{registerForm.email}</span>.
+                Click the link in the email to activate your account, then log in here.
+              </p>
+              <p className="text-xs text-gray-400">Check your spam folder if you don't see it.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setRegisterSuccess(false);
+                  setActiveTab("login");
+                  setLoginForm((prev) => ({ ...prev, email: registerForm.email }));
+                }}
+                className="mt-2 rounded-full bg-red-600 px-8 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+              >
+                Go to login
+              </button>
+            </div>
+
           ) : (
             <>
               {/* ── TABS ── */}
               <div className="flex mb-6 border-b">
                 <button
                   onClick={() => setActiveTab("login")}
-                  className={`flex-1 py-2 text-center ${activeTab === "login"
-                    ? "border-b border-[#3C3C3C] font-semibold"
-                    : "text-gray-500"
-                    }`}
+                  className={`flex-1 py-2 text-center ${
+                    activeTab === "login" ? "border-b border-[#3C3C3C] font-semibold" : "text-gray-500"
+                  }`}
                 >
                   Log in
                 </button>
                 <button
                   onClick={() => setActiveTab("register")}
-                  className={`flex-1 py-2 text-center ${activeTab === "register"
-                    ? "border-b border-black font-semibold"
-                    : "text-gray-500"
-                    }`}
+                  className={`flex-1 py-2 text-center ${
+                    activeTab === "register" ? "border-b border-black font-semibold" : "text-gray-500"
+                  }`}
                 >
                   Create Account
                 </button>
@@ -644,9 +558,7 @@ export default function AuthModal({
                         type={showLoginPassword ? "text" : "password"}
                         placeholder="Password"
                         value={loginForm.password}
-                        onChange={(e) =>
-                          setLoginForm({ ...loginForm, password: e.target.value })
-                        }
+                        onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                         className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none focus:border-red-400"
                         required
                       />
@@ -655,11 +567,7 @@ export default function AuthModal({
                         onClick={() => setShowLoginPassword(!showLoginPassword)}
                         className="absolute right-3 top-3 text-gray-500"
                       >
-                        {showLoginPassword ? (
-                          <EyeOff className="h-5 w-5" />
-                        ) : (
-                          <Eye className="h-5 w-5" />
-                        )}
+                        {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
                     </div>
                     <button
@@ -683,9 +591,7 @@ export default function AuthModal({
                         "Sign in"
                       )}
                     </button>
-                    {loginErr && (
-                      <p className="text-red-500 text-sm text-center">{loginErr}</p>
-                    )}
+                    {loginErr && <p className="text-red-500 text-sm text-center">{loginErr}</p>}
                   </form>
                   <p className="text-center text-sm">
                     Don&apos;t have an account?{" "}
@@ -706,7 +612,6 @@ export default function AuthModal({
                   {GoogleButton}
                   {Divider}
                   <form onSubmit={handleRegister} className="flex flex-col gap-3" noValidate>
-                    {/* Full Name */}
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-semibold text-[#1C1C1C]">Full Name</label>
                       <input
@@ -715,16 +620,15 @@ export default function AuthModal({
                         value={registerForm.fullName}
                         onChange={(e) => {
                           setRegisterForm({ ...registerForm, fullName: e.target.value });
-                          if (registerErrors.fullName)
-                            setRegisterErrors((p) => ({ ...p, fullName: "" }));
+                          if (registerErrors.fullName) setRegisterErrors((p) => ({ ...p, fullName: "" }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.fullName ? "border-red-400" : "border-[#E5E5E5]"
-                          }`}
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
+                          registerErrors.fullName ? "border-red-400" : "border-[#E5E5E5]"
+                        }`}
                       />
                       <FieldError msg={registerErrors.fullName} />
                     </div>
 
-                    {/* Email */}
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-semibold text-[#1C1C1C]">Email</label>
                       <input
@@ -733,16 +637,15 @@ export default function AuthModal({
                         value={registerForm.email}
                         onChange={(e) => {
                           setRegisterForm({ ...registerForm, email: e.target.value });
-                          if (registerErrors.email)
-                            setRegisterErrors((p) => ({ ...p, email: "" }));
+                          if (registerErrors.email) setRegisterErrors((p) => ({ ...p, email: "" }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.email ? "border-red-400" : "border-[#E5E5E5]"
-                          }`}
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
+                          registerErrors.email ? "border-red-400" : "border-[#E5E5E5]"
+                        }`}
                       />
                       <FieldError msg={registerErrors.email} />
                     </div>
 
-                    {/* Password */}
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-semibold text-[#1C1C1C]">Password</label>
                       <div className="relative">
@@ -752,22 +655,18 @@ export default function AuthModal({
                           value={registerForm.password}
                           onChange={(e) => {
                             setRegisterForm({ ...registerForm, password: e.target.value });
-                            if (registerErrors.password)
-                              setRegisterErrors((p) => ({ ...p, password: "" }));
+                            if (registerErrors.password) setRegisterErrors((p) => ({ ...p, password: "" }));
                           }}
-                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${registerErrors.password ? "border-red-400" : "border-[#E5E5E5]"
-                            }`}
+                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${
+                            registerErrors.password ? "border-red-400" : "border-[#E5E5E5]"
+                          }`}
                         />
                         <button
                           type="button"
                           onClick={() => setShowRegisterPassword(!showRegisterPassword)}
                           className="absolute right-3 top-2 text-gray-500"
                         >
-                          {showRegisterPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
+                          {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
                       {registerForm.password.length > 0 && (
@@ -778,14 +677,11 @@ export default function AuthModal({
                               style={{ width: passwordStrength.width }}
                             />
                           </div>
-                          <p
-                            className={`text-xs font-medium pl-1 ${passwordStrength.label === "Weak"
-                              ? "text-red-500"
-                              : passwordStrength.label === "Fair"
-                                ? "text-yellow-500"
-                                : "text-green-600"
-                              }`}
-                          >
+                          <p className={`text-xs font-medium pl-1 ${
+                            passwordStrength.label === "Weak" ? "text-red-500"
+                            : passwordStrength.label === "Fair" ? "text-yellow-500"
+                            : "text-green-600"
+                          }`}>
                             {passwordStrength.label} password
                           </p>
                         </div>
@@ -793,7 +689,6 @@ export default function AuthModal({
                       <FieldError msg={registerErrors.password} />
                     </div>
 
-                    {/* Referral Code */}
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-semibold text-[#1C1C1C]">
                         Referral Code (Optional)
@@ -802,14 +697,11 @@ export default function AuthModal({
                         type="text"
                         placeholder="Enter Referral Code"
                         value={registerForm.referCode}
-                        onChange={(e) =>
-                          setRegisterForm({ ...registerForm, referCode: e.target.value })
-                        }
+                        onChange={(e) => setRegisterForm({ ...registerForm, referCode: e.target.value })}
                         className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
                       />
                     </div>
 
-                    {/* Terms */}
                     <div>
                       <label className="flex items-start gap-2 text-sm cursor-pointer">
                         <input
@@ -817,25 +709,20 @@ export default function AuthModal({
                           checked={registerForm.agree}
                           onChange={(e) => {
                             setRegisterForm({ ...registerForm, agree: e.target.checked });
-                            if (registerErrors.agree)
-                              setRegisterErrors((p) => ({ ...p, agree: "" }));
+                            if (registerErrors.agree) setRegisterErrors((p) => ({ ...p, agree: "" }));
                           }}
                           className="mt-0.5 mr-1"
                         />
                         <span className="text-xs">
                           I agree to all{" "}
-                          <a href="#" className="underline font-medium">
-                            Terms & Conditions
-                          </a>
+                          <a href="#" className="underline font-medium">Terms & Conditions</a>
                         </span>
                       </label>
                       <FieldError msg={registerErrors.agree} />
                     </div>
 
                     {registerErrors.general && (
-                      <p className="text-red-500 text-xs text-center">
-                        {registerErrors.general}
-                      </p>
+                      <p className="text-red-500 text-xs text-center">{registerErrors.general}</p>
                     )}
 
                     <button
