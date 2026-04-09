@@ -1,5 +1,5 @@
 "use client";
-import React, { Suspense, useMemo, useState, useEffect } from "react";
+import React, { Suspense, useMemo, useState, useEffect, useRef } from "react";
 import Navbar from "../../Components/Navbar/Navbar";
 import Footer from "../../Components/Footer/Footer";
 import Image from "next/image";
@@ -87,7 +87,6 @@ interface InfoRowProps {
   text: string;
 }
 
-/* ------------------- Extended Paystack type ------------------- */
 type PaystackTransactionConfig = {
   key: string;
   email: string;
@@ -118,7 +117,6 @@ function extractErrorMessage(err: unknown): string {
   }
 }
 
-/* ------------------- Formatters ------------------- */
 const NGN = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",
@@ -152,11 +150,29 @@ function CheckoutPage() {
   const [installmentPlan, setInstallmentPlan] = useState<InstallmentPlan | null>(null);
   const [addItemToOrder] = useMutation(ADD_TO_CART);
 
+  // Track whether we've already recovered the order in this session
+  const hasRecovered = useRef(false);
+
   const { data: activeOrderData, refetch: refetchActiveOrder } = useQuery<{
     activeOrder: ActiveOrder;
   }>(GET_ACTIVE_ORDER);
 
   const activeOrder = activeOrderData?.activeOrder;
+
+  // ── On mount: if order is stuck in ArrangingPayment, recover it immediately ──
+  useEffect(() => {
+    if (hasRecovered.current) return;
+    if (!activeOrder) return;
+
+    if (activeOrder.state === "ArrangingPayment") {
+      hasRecovered.current = true;
+      recreateFailedOrder({ variables: { orderCode: activeOrder.code } })
+        .then(() => refetchActiveOrder())
+        .catch((e) =>
+          console.error("[checkout] auto-recovery failed:", extractErrorMessage(e))
+        );
+    }
+  }, [activeOrder?.state]);
 
   useEffect(() => {
     const methodParam = searchParams?.get("method");
@@ -305,14 +321,27 @@ function CheckoutPage() {
     }
   };
 
-  /* ------------------- Core checkout / Paystack launch ------------------- */
+  /* ------------------- Core checkout ------------------- */
   const handleCheckout = async () => {
     setIsPaying(true);
 
     try {
       // STEP 0: Get freshest order state
-      const freshResult = await refetchActiveOrder();
-      let order = freshResult.data?.activeOrder;
+      let { data: freshData } = await refetchActiveOrder();
+      let order = freshData?.activeOrder;
+
+      // STEP 0a: If order is still stuck in ArrangingPayment, recover it first
+      if (order?.state === "ArrangingPayment") {
+        try {
+          await recreateFailedOrder({ variables: { orderCode: order.code } });
+          const recovered = await refetchActiveOrder();
+          order = recovered.data?.activeOrder;
+        } catch (e) {
+          console.error("[checkout] recovery failed:", extractErrorMessage(e));
+          toast.error("Could not recover your previous order. Please refresh the page.");
+          return;
+        }
+      }
 
       // STEP 0b: Sync local cart to server if order is empty
       if ((!order?.lines || order.lines.length === 0) && localItems.length > 0) {
@@ -338,12 +367,31 @@ function CheckoutPage() {
         return;
       }
 
-      // STEP 1: Set shipping method
+      // STEP 1: Set shipping address again if we just recovered the order
+      // (the new order won't have the address from the previous attempt)
+      if (shippingAddress && !order.shippingAddress) {
+        await setShippingAddressMutation({
+          variables: {
+            input: {
+              fullName: shippingAddress.fullName,
+              streetLine1: shippingAddress.streetLine1,
+              streetLine2: shippingAddress.streetLine2 || "",
+              city: shippingAddress.city,
+              province: shippingAddress.province || "",
+              postalCode: shippingAddress.postalCode || "",
+              countryCode: shippingAddress.countryCode || "NG",
+              phoneNumber: shippingAddress.phoneNumber,
+            },
+          },
+        });
+      }
+
+      // STEP 2: Set shipping method
       await setShippingMethodMutation({
         variables: { id: [selectedShippingMethod] },
       });
 
-      // STEP 2: Refetch after shipping — get the server-confirmed total with shipping included
+      // STEP 3: Refetch after shipping to get confirmed total
       const afterShipping = await refetchActiveOrder();
       order = afterShipping.data?.activeOrder;
 
@@ -352,7 +400,7 @@ function CheckoutPage() {
         return;
       }
 
-      // STEP 3: Transition to ArrangingPayment
+      // STEP 4: Transition to ArrangingPayment
       const transitionResult = await transitionToState({
         variables: { state: "ArrangingPayment" },
       });
@@ -374,28 +422,33 @@ function CheckoutPage() {
         return;
       }
 
-      // STEP 4: Create Paystack intent
-      await createPaystackIntent({ variables: { orderCode: order.code } });
+      // STEP 5: Create Paystack intent — use order code from the
+      // post-transition refetch to ensure it's fresh
+      const afterTransition = await refetchActiveOrder();
+      order = afterTransition.data?.activeOrder ?? order;
 
-      // ─────────────────────────────────────────────────────────────────────
-      // STEP 5: Determine charge amount
-      //
-      // After setShippingMethod + refetch, order.totalWithTax is now the
-      // server-confirmed total (items + shipping) in kobo. We use this
-      // directly to avoid any client-side mismatch.
-      //
-      // For installment: depositAmount comes in as Naira from InstallmentPlan,
-      // so we multiply by 100 to convert to kobo for Paystack.
-      // ─────────────────────────────────────────────────────────────────────
+      let paystackIntentResult;
+      try {
+        paystackIntentResult = await createPaystackIntent({
+          variables: { orderCode: order.code },
+        });
+      } catch (intentErr) {
+        console.error("[checkout] createPaystackIntent failed:", extractErrorMessage(intentErr));
+        toast.error("Failed to initialise payment. Please try again.");
+        // Recover order so next attempt works cleanly
+        await recreateFailedOrder({ variables: { orderCode: order.code } }).catch(() => {});
+        await refetchActiveOrder();
+        return;
+      }
+
+      // STEP 6: Determine charge amount
       const serverTotal = order.totalWithTax; // kobo, confirmed by server
 
       const chargeAmount =
         method === "installment" && installmentPlan
-          ? Math.round(installmentPlan.depositAmount * 100) // naira → kobo
+          ? Math.round(installmentPlan.depositAmount * 100)
           : serverTotal;
 
-      // STEP 5b: Validate all Paystack params before launching.
-      // This catches "Invalid transaction parameters" before Paystack sees them.
       const email = order.customer?.emailAddress ?? "";
 
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -420,8 +473,6 @@ function CheckoutPage() {
         return;
       }
 
-      // Make reference unique per attempt — prevents Paystack's
-      // "duplicate reference" rejection on retries
       const uniqueReference = `${order.code}-${Date.now()}`;
 
       console.log("[checkout] Paystack params →", {
@@ -432,7 +483,7 @@ function CheckoutPage() {
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY?.slice(0, 10) + "...",
       });
 
-      // STEP 6: Load and launch Paystack popup
+      // STEP 7: Load and launch Paystack popup
       const PaystackPop = (await import("@paystack/inline-js")).default;
       const paystack = new PaystackPop();
 
@@ -449,7 +500,7 @@ function CheckoutPage() {
 
         metadata: {
           order_id: order.id,
-          order_code: order.code,   // keep original code in metadata for webhook lookup
+          order_code: order.code,
           payment_method: method,
         },
 
@@ -460,13 +511,15 @@ function CheckoutPage() {
         },
 
         onCancel: async () => {
+          // Recover the order so the user can try again without getting "cart empty"
           try {
             await recreateFailedOrder({ variables: { orderCode: order!.code } });
+            await refetchActiveOrder();
+            hasRecovered.current = false; // allow auto-recovery to run again if needed
           } catch (e) {
-            console.error("[checkout] recreateFailedOrder failed:", extractErrorMessage(e));
+            console.error("[checkout] recreateFailedOrder on cancel failed:", extractErrorMessage(e));
           }
-          toast.error("Payment cancelled.");
-          router.push("/cart");
+          toast.error("Payment cancelled. You can try again.");
         },
       };
 

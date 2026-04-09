@@ -106,6 +106,14 @@ const sanitizePhoneNumber = (value: string): string => value.replace(/\D/g, "");
 
 const isValidPhoneNumber = (value: string): boolean => /^\d{11,}$/.test(value);
 
+const handlePhoneKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const allowed = ["Backspace", "Delete", "Tab", "Enter", "ArrowLeft", "ArrowRight", "Home", "End"];
+  if (!allowed.includes(e.key) && !/^\d$/.test(e.key)) {
+    e.preventDefault();
+  }
+};
+
+
 export default function AddressModal({
   trigger,
   onSubmit,
@@ -261,6 +269,26 @@ export default function AddressModal({
     setOpen(false);
   };
 
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (name === "fullName" && value.trim() && !isValidFullName(value)) {
+      setErrors((prev) => ({ ...prev, fullName: "Full name must contain at least 2 words." }));
+    }
+    if (name === "phoneNumber" && value && !isValidPhoneNumber(value)) {
+      setErrors((prev) => ({ ...prev, phoneNumber: "Phone number must contain only numbers and be at least 11 digits." }));
+    }
+  };
+
+  const handlePhonePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData("text");
+    if (/\D/.test(pasted)) {
+      e.preventDefault();
+      // Strip non-digits and insert clean value
+      const clean = pasted.replace(/\D/g, "");
+      setForm((prev) => ({ ...prev, phoneNumber: (prev.phoneNumber + clean).slice(0, 15) }));
+    }
+  };
+
   const title =
     initialValue && Object.keys(initialValue).length > 0
       ? "Edit Shipping Address"
@@ -364,9 +392,9 @@ export default function AddressModal({
                 placeholder="e.g. John Doe"
                 value={form.fullName}
                 onChange={handleChange}
-                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600 ${
-                  errors.fullName ? "border-red-500" : "border-neutral-300"
-                }`}
+                onBlur={handleBlur}
+                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600 ${errors.fullName ? "border-red-500" : "border-neutral-300"
+                  }`}
                 required
               />
               {errors.fullName ? (
@@ -388,13 +416,15 @@ export default function AddressModal({
                 placeholder="e.g. 08000000000"
                 value={form.phoneNumber}
                 onChange={handleChange}
+                onKeyDown={handlePhoneKeyDown}
+                onBlur={handleBlur}
+                onPaste={handlePhonePaste}
                 inputMode="numeric"
                 pattern="[0-9]*"
                 minLength={11}
                 maxLength={15}
-                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600 ${
-                  errors.phoneNumber ? "border-red-500" : "border-neutral-300"
-                }`}
+                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600 ${errors.phoneNumber ? "border-red-500" : "border-neutral-300"
+                  }`}
                 required
               />
               {errors.phoneNumber ? (

@@ -1,19 +1,12 @@
 "use client";
 
-import React, { useState, useMemo, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { useMutation } from "@apollo/client/react";
-import { RESET_PASSWORD } from "@/graphql/queries";
+import React, { useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { useClerk } from "@clerk/nextjs";
 import Navbar from "@/Components/Navbar/Navbar";
 import Footer from "@/Components/Footer/Footer";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-
-/* ── Types ────────────────────────────────────────────────────────────────── */
-type CurrentUser = { __typename: "CurrentUser"; id: string; identifier: string };
-type ErrorResult = { __typename: "ErrorResult"; errorCode?: string | null; message?: string | null };
-type ResetPasswordResult = { resetPassword: CurrentUser | ErrorResult };
-type ResetPasswordVars = { token: string; password: string };
 
 /* ── Validation helpers ───────────────────────────────────────────────────── */
 const isValidPassword = (p: string) =>
@@ -34,29 +27,29 @@ const getPasswordStrength = (password: string) => {
 
 /* ── Form component ───────────────────────────────────────────────────────── */
 function ResetPasswordForm() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const token = useMemo(() => searchParams?.get("token") || "", [searchParams]);
+  const clerk = useClerk();
 
+  const [code, setCode] = useState("");
   const [form, setForm] = useState({ password: "", confirm: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [errors, setErrors] = useState<{ password?: string; confirm?: string }>({});
-
-  const [reset, { data, loading, error }] = useMutation<ResetPasswordResult, ResetPasswordVars>(
-    RESET_PASSWORD
-  );
-
-  const payload = data?.resetPassword;
-  const isSuccess = payload?.__typename === "CurrentUser";
-  const serverError =
-    error?.message ||
-    (payload?.__typename === "ErrorResult" ? payload.message || "Reset failed." : null);
+  const [errors, setErrors] = useState<{
+    code?: string;
+    password?: string;
+    confirm?: string;
+  }>({});
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const strength = getPasswordStrength(form.password);
 
   const validate = () => {
     const errs: typeof errors = {};
+    if (!code.trim()) {
+      errs.code = "Please enter the 6-digit code from your email.";
+    }
     if (!form.password) {
       errs.password = "Password is required.";
     } else if (!isValidPassword(form.password)) {
@@ -74,31 +67,34 @@ function ResetPasswordForm() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !validate()) return;
-    await reset({ variables: { token, password: form.password } });
-  };
+    setServerError(null);
+    if (!validate()) return;
 
-  /* ── No token state ── */
-  if (!token) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-16">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm text-center">
-          <div className="text-4xl mb-4">🔗</div>
-          <h1 className="text-lg font-semibold text-neutral-900">Invalid reset link</h1>
-          <p className="mt-2 text-sm text-neutral-500">
-            This link is missing a reset token. Please use the link from your email, or request a
-            new one.
-          </p>
-          <Link
-            href="/forgot-password"
-            className="mt-6 inline-block rounded-full bg-red-600 px-8 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
-          >
-            Request new link
-          </Link>
-        </div>
-      </div>
-    );
-  }
+    setLoading(true);
+    try {
+      // Use the low-level Clerk client API which works across all versions
+      const signIn = await (clerk as any).client.signIn.attemptFirstFactor({
+        strategy: "reset_password_email_code",
+        code: code.trim(),
+        password: form.password,
+      });
+
+      if (signIn.status === "complete") {
+        await (clerk as any).setActive({ session: signIn.createdSessionId });
+        setIsSuccess(true);
+      } else {
+        setServerError("Reset incomplete. Please try again.");
+      }
+    } catch (err: any) {
+      setServerError(
+        err?.errors?.[0]?.longMessage ??
+        err?.message ??
+        "Invalid or expired code. Please request a new one."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   /* ── Success state ── */
   if (isSuccess) {
@@ -108,24 +104,14 @@ function ResetPasswordForm() {
           <div className="text-5xl">✅</div>
           <h2 className="text-lg font-semibold text-neutral-900">Password updated!</h2>
           <p className="text-sm text-neutral-500">
-            Your password has been reset successfully for{" "}
-            <span className="font-medium text-neutral-700">{payload.identifier}</span>.
-            You can now log in with your new password.
+            Your password has been reset successfully. You can now continue shopping.
           </p>
-          <div className="flex gap-3 mt-2">
-            <button
-              className="rounded-full bg-red-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
-              onClick={() => router.push("/login")}
-            >
-              Go to login
-            </button>
-            <button
-              className="rounded-full border border-neutral-300 px-6 py-2.5 text-sm font-semibold hover:bg-neutral-50 transition-colors"
-              onClick={() => router.push("/")}
-            >
-              Home
-            </button>
-          </div>
+          <button
+            className="mt-2 rounded-full bg-red-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+            onClick={() => router.push("/")}
+          >
+            Go to home
+          </button>
         </div>
       </div>
     );
@@ -137,10 +123,38 @@ function ResetPasswordForm() {
       <div className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm">
         <h1 className="text-xl font-semibold text-neutral-900">Reset your password</h1>
         <p className="mt-1 text-sm text-neutral-500">
-          Choose a strong new password for your account.
+          Enter the 6-digit code from your email and choose a new password.
         </p>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-5" noValidate>
+
+          {/* Reset code */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
+              Reset code
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="000000"
+              value={code}
+              onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                if (errors.code) setErrors((p) => ({ ...p, code: "" }));
+                if (serverError) setServerError(null);
+              }}
+              className={`w-full rounded-full border px-4 py-3 text-center text-xl font-bold tracking-[0.4em] focus:outline-none transition-colors ${
+                errors.code
+                  ? "border-red-400 focus:border-red-500"
+                  : "border-neutral-300 focus:border-red-400"
+              }`}
+            />
+            {errors.code && (
+              <p className="mt-1.5 text-xs text-red-500 pl-1">{errors.code}</p>
+            )}
+          </div>
+
           {/* New password */}
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">
@@ -170,7 +184,6 @@ function ResetPasswordForm() {
               </button>
             </div>
 
-            {/* Strength bar */}
             {form.password.length > 0 && (
               <div className="mt-2 space-y-1">
                 <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
@@ -179,15 +192,13 @@ function ResetPasswordForm() {
                     style={{ width: strength.width }}
                   />
                 </div>
-                <p
-                  className={`text-xs font-medium pl-1 ${
-                    strength.label === "Weak"
-                      ? "text-red-500"
-                      : strength.label === "Fair"
-                      ? "text-yellow-500"
-                      : "text-green-600"
-                  }`}
-                >
+                <p className={`text-xs font-medium pl-1 ${
+                  strength.label === "Weak"
+                    ? "text-red-500"
+                    : strength.label === "Fair"
+                    ? "text-yellow-500"
+                    : "text-green-600"
+                }`}>
                   {strength.label} password
                 </p>
               </div>
@@ -230,7 +241,6 @@ function ResetPasswordForm() {
             )}
           </div>
 
-          {/* Server error */}
           {serverError && (
             <p className="text-sm text-red-600 text-center">⚠ {serverError}</p>
           )}
@@ -249,6 +259,13 @@ function ResetPasswordForm() {
               "Update password"
             )}
           </button>
+
+          <p className="text-center text-sm text-neutral-500">
+            Didn&apos;t get a code?{" "}
+            <Link href="/forgot-password" className="text-red-600 font-medium hover:underline">
+              Request a new one
+            </Link>
+          </p>
         </form>
       </div>
     </div>

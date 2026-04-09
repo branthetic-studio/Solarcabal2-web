@@ -140,6 +140,8 @@ const emptyAddress = (): AddressForm => ({
   defaultBillingAddress: false,
 });
 
+
+
 export default function AccountPage() {
   const { customer, loading: userLoading, logout } = useUser();
   const router = useRouter();
@@ -339,6 +341,33 @@ export default function AccountPage() {
     }
   };
 
+  const handlePhoneKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const allowed = ["Backspace", "Delete", "Tab", "Enter", "ArrowLeft", "ArrowRight", "Home", "End"];
+    if (!allowed.includes(e.key) && !/^\d$/.test(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  const handlePhonePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData("text");
+    if (/\D/.test(pasted)) {
+      e.preventDefault();
+      const clean = pasted.replace(/\D/g, "");
+      setAddr((prev) => ({ ...prev, phoneNumber: (prev.phoneNumber + clean).slice(0, 15) }));
+    }
+  };
+
+  const handleAddrBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (name === "fullName" && value.trim() && value.trim().split(/\s+/).filter(Boolean).length < 2) {
+      toast.error("Full name must contain at least 2 words.");
+    }
+    if (name === "phoneNumber" && value && !/^\d{11,}$/.test(value)) {
+      toast.error("Phone number must contain only numbers and be at least 11 digits.");
+    }
+  };
+
+
   if (userLoading) return <div className="">
     <Navbar />
     <div className="min-h-50 flex items-center justify-center">Loading user details…</div>
@@ -537,7 +566,9 @@ export default function AccountPage() {
                 <input
                   className="border rounded-lg p-2"
                   placeholder="Full name"
+                  name="fullName"
                   value={addr.fullName}
+                  onBlur={handleAddrBlur}
                   onChange={(e) =>
                     setAddr((a) => ({ ...a, fullName: e.target.value }))
                   }
@@ -545,9 +576,13 @@ export default function AccountPage() {
                 <input
                   className="border rounded-lg p-2"
                   placeholder="Phone"
+                  name="phoneNumber"
                   value={addr.phoneNumber}
+                  onKeyDown={handlePhoneKeyDown}
+                  onPaste={handlePhonePaste}
+                  onBlur={handleAddrBlur}
                   onChange={(e) =>
-                    setAddr((a) => ({ ...a, phoneNumber: e.target.value }))
+                    setAddr((a) => ({ ...a, phoneNumber: e.target.value.replace(/\D/g, "") }))
                   }
                 />
                 <input

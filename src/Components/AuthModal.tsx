@@ -37,8 +37,8 @@ const CLERK_AUTHENTICATE = gql`
 
 type AuthenticateResult = {
   authenticate:
-    | { __typename: "CurrentUser"; id: string; identifier: string }
-    | { __typename: "ErrorResult"; errorCode: string; message: string };
+  | { __typename: "CurrentUser"; id: string; identifier: string }
+  | { __typename: "ErrorResult"; errorCode: string; message: string };
 };
 
 type AuthenticateVars = {
@@ -265,7 +265,11 @@ export default function AuthModal({
 
       if (
         err?.errors?.[0]?.code === "form_identifier_exists" ||
-        message.toLowerCase().includes("already")
+        err?.errors?.[0]?.code === "duplicate_record" ||
+        message.toLowerCase().includes("already") ||
+        message.toLowerCase().includes("taken") ||
+        message.toLowerCase().includes("exists") ||
+        message.toLowerCase().includes("in use")
       ) {
         setRegisterErrors((p) => ({
           ...p,
@@ -297,8 +301,7 @@ export default function AuthModal({
       }
 
       // Pass referral code here — this is where it gets applied on signup
-      const referralCode = registerForm.referCode.trim() || undefined;
-      await authenticateWithVendure(referralCode);
+      await authenticateWithVendure(registerForm.referCode);
 
       toast.success("Account created! Welcome 🎉", { duration: 5000 });
       onOpenChange?.(false);
@@ -378,6 +381,9 @@ export default function AuthModal({
       setVerifyStep(false);
       setOtpCode("");
       setOtpError(null);
+        setForgotStep(false);
+    setForgotEmail("");
+    setForgotSent(false);  
     }
     onOpenChange?.(open);
   };
@@ -412,6 +418,12 @@ export default function AuthModal({
     </div>
   );
 
+
+  const [forgotStep, setForgotStep] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -437,7 +449,76 @@ export default function AuthModal({
           </Dialog.Close>
 
           {/* ── OTP VERIFY STEP ── */}
-          {verifyStep ? (
+          {forgotStep ? (
+  <div className="flex flex-col gap-5">
+    {forgotSent ? (
+      <div className="flex flex-col items-center gap-3 text-center">
+        <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
+          <Mail className="h-6 w-6 text-red-600" />
+        </div>
+        <h2 className="font-semibold text-lg">Check your email</h2>
+        <p className="text-sm text-gray-500">
+          Password reset instructions have been sent to{" "}
+          <span className="font-semibold text-neutral-800">{forgotEmail}</span>
+        </p>
+        <button
+          type="button"
+          onClick={() => { setForgotStep(false); setForgotSent(false); setForgotEmail(""); }}
+          className="flex items-center gap-1 text-sm text-red-600 font-medium"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to login
+        </button>
+      </div>
+    ) : (
+      <>
+        <div className="flex flex-col items-center gap-2 text-center">
+          <h2 className="font-semibold text-lg">Reset your password</h2>
+          <p className="text-sm text-gray-500">
+            Enter your email and we&apos;ll send you reset instructions.
+          </p>
+        </div>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setForgotLoading(true);
+            try {
+              await signIn.create({ strategy: "reset_password_email_code", identifier: forgotEmail });
+              setForgotSent(true);
+            } catch (err: any) {
+              toast.error(err?.errors?.[0]?.longMessage ?? err?.message ?? "Failed to send reset email.");
+            } finally {
+              setForgotLoading(false);
+            }
+          }}
+          className="flex flex-col gap-4"
+        >
+          <input
+            type="email"
+            placeholder="Enter your email"
+            value={forgotEmail}
+            onChange={(e) => setForgotEmail(e.target.value)}
+            className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-3 focus:outline-none focus:border-red-400"
+            required
+          />
+          <button
+            type="submit"
+            disabled={forgotLoading}
+            className="w-full rounded-full bg-red-600 py-3 text-white font-semibold disabled:opacity-60"
+          >
+            {forgotLoading ? "Sending..." : "Send Reset Instructions"}
+          </button>
+        </form>
+        <button
+          type="button"
+          onClick={() => { setForgotStep(false); setForgotEmail(""); }}
+          className="flex items-center justify-center gap-1 text-sm text-gray-400 hover:text-gray-600"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to login
+        </button>
+      </>
+    )}
+  </div>
+) : verifyStep ? (
             <div className="flex flex-col gap-5">
               <div className="flex flex-col items-center gap-3 text-center">
                 <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
@@ -470,9 +551,8 @@ export default function AuthModal({
                       setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6));
                       if (otpError) setOtpError(null);
                     }}
-                    className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-3 text-center text-xl font-bold tracking-[0.4em] focus:outline-none ${
-                      otpError ? "border-red-400" : "border-[#E5E5E5]"
-                    }`}
+                    className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-3 text-center text-xl font-bold tracking-[0.4em] focus:outline-none ${otpError ? "border-red-400" : "border-[#E5E5E5]"
+                      }`}
                   />
                   {otpError && (
                     <p className="text-red-500 text-xs mt-1 text-center">{otpError}</p>
@@ -527,21 +607,19 @@ export default function AuthModal({
               <div className="flex mb-6 border-b">
                 <button
                   onClick={() => setActiveTab("login")}
-                  className={`flex-1 py-2 text-center ${
-                    activeTab === "login"
-                      ? "border-b border-[#3C3C3C] font-semibold"
-                      : "text-gray-500"
-                  }`}
+                  className={`flex-1 py-2 text-center ${activeTab === "login"
+                    ? "border-b border-[#3C3C3C] font-semibold"
+                    : "text-gray-500"
+                    }`}
                 >
                   Log in
                 </button>
                 <button
                   onClick={() => setActiveTab("register")}
-                  className={`flex-1 py-2 text-center ${
-                    activeTab === "register"
-                      ? "border-b border-black font-semibold"
-                      : "text-gray-500"
-                  }`}
+                  className={`flex-1 py-2 text-center ${activeTab === "register"
+                    ? "border-b border-black font-semibold"
+                    : "text-gray-500"
+                    }`}
                 >
                   Create Account
                 </button>
@@ -584,12 +662,13 @@ export default function AuthModal({
                         )}
                       </button>
                     </div>
-                    <a
-                      href="/forgot-password"
-                      className="text-red-600 hover:underline font-medium text-sm"
+                    <button
+                      type="button"
+                      onClick={() => setForgotStep(true)}
+                      className="text-red-600 hover:underline font-medium text-sm text-left"
                     >
                       Forgot password?
-                    </a>
+                    </button>
                     <button
                       type="submit"
                       disabled={loginSubmitting}
@@ -639,9 +718,8 @@ export default function AuthModal({
                           if (registerErrors.fullName)
                             setRegisterErrors((p) => ({ ...p, fullName: "" }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
-                          registerErrors.fullName ? "border-red-400" : "border-[#E5E5E5]"
-                        }`}
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.fullName ? "border-red-400" : "border-[#E5E5E5]"
+                          }`}
                       />
                       <FieldError msg={registerErrors.fullName} />
                     </div>
@@ -658,9 +736,8 @@ export default function AuthModal({
                           if (registerErrors.email)
                             setRegisterErrors((p) => ({ ...p, email: "" }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
-                          registerErrors.email ? "border-red-400" : "border-[#E5E5E5]"
-                        }`}
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.email ? "border-red-400" : "border-[#E5E5E5]"
+                          }`}
                       />
                       <FieldError msg={registerErrors.email} />
                     </div>
@@ -678,9 +755,8 @@ export default function AuthModal({
                             if (registerErrors.password)
                               setRegisterErrors((p) => ({ ...p, password: "" }));
                           }}
-                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${
-                            registerErrors.password ? "border-red-400" : "border-[#E5E5E5]"
-                          }`}
+                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${registerErrors.password ? "border-red-400" : "border-[#E5E5E5]"
+                            }`}
                         />
                         <button
                           type="button"
@@ -703,13 +779,12 @@ export default function AuthModal({
                             />
                           </div>
                           <p
-                            className={`text-xs font-medium pl-1 ${
-                              passwordStrength.label === "Weak"
-                                ? "text-red-500"
-                                : passwordStrength.label === "Fair"
+                            className={`text-xs font-medium pl-1 ${passwordStrength.label === "Weak"
+                              ? "text-red-500"
+                              : passwordStrength.label === "Fair"
                                 ? "text-yellow-500"
                                 : "text-green-600"
-                            }`}
+                              }`}
                           >
                             {passwordStrength.label} password
                           </p>

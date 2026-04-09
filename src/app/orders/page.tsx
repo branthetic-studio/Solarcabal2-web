@@ -137,18 +137,19 @@ export default function OrdersPage() {
   }
 
   /* ── Error ── */
-  if (error) {
-    return (
-      <main className="min-h-screen bg-neutral-50">
-        <Navbar />
-        <div className="mx-auto max-w-3xl px-4 py-10 text-center">
-          <p className="text-red-500 text-sm">Failed to load orders. Please try again later.</p>
-        </div>
-        <Suscribe />
-        <Footer />
-      </main>
-    );
-  }
+ /* ── Error ── */
+if (error && !data) {
+  return (
+    <main className="min-h-screen bg-neutral-50">
+      <Navbar />
+      <div className="mx-auto max-w-3xl px-4 py-10 text-center">
+        <p className="text-red-500 text-sm">Failed to load orders. Please try again later.</p>
+      </div>
+      <Suscribe />
+      <Footer />
+    </main>
+  );
+}
 
   /* ── Empty state ── */
   if (orders.length === 0) {

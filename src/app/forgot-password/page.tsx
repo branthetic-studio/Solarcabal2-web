@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { useMutation } from "@apollo/client/react";
-import { REQUEST_PASSWORD_RESET } from "@/graphql/queries";
 import Navbar from "@/Components/Navbar/Navbar";
 import Footer from "@/Components/Footer/Footer";
 import Link from "next/link";
@@ -14,8 +12,7 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [submitted, setSubmitted] = useState(false);
-
-  const [requestReset, { loading }] = useMutation(REQUEST_PASSWORD_RESET);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,13 +27,23 @@ export default function ForgotPasswordPage() {
       return;
     }
 
+    setLoading(true);
     try {
-      await requestReset({ variables: { emailAddress: email.trim() } });
-      // Always show success — don't reveal whether email exists (security best practice)
+      await fetch("https://api.clerk.com/v1/client/sign_ins", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          strategy: "reset_password_email_code",
+          identifier: email.trim(),
+        }),
+        credentials: "include",
+      });
+      // Always show success to avoid email enumeration
       setSubmitted(true);
     } catch (err) {
-      // Still show success to avoid email enumeration
       setSubmitted(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -49,18 +56,16 @@ export default function ForgotPasswordPage() {
 
           {!submitted ? (
             <>
-              {/* Header */}
               <div className="mb-6">
                 <h1 className="text-xl font-semibold text-neutral-900">
                   Forgot your password?
                 </h1>
                 <p className="mt-2 text-sm text-neutral-500">
                   Enter the email address linked to your account and we'll send
-                  you a link to reset your password.
+                  you a code to reset your password.
                 </p>
               </div>
 
-              {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                 <div>
                   <label
@@ -100,20 +105,19 @@ export default function ForgotPasswordPage() {
                       Sending…
                     </span>
                   ) : (
-                    "Send reset link"
+                    "Send reset code"
                   )}
                 </button>
               </form>
 
               <p className="mt-6 text-center text-sm text-neutral-500">
                 Remember your password?{" "}
-                <Link href="/login" className="text-red-600 font-medium hover:underline">
-                  Back to login
+                <Link href="/" className="text-red-600 font-medium hover:underline">
+                  Back to home
                 </Link>
               </p>
             </>
           ) : (
-            /* Success state */
             <div className="text-center py-4 flex flex-col items-center gap-4">
               <div className="text-5xl">📧</div>
               <h2 className="text-lg font-semibold text-neutral-900">
@@ -122,17 +126,18 @@ export default function ForgotPasswordPage() {
               <p className="text-sm text-neutral-500 max-w-xs">
                 If an account exists for{" "}
                 <span className="font-medium text-neutral-700">{email}</span>,
-                we've sent a password reset link. Check your spam folder if you
+                we've sent a 6-digit reset code. Check your spam folder if you
                 don't see it.
               </p>
-              <p className="text-xs text-neutral-400">
-                The link expires in 1 hour.
-              </p>
+              <p className="text-xs text-neutral-400">The code expires in 1 hour.</p>
               <Link
-                href="/login"
+                href="/reset-password"
                 className="mt-2 rounded-full bg-red-600 px-8 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
               >
-                Back to login
+                Enter reset code
+              </Link>
+              <Link href="/" className="text-sm text-neutral-400 hover:text-neutral-600">
+                Back to home
               </Link>
             </div>
           )}
