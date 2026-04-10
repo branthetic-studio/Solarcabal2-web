@@ -6,20 +6,32 @@ import React, {
   useMemo,
   useState,
   useCallback,
-  useEffect,
 } from "react";
-import { useMutation, useQuery, useApolloClient } from "@apollo/client/react";
-import { GET_CURRENT_USER, LOGIN, LOGOUT } from "@/graphql/queries";
+
+import {
+  useMutation,
+  useQuery,
+  useApolloClient,
+} from "@apollo/client/react";
+
+import {
+  GET_CURRENT_USER,
+  LOGIN,
+  LOGOUT,
+} from "@/graphql/queries";
+
 import type {
   GetCurrentUserData,
   LoginData,
   LoginVars,
 } from "@/graphql/auth.types.manual";
 
+import { useClerk } from "@clerk/nextjs";
+
 type UserCtx = {
   loading: boolean;
   customer: GetCurrentUserData["activeCustomer"] | null | undefined;
-  login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
+  login: (u: string, p: string, remember?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refetchUser: () => Promise<void>;
   retryGoogleLogin: () => Promise<void>;
@@ -38,82 +50,92 @@ export const useUser = () => useContext(Ctx);
 
 const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const apollo = useApolloClient();
+  const clerk = useClerk();
+
   const [isActing, setIsActing] = useState(false);
 
   const { data, loading, refetch } = useQuery<GetCurrentUserData>(
     GET_CURRENT_USER,
     {
-      // cache-and-network: serves cached value instantly (so navbar
-      // doesn't flicker) AND re-validates in the background.
-      // Critically, writes results back to cache so all consumers update.
       fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
     }
   );
 
-  const [loginMut] = useMutation<LoginData, LoginVars>(LOGIN, {
-    refetchQueries: [{ query: GET_CURRENT_USER }],
-    awaitRefetchQueries: true,
-  });
+  const [loginMut] = useMutation<LoginData, LoginVars>(LOGIN);
 
-  const [logoutMut] = useMutation(LOGOUT, {
-    refetchQueries: [{ query: GET_CURRENT_USER }],
-    awaitRefetchQueries: true,
-  });
+  const [logoutMut] = useMutation(LOGOUT);
 
-  const login = async (username: string, password: string, rememberMe = true) => {
+  // ---------------- LOGIN ----------------
+  const login = async (
+    username: string,
+    password: string,
+    rememberMe = true
+  ) => {
     setIsActing(true);
+
     try {
       const res = await loginMut({
         variables: { username, password, rememberMe },
         context: { fetchOptions: { credentials: "include" } },
       });
+
       const payload: any = res.data?.login;
+
       if (payload?.errorCode) {
-        throw new Error(payload?.message ?? "Login failed");
+        throw new Error(payload.message ?? "Login failed");
       }
-    } catch (error) {
-      throw error;
+
+      // 🔥 IMPORTANT: refresh everything after login
+      await refetch();
+      await apollo.resetStore();
     } finally {
       setIsActing(false);
     }
   };
 
+  // ---------------- LOGOUT ----------------
   const logout = async () => {
     setIsActing(true);
+
     try {
+      // 1. backend logout (Vendure)
       await logoutMut({
         context: { fetchOptions: { credentials: "include" } },
       });
-      // Clear entire Apollo cache on logout so stale customer data
-      // doesn't linger across sessions
+
+      // 2. clear Apollo cache + reset store (VERY IMPORTANT)
       await apollo.clearStore();
+      await apollo.resetStore();
+
+      // 3. logout Clerk safely (ONLY here, NOT during login)
+      await clerk.signOut();
+
+      // 4. refetch user
       await refetch();
     } finally {
       setIsActing(false);
     }
   };
 
-  // Retry with backoff — gives Vendure time to set the session cookie.
-  // Called by AuthModal after Clerk setActive() and by sso-callback.
+  // ---------------- REFRESH USER ----------------
   const refetchUser = useCallback(async () => {
-    // Attempt 1 — immediate
     const r1 = await refetch();
     if (r1.data?.activeCustomer) return;
 
-    // Attempt 2 — wait 600ms then retry
-    await new Promise((res) => setTimeout(res, 600));
+    await new Promise((r) => setTimeout(r, 500));
+
     const r2 = await refetch();
     if (r2.data?.activeCustomer) return;
 
-    // Attempt 3 — wait another 1s then final retry
-    await new Promise((res) => setTimeout(res, 1000));
+    await new Promise((r) => setTimeout(r, 1000));
+
     await refetch();
   }, [refetch]);
 
   const retryGoogleLogin = async () => {};
 
-  const value = useMemo<UserCtx>(
+  const value = useMemo(
     () => ({
       loading: loading || isActing,
       customer: data?.activeCustomer,

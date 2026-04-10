@@ -1,34 +1,23 @@
-import {
-  ApolloClient,
-  InMemoryCache,
-  HttpLink,
-  ApolloLink,
-  concat,
-} from "@apollo/client";
+import { ApolloClient, InMemoryCache, HttpLink } from "@apollo/client";
 
-// Make sure cookies are included
 const httpLink = new HttpLink({
-  uri: "/api/graphql-proxy",
-  credentials: "include", 
-});
-
-const authMiddleware = new ApolloLink((operation, forward) => {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-  operation.setContext(({ headers = {} }) => ({
-    headers: {
-      ...headers,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}), // only add if token exists
-    },
-  }));
-
-  return forward(operation);
+  uri: "/api/graphql",
+  credentials: "include",
 });
 
 const client = new ApolloClient({
-  link: concat(authMiddleware, httpLink),
-  cache: new InMemoryCache(),
+  link: httpLink,
+  cache: new InMemoryCache({
+    typePolicies: {
+      Query: {
+        fields: {
+          activeCustomer: {
+            merge: true,
+          },
+        },
+      },
+    },
+  }),
 });
 
 export default client;
