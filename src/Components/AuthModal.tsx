@@ -8,41 +8,18 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useUser } from "@/context/UserContext";
 import { toast } from "sonner";
 import { FaGoogle } from "react-icons/fa";
-import { useClerk, useAuth } from "@clerk/nextjs";
-
-import {
-  GET_ACTIVE_ORDER,
-  CLERK_AUTHENTICATE,
-  REGISTER_CUSTOMER,
-  LOGIN,
-  REQUEST_PASSWORD_RESET,
-} from "@/graphql/queries";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import { useSignIn, useSignUp, useClerk, useAuth } from "@clerk/nextjs";
+import { GET_ACTIVE_ORDER, CLERK_AUTHENTICATE } from "@/graphql/queries";
 
 type AuthenticateResult = {
   authenticate:
-  | { __typename: "CurrentUser"; id: string; identifier: string }
-  | { __typename: "ErrorResult"; errorCode: string; message: string };
+    | { __typename: "CurrentUser"; id: string; identifier: string }
+    | { __typename: "ErrorResult"; errorCode: string; message: string };
 };
 
 type AuthenticateVars = {
-  input: { token: string; referralCode?: string };
-};
-
-type LoginResult = {
-  login:
-  | { __typename: "CurrentUser"; id: string; identifier: string }
-  | { __typename: "InvalidCredentialsError"; errorCode: string; message: string }
-  | { __typename: "NotVerifiedError"; errorCode: string; message: string };
-};
-
-type RegisterResult = {
-  registerCustomerAccount:
-  | { __typename: "Success"; success: boolean }
-  | { __typename: "ErrorResult"; errorCode: string; message: string };
+  token: string;
+  referralCode?: string;
 };
 
 type AuthModalProps = {
@@ -51,12 +28,9 @@ type AuthModalProps = {
   onOpenChange?: (open: boolean) => void;
 };
 
-// ---------------------------------------------------------------------------
-// Validation helpers
-// ---------------------------------------------------------------------------
-
 const isValidFullName = (name: string) =>
-  /^[a-zA-Z\s'\-]{2,}$/.test(name.trim()) && name.trim().split(/\s+/).length >= 2;
+  /^[a-zA-Z\s'\-]{2,}$/.test(name.trim()) &&
+  name.trim().split(/\s+/).length >= 2;
 
 const isValidEmail = (email: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -64,7 +38,9 @@ const isValidEmail = (email: string) =>
 const isValidPassword = (password: string) =>
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
 
-const getPasswordStrength = (password: string): { label: string; color: string; width: string } => {
+const getPasswordStrength = (
+  password: string
+): { label: string; color: string; width: string } => {
   if (!password) return { label: "", color: "", width: "0%" };
   let score = 0;
   if (password.length >= 8) score++;
@@ -77,26 +53,27 @@ const getPasswordStrength = (password: string): { label: string; color: string; 
   return { label: "Strong", color: "bg-green-500", width: "100%" };
 };
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-export default function AuthModal({ trigger, open: controlledOpen, onOpenChange }: AuthModalProps) {
+export default function AuthModal({
+  trigger,
+  open: controlledOpen,
+  onOpenChange,
+}: AuthModalProps) {
   const apollo = useApolloClient();
   const { refetchUser } = useUser();
-  const clerk = useClerk();
-  const { getToken } = useAuth();
+
+  const { signIn, isLoaded: signInLoaded } = useSignIn() as any;
+  const { signUp, isLoaded: signUpLoaded } = useSignUp() as any;
+  const clerk = useClerk() as any;
+  const { getToken } = useAuth() as any;
 
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // ── Login state ──
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginErr, setLoginErr] = useState<string | null>(null);
   const [loginSubmitting, setLoginSubmitting] = useState(false);
 
-  // ── Register state ──
   const [registerForm, setRegisterForm] = useState({
     fullName: "",
     email: "",
@@ -107,68 +84,91 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [registerErrors, setRegisterErrors] = useState<Record<string, string>>({});
   const [registerLoading, setRegisterLoading] = useState(false);
-  const [registerSuccess, setRegisterSuccess] = useState(false);
 
-  // ── Forgot password state ──
+  const [verifyStep, setVerifyStep] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+
   const [forgotStep, setForgotStep] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
 
-  // ── Mutations — all imported from queries.ts ──
-  const [authenticate] = useMutation<AuthenticateResult, AuthenticateVars>(CLERK_AUTHENTICATE);
-  const [loginMutation] = useMutation<LoginResult>(LOGIN);
-  const [registerMutation] = useMutation<RegisterResult>(REGISTER_CUSTOMER);
-  const [requestPasswordResetMutation] = useMutation(REQUEST_PASSWORD_RESET);
+  const [authenticate] = useMutation<AuthenticateResult, AuthenticateVars>(
+    CLERK_AUTHENTICATE
+  );
 
   const passwordStrength = getPasswordStrength(registerForm.password);
 
-  // ---------------------------------------------------------------------------
-  // Core: exchange Clerk JWT for Vendure session (Google SSO only)
-  // ---------------------------------------------------------------------------
+  // ─── Core: Clerk JWT → Vendure session ──────────────────────────────────
   const authenticateWithVendure = async (referralCode?: string) => {
-    const token = await getToken();
-    if (!token) throw new Error("No Clerk token available");
+    try {
+      console.log("🔐 [1] Getting Clerk token...");
+      const token = await getToken();
+      console.log(
+        "🔐 [2] Token:",
+        token ? `✅ Got token (${String(token).slice(0, 20)}...)` : "❌ NULL"
+      );
 
-    const trimmedReferral = referralCode?.trim() || undefined;
+      if (!token) throw new Error("No Clerk token available");
 
-    const { data } = await authenticate({
-      variables: {
-        input: {
+      console.log("🔐 [3] Calling authenticate mutation...", { referralCode });
+
+      const response = await authenticate({
+        variables: {
           token,
-          ...(trimmedReferral ? { referralCode: trimmedReferral } : {}),
+          ...(referralCode && referralCode.trim().length >= 3
+            ? { referralCode: referralCode.trim() }
+            : {}),
         },
-      },
-    });
+      });
 
-    const result = data?.authenticate;
-    if (result?.__typename === "ErrorResult") {
-      throw new Error(result.message ?? "Authentication failed");
+      console.log("🔐 [4] Full response:", JSON.stringify(response, null, 2));
+      console.log("🔐 [4b] data:", JSON.stringify(response.data, null, 2));
+
+      const result = response.data?.authenticate;
+      console.log("🔐 [5] Result typename:", result?.__typename);
+
+      if (!result) throw new Error("No response from server");
+
+      if (result.__typename === "ErrorResult") {
+        console.error("🔐 [6] ❌ ErrorResult:", result);
+        throw new Error(result.message || "Authentication failed");
+      }
+
+      console.log("🔐 [6] ✅ Auth success, refetching user...");
+      await refetchUser();
+      console.log("🔐 [7] ✅ User refetched");
+      await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
+      console.log("🔐 [8] ✅ All done");
+    } catch (err: any) {
+      console.error("🔐 ❌ FULL ERROR:", err);
+      console.error("🔐 ❌ message:", err?.message);
+      console.error("🔐 ❌ stack:", err?.stack);
+      throw err;
     }
-
-    await refetchUser();
-    await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
   };
 
-  // ---------------------------------------------------------------------------
-  // Validation
-  // ---------------------------------------------------------------------------
+  // ─── Validation ─────────────────────────────────────────────────────────
   const validateRegisterForm = (): boolean => {
     const errors: Record<string, string> = {};
     if (!registerForm.fullName.trim()) {
       errors.fullName = "Full name is required.";
     } else if (!isValidFullName(registerForm.fullName)) {
-      errors.fullName = "Enter your first and last name using letters only (no numbers or symbols).";
+      errors.fullName = "Enter your first and last name using letters only.";
     }
     if (!registerForm.email.trim()) {
       errors.email = "Email is required.";
     } else if (!isValidEmail(registerForm.email)) {
-      errors.email = "Please enter a valid email address (e.g. name@example.com).";
+      errors.email = "Please enter a valid email address.";
     }
     if (!registerForm.password) {
       errors.password = "Password is required.";
     } else if (!isValidPassword(registerForm.password)) {
-      errors.password = "Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.";
+      errors.password =
+        "Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.";
     }
     if (!registerForm.agree) {
       errors.agree = "You must agree to the Terms & Conditions.";
@@ -177,75 +177,68 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
     return Object.keys(errors).length === 0;
   };
 
-  // ---------------------------------------------------------------------------
-  // LOGIN — uses LOGIN from queries.ts which expects $username, $password, $rememberMe
-  // ---------------------------------------------------------------------------
+  // ─── LOGIN ───────────────────────────────────────────────────────────────
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginErr(null);
     setLoginSubmitting(true);
 
     try {
-      const { data } = await loginMutation({
-        variables: {
-          username: loginForm.email.trim(), // matches $username in LOGIN query
-          password: loginForm.password,
-          rememberMe: true,
-        },
+      console.log("🔑 [1] handleLogin called");
+      console.log("🔑 [2] signIn exists?", !!signIn, "loaded?", signInLoaded);
+
+      if (!signIn || !signInLoaded) throw new Error("Auth not ready. Please wait.");
+
+      console.log("🔑 [3] Calling signIn.create...");
+      const result = await signIn.create({
+        identifier: loginForm.email.trim(),
+        password: loginForm.password,
       });
 
-      console.log("[login] response:", JSON.stringify(data, null, 2));
+      console.log("🔑 [4] signIn.create result status:", result.status);
 
-      const result = data?.login;
-
-      if (!result) {
-        setLoginErr("No response from server. Please try again.");
-        return;
-      }
-
-      if (result.__typename === "CurrentUser") {
-        await refetchUser();
-        await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
+      if (result.status === "complete") {
+        console.log("🔑 [5] Setting active session...");
+        await clerk.setActive({ session: result.createdSessionId });
+        await new Promise((r) => setTimeout(r, 300));
+        console.log("🔑 [6] Authenticating with Vendure...");
+        await authenticateWithVendure();
         toast.success("Welcome back!");
         onOpenChange?.(false);
         return;
       }
 
-      if (
-        result.__typename === "InvalidCredentialsError" ||
-        result.__typename === "NotVerifiedError"
-      ) {
-        const code = result.errorCode;
-        if (code === "INVALID_CREDENTIALS_ERROR") {
-          setLoginErr("Incorrect email or password. Please try again.");
-        } else if (code === "NOT_VERIFIED_ERROR") {
-          setLoginErr("Please verify your email before logging in. Check your inbox.");
-        } else {
-          setLoginErr(result.message ?? "Login failed. Please try again.");
-        }
-        return;
-      }
-
-      setLoginErr("Login failed. Please try again.");
+      throw new Error("Login could not be completed. Please try again.");
     } catch (err: any) {
-      console.error("[login] error:", err);
-      setLoginErr(
-        err?.graphQLErrors?.[0]?.message ??
-        err?.networkError?.message ??
+      console.error("🔑 ❌ LOGIN ERROR:", err);
+      const msg =
+        err?.errors?.[0]?.longMessage ??
+        err?.errors?.[0]?.message ??
         err?.message ??
-        "Login failed. Please check your credentials."
-      );
+        "Login failed.";
+      if (/invalid|credentials|no account|identifier/i.test(msg)) {
+        setLoginErr("Incorrect email or password. Please try again.");
+      } else if (/verif/i.test(msg)) {
+        setLoginErr("Please verify your email before logging in.");
+      } else {
+        setLoginErr(msg);
+      }
     } finally {
       setLoginSubmitting(false);
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // REGISTER — Vendure native registration
-  // ---------------------------------------------------------------------------
+  // ─── REGISTER ────────────────────────────────────────────────────────────
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateRegisterForm()) return;
+    console.log("📝 [1] handleRegister called");
+
+    if (!validateRegisterForm()) {
+      console.log("📝 [2] ❌ Validation failed:", registerErrors);
+      return;
+    }
+    console.log("📝 [3] ✅ Validation passed");
+
     setRegisterLoading(true);
 
     const nameParts = registerForm.fullName.trim().split(/\s+/);
@@ -253,79 +246,61 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
     const lastName = nameParts.slice(1).join(" ");
 
     try {
-      const { data } = await registerMutation({
-        variables: {
-          input: {
-            emailAddress: registerForm.email.trim(),
-            firstName,
-            lastName,
-            password: registerForm.password,
-            ...(registerForm.referCode.trim()
-              ? {
-                customFields: {
-                  parentReferralCode: registerForm.referCode.trim(),
-                }
-              }
-              : {}),
-          },
-        },
+      console.log("📝 [4] signUp exists?", !!signUp, "loaded?", signUpLoaded);
+      if (!signUp || !signUpLoaded) throw new Error("Auth not ready. Please wait.");
+
+      console.log("📝 [5] Calling signUp.create with:", {
+        emailAddress: registerForm.email.trim(),
+        firstName,
+        lastName,
       });
 
-      console.log("[register] response:", JSON.stringify(data, null, 2));
+      const result = await signUp.create({
+        emailAddress: registerForm.email.trim(),
+        password: registerForm.password,
+        firstName,
+        lastName,
+      });
 
-      const result = data?.registerCustomerAccount;
+      console.log("📝 [6] signUp.create result:", JSON.stringify(result, null, 2));
+      console.log("📝 [7] status:", result.status);
 
-      if (result?.__typename === "Success") {
-        // 🚨 Extra safety check
-        if (
-          registerForm.email &&
-          registerForm.email.length > 0 &&
-          result.success === false
-        ) {
-          setRegisterErrors((p) => ({
-            ...p,
-            email: "This email is already registered.",
-          }));
-          return;
-        }
-
-        setRegisterSuccess(true);
+      if (result.status === "missing_requirements") {
+        console.log("📝 [8] Preparing email verification...");
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+        setVerifyStep(true);
+        toast.info("Check your email for a 6-digit verification code.");
         return;
       }
 
-      if (result?.__typename === "ErrorResult") {
-        const message = result.message?.toLowerCase() || "";
-
-        if (
-          result.errorCode === "EMAIL_ADDRESS_CONFLICT_ERROR" ||
-          message.includes("already") ||
-          message.includes("exists") ||
-          message.includes("duplicate")
-        ) {
-          setRegisterErrors((p) => ({
-            ...p,
-            email: "This email is already registered. Please log in.",
-          }));
-
-          toast.error("Email already exists");
-        } else {
-          setRegisterErrors((p) => ({
-            ...p,
-            general: result.message ?? "Registration failed.",
-          }));
-        }
-
+      if (result.status === "complete") {
+        console.log("📝 [8] Setting active session...");
+        await clerk.setActive({ session: result.createdSessionId });
+        await new Promise((r) => setTimeout(r, 300));
+        console.log("📝 [9] Authenticating with Vendure...");
+        await authenticateWithVendure(registerForm.referCode.trim() || undefined);
+        toast.success("Account created! Welcome 🎉", { duration: 5000 });
+        onOpenChange?.(false);
         return;
       }
 
-      setRegisterErrors((p) => ({ ...p, general: "Registration failed. Please try again." }));
+      throw new Error("Registration incomplete. Please try again.");
     } catch (err: any) {
-      console.error("[register] error:", err);
-      const message = err?.graphQLErrors?.[0]?.message ?? err?.message ?? "Registration failed.";
+      console.error("📝 ❌ REGISTER ERROR:", err);
+      console.error("📝 ❌ message:", err?.message);
+      console.error("📝 ❌ clerk errors:", JSON.stringify(err?.errors, null, 2));
+
+      const message =
+        err?.errors?.[0]?.longMessage ??
+        err?.errors?.[0]?.message ??
+        err?.message ??
+        "Registration failed.";
+      const clerkError = err?.errors?.[0];
+
       if (
-        message.toLowerCase().includes("already") ||
-        message.toLowerCase().includes("exists") ||
-        message.toLowerCase().includes("in use")
+        clerkError?.code === "form_identifier_exists" ||
+        clerkError?.code === "identifier_exists" ||
+        /already|exists|taken|in use/i.test(message)
       ) {
         setRegisterErrors((p) => ({
           ...p,
@@ -339,66 +314,129 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // FORGOT PASSWORD — uses REQUEST_PASSWORD_RESET from queries.ts
-  // which expects $emailAddress (not $email)
-  // ---------------------------------------------------------------------------
+  // ─── OTP VERIFY ──────────────────────────────────────────────────────────
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOtpLoading(true);
+    setOtpError(null);
+
+    try {
+      console.log("✉️ [1] handleVerify called, code:", otpCode);
+      if (!signUp || !signUpLoaded) throw new Error("Auth not ready.");
+
+      const result = await signUp.attemptEmailAddressVerification({
+        code: otpCode,
+      });
+
+      console.log("✉️ [2] verify result status:", result.status);
+
+      if (result.status !== "complete") {
+        throw new Error("Verification incomplete. Please try again.");
+      }
+
+      console.log("✉️ [3] Setting active session...");
+      await clerk.setActive({ session: result.createdSessionId });
+      await new Promise((r) => setTimeout(r, 300));
+      console.log("✉️ [4] Authenticating with Vendure...");
+      await authenticateWithVendure(registerForm.referCode.trim() || undefined);
+      toast.success("Account created! Welcome 🎉", { duration: 5000 });
+      onOpenChange?.(false);
+    } catch (err: any) {
+      console.error("✉️ ❌ VERIFY ERROR:", err);
+      setOtpError(
+        err?.errors?.[0]?.longMessage ??
+          err?.errors?.[0]?.message ??
+          err?.message ??
+          "Invalid code. Please try again."
+      );
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // ─── RESEND OTP ───────────────────────────────────────────────────────────
+  const handleResendCode = async () => {
+    setResendLoading(true);
+    setOtpError(null);
+    try {
+      if (!signUp || !signUpLoaded) throw new Error("Auth not ready.");
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      setOtpCode("");
+      toast.info("A new code has been sent to your email.");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to resend.");
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  // ─── FORGOT PASSWORD ──────────────────────────────────────────────────────
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setForgotLoading(true);
     try {
-      await requestPasswordResetMutation({
-        variables: { emailAddress: forgotEmail.trim() }, // matches $emailAddress in queries.ts
+      if (!signIn || !signInLoaded) throw new Error("Auth not ready.");
+      await signIn.create({
+        strategy: "reset_password_email_code",
+        identifier: forgotEmail.trim(),
       });
       setForgotSent(true);
-    } catch (err) {
-      // Always show success to avoid email enumeration
+    } catch {
       setForgotSent(true);
     } finally {
       setForgotLoading(false);
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // GOOGLE SSO — Clerk OAuth → Vendure authenticate mutation
-  // ---------------------------------------------------------------------------
+  // ─── GOOGLE SSO ───────────────────────────────────────────────────────────
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      const trimmedReferCode = registerForm.referCode.trim();
+      const trimmedReferCode = registerForm.referCode?.trim();
       if (trimmedReferCode) {
         sessionStorage.setItem("pendingReferralCode", trimmedReferCode);
       } else {
         sessionStorage.removeItem("pendingReferralCode");
       }
 
-      await (clerk as any).openSignIn?.({
-        redirectUrl: "/sso-callback",
-        appearance: { elements: { rootBox: "hidden" } },
-      });
+      if (!signIn || !signInLoaded) throw new Error("Auth not ready.");
 
-      if (!(clerk as any).openSignIn) {
-        await (clerk as any).redirectToSignIn?.({ redirectUrl: "/sso-callback" });
-      }
+      const baseUrl = window.location.origin;
+      const referral = registerForm.referCode?.trim();
+
+      await signIn.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: `${baseUrl}/sso-callback${referral ? `?ref=${referral}` : ""}`,
+        redirectUrlComplete: `${baseUrl}/`,
+      });
     } catch (err: any) {
-      toast.error(err?.message ?? "Google sign-in failed. Please try again.");
+      console.error("🌐 ❌ GOOGLE ERROR:", err);
+      toast.error(
+        err?.errors?.[0]?.message ?? err?.message ?? "Google sign-in failed."
+      );
       setGoogleLoading(false);
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // Reset all state on modal close
-  // ---------------------------------------------------------------------------
+  // ─── RESET STATE ON CLOSE ─────────────────────────────────────────────────
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setActiveTab("login");
       setLoginForm({ email: "", password: "" });
       setShowLoginPassword(false);
       setLoginErr(null);
-      setRegisterForm({ fullName: "", email: "", password: "", agree: false, referCode: "" });
+      setRegisterForm({
+        fullName: "",
+        email: "",
+        password: "",
+        agree: false,
+        referCode: "",
+      });
       setRegisterErrors({});
       setShowRegisterPassword(false);
-      setRegisterSuccess(false);
+      setVerifyStep(false);
+      setOtpCode("");
+      setOtpError(null);
       setForgotStep(false);
       setForgotEmail("");
       setForgotSent(false);
@@ -406,9 +444,6 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
     onOpenChange?.(open);
   };
 
-  // ---------------------------------------------------------------------------
-  // Shared UI helpers
-  // ---------------------------------------------------------------------------
   const FieldError = ({ msg }: { msg?: string }) =>
     msg ? <p className="text-red-500 text-xs mt-1 pl-1">{msg}</p> : null;
 
@@ -416,7 +451,7 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
     <button
       type="button"
       onClick={handleGoogleSignIn}
-      disabled={googleLoading}
+      disabled={googleLoading || !signInLoaded}
       className="w-full flex items-center justify-center gap-2 rounded-full border border-gray-300 py-3 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
     >
       {googleLoading ? (
@@ -436,9 +471,6 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
     </div>
   );
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
   return (
     <Dialog.Root open={controlledOpen} onOpenChange={handleOpenChange}>
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
@@ -448,16 +480,21 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-8 shadow-xl max-h-[90vh] overflow-y-auto">
           <VisuallyHidden>
             <Dialog.Title>Authentication</Dialog.Title>
-            <Dialog.Description>Log in or create an account to continue.</Dialog.Description>
+            <Dialog.Description>
+              Log in or create an account to continue.
+            </Dialog.Description>
           </VisuallyHidden>
 
           <Dialog.Close asChild>
-            <button className="absolute right-4 top-4 text-gray-400 hover:text-black" aria-label="Close">
+            <button
+              className="absolute right-4 top-4 text-gray-400 hover:text-black"
+              aria-label="Close"
+            >
               <X className="h-5 w-5" />
             </button>
           </Dialog.Close>
 
-          {/* ── FORGOT PASSWORD STEP ── */}
+          {/* ── FORGOT PASSWORD ── */}
           {forgotStep ? (
             <div className="flex flex-col gap-5">
               {forgotSent ? (
@@ -468,13 +505,22 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                   <h2 className="font-semibold text-lg">Check your inbox</h2>
                   <p className="text-sm text-gray-500">
                     If an account exists for{" "}
-                    <span className="font-semibold text-neutral-800">{forgotEmail}</span>,
-                    we've sent a password reset link. Check your spam folder too.
+                    <span className="font-semibold text-neutral-800">
+                      {forgotEmail}
+                    </span>
+                    , we've sent a password reset link. Check your spam folder
+                    too.
                   </p>
-                  <p className="text-xs text-gray-400">The link expires in 1 hour.</p>
+                  <p className="text-xs text-gray-400">
+                    The link expires in 1 hour.
+                  </p>
                   <button
                     type="button"
-                    onClick={() => { setForgotStep(false); setForgotSent(false); setForgotEmail(""); }}
+                    onClick={() => {
+                      setForgotStep(false);
+                      setForgotSent(false);
+                      setForgotEmail("");
+                    }}
                     className="flex items-center gap-1 text-sm text-red-600 font-medium mt-2"
                   >
                     <ArrowLeft className="h-4 w-4" /> Back to login
@@ -483,12 +529,17 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
               ) : (
                 <>
                   <div className="flex flex-col items-center gap-2 text-center">
-                    <h2 className="font-semibold text-lg">Reset your password</h2>
+                    <h2 className="font-semibold text-lg">
+                      Reset your password
+                    </h2>
                     <p className="text-sm text-gray-500">
-                      Enter your email and we&apos;ll send you a reset link.
+                      Enter your email and we'll send you a reset link.
                     </p>
                   </div>
-                  <form onSubmit={handleForgotPassword} className="flex flex-col gap-4">
+                  <form
+                    onSubmit={handleForgotPassword}
+                    className="flex flex-col gap-4"
+                  >
                     <input
                       type="email"
                       placeholder="Enter your email"
@@ -507,7 +558,10 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                   </form>
                   <button
                     type="button"
-                    onClick={() => { setForgotStep(false); setForgotEmail(""); }}
+                    onClick={() => {
+                      setForgotStep(false);
+                      setForgotEmail("");
+                    }}
                     className="flex items-center justify-center gap-1 text-sm text-gray-400 hover:text-gray-600"
                   >
                     <ArrowLeft className="h-4 w-4" /> Back to login
@@ -515,48 +569,117 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                 </>
               )}
             </div>
-
-          ) : registerSuccess ? (
-            /* ── REGISTER SUCCESS — awaiting email verification ── */
-            <div className="flex flex-col items-center gap-4 text-center py-4">
-              <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
-                <Mail className="h-6 w-6 text-red-600" />
+          ) : verifyStep ? (
+            /* ── OTP VERIFY ── */
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
+                  <Mail className="h-6 w-6 text-red-600" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-[#1C1C1C] text-lg">
+                    Check your email
+                  </h2>
+                  <p className="text-gray-500 text-sm mt-1">
+                    We sent a 6-digit code to
+                  </p>
+                  <p className="font-semibold text-sm text-[#1C1C1C] mt-0.5">
+                    {registerForm.email}
+                  </p>
+                </div>
               </div>
-              <h2 className="font-semibold text-lg text-[#1C1C1C]">Verify your email</h2>
-              <p className="text-sm text-gray-500 max-w-xs">
-                We sent a verification link to{" "}
-                <span className="font-semibold text-neutral-800">{registerForm.email}</span>.
-                Click the link in the email to activate your account, then log in here.
-              </p>
-              <p className="text-xs text-gray-400">Check your spam folder if you don't see it.</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setRegisterSuccess(false);
-                  setActiveTab("login");
-                  setLoginForm((prev) => ({ ...prev, email: registerForm.email }));
-                }}
-                className="mt-2 rounded-full bg-red-600 px-8 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
-              >
-                Go to login
-              </button>
-            </div>
 
+              <form onSubmit={handleVerify} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-[#1C1C1C]">
+                    Verification Code
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="000000"
+                    value={otpCode}
+                    autoFocus
+                    onChange={(e) => {
+                      setOtpCode(
+                        e.target.value.replace(/\D/g, "").slice(0, 6)
+                      );
+                      if (otpError) setOtpError(null);
+                    }}
+                    className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-3 text-center text-xl font-bold tracking-[0.4em] focus:outline-none ${
+                      otpError ? "border-red-400" : "border-[#E5E5E5]"
+                    }`}
+                  />
+                  {otpError && (
+                    <p className="text-red-500 text-xs mt-1 text-center">
+                      {otpError}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={otpLoading || otpCode.length < 6}
+                  className="w-full rounded-full bg-red-600 py-3 text-white font-semibold disabled:opacity-60 transition-opacity"
+                >
+                  {otpLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Verifying...
+                    </span>
+                  ) : (
+                    "Verify & Create Account"
+                  )}
+                </button>
+              </form>
+
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-sm text-gray-500">
+                  Didn't receive it?{" "}
+                  <button
+                    type="button"
+                    onClick={handleResendCode}
+                    disabled={resendLoading}
+                    className="text-[#FF0000] font-medium disabled:opacity-60"
+                  >
+                    {resendLoading ? "Sending..." : "Resend code"}
+                  </button>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerifyStep(false);
+                    setOtpCode("");
+                    setOtpError(null);
+                  }}
+                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+                >
+                  <ArrowLeft className="h-3 w-3" /> Back to registration
+                </button>
+              </div>
+            </div>
           ) : (
             <>
               {/* ── TABS ── */}
               <div className="flex mb-6 border-b">
                 <button
                   onClick={() => setActiveTab("login")}
-                  className={`flex-1 py-2 text-center ${activeTab === "login" ? "border-b border-[#3C3C3C] font-semibold" : "text-gray-500"
-                    }`}
+                  className={`flex-1 py-2 text-center ${
+                    activeTab === "login"
+                      ? "border-b border-[#3C3C3C] font-semibold"
+                      : "text-gray-500"
+                  }`}
                 >
                   Log in
                 </button>
                 <button
                   onClick={() => setActiveTab("register")}
-                  className={`flex-1 py-2 text-center ${activeTab === "register" ? "border-b border-black font-semibold" : "text-gray-500"
-                    }`}
+                  className={`flex-1 py-2 text-center ${
+                    activeTab === "register"
+                      ? "border-b border-black font-semibold"
+                      : "text-gray-500"
+                  }`}
                 >
                   Create Account
                 </button>
@@ -572,7 +695,9 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                       type="email"
                       placeholder="Enter Email"
                       value={loginForm.email}
-                      onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                      onChange={(e) =>
+                        setLoginForm({ ...loginForm, email: e.target.value })
+                      }
                       className="w-full rounded-full border px-4 py-3 focus:outline-none focus:border-red-400"
                       required
                     />
@@ -581,16 +706,27 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                         type={showLoginPassword ? "text" : "password"}
                         placeholder="Password"
                         value={loginForm.password}
-                        onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                        onChange={(e) =>
+                          setLoginForm({
+                            ...loginForm,
+                            password: e.target.value,
+                          })
+                        }
                         className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none focus:border-red-400"
                         required
                       />
                       <button
                         type="button"
-                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        onClick={() =>
+                          setShowLoginPassword(!showLoginPassword)
+                        }
                         className="absolute right-3 top-3 text-gray-500"
                       >
-                        {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        {showLoginPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
                       </button>
                     </div>
                     <button
@@ -602,7 +738,7 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                     </button>
                     <button
                       type="submit"
-                      disabled={loginSubmitting}
+                      disabled={loginSubmitting || !signInLoaded}
                       className="w-full rounded-full bg-red-600 py-3 text-white font-semibold disabled:opacity-60"
                     >
                       {loginSubmitting ? (
@@ -614,10 +750,14 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                         "Sign in"
                       )}
                     </button>
-                    {loginErr && <p className="text-red-500 text-sm text-center">{loginErr}</p>}
+                    {loginErr && (
+                      <p className="text-red-500 text-sm text-center">
+                        {loginErr}
+                      </p>
+                    )}
                   </form>
                   <p className="text-center text-sm">
-                    Don&apos;t have an account?{" "}
+                    Don't have an account?{" "}
                     <button
                       type="button"
                       onClick={() => setActiveTab("register")}
@@ -634,59 +774,102 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                 <div className="flex flex-col gap-3">
                   {GoogleButton}
                   {Divider}
-                  <form onSubmit={handleRegister} className="flex flex-col gap-3" noValidate>
+                  <form
+                    onSubmit={handleRegister}
+                    className="flex flex-col gap-3"
+                    noValidate
+                  >
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-semibold text-[#1C1C1C]">Full Name</label>
+                      <label className="text-xs font-semibold text-[#1C1C1C]">
+                        Full Name
+                      </label>
                       <input
                         type="text"
                         placeholder="e.g. John Doe"
                         value={registerForm.fullName}
                         onChange={(e) => {
-                          setRegisterForm({ ...registerForm, fullName: e.target.value });
-                          if (registerErrors.fullName) setRegisterErrors((p) => ({ ...p, fullName: "" }));
+                          setRegisterForm({
+                            ...registerForm,
+                            fullName: e.target.value,
+                          });
+                          if (registerErrors.fullName)
+                            setRegisterErrors((p) => ({
+                              ...p,
+                              fullName: "",
+                            }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.fullName ? "border-red-400" : "border-[#E5E5E5]"
-                          }`}
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
+                          registerErrors.fullName
+                            ? "border-red-400"
+                            : "border-[#E5E5E5]"
+                        }`}
                       />
                       <FieldError msg={registerErrors.fullName} />
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-semibold text-[#1C1C1C]">Email</label>
+                      <label className="text-xs font-semibold text-[#1C1C1C]">
+                        Email
+                      </label>
                       <input
                         type="email"
                         placeholder="name@example.com"
                         value={registerForm.email}
                         onChange={(e) => {
-                          setRegisterForm({ ...registerForm, email: e.target.value });
-                          if (registerErrors.email) setRegisterErrors((p) => ({ ...p, email: "" }));
+                          setRegisterForm({
+                            ...registerForm,
+                            email: e.target.value,
+                          });
+                          if (registerErrors.email)
+                            setRegisterErrors((p) => ({ ...p, email: "" }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.email ? "border-red-400" : "border-[#E5E5E5]"
-                          }`}
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
+                          registerErrors.email
+                            ? "border-red-400"
+                            : "border-[#E5E5E5]"
+                        }`}
                       />
                       <FieldError msg={registerErrors.email} />
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-semibold text-[#1C1C1C]">Password</label>
+                      <label className="text-xs font-semibold text-[#1C1C1C]">
+                        Password
+                      </label>
                       <div className="relative">
                         <input
                           type={showRegisterPassword ? "text" : "password"}
                           placeholder="Min 8 chars, upper, lower, number, symbol"
                           value={registerForm.password}
                           onChange={(e) => {
-                            setRegisterForm({ ...registerForm, password: e.target.value });
-                            if (registerErrors.password) setRegisterErrors((p) => ({ ...p, password: "" }));
+                            setRegisterForm({
+                              ...registerForm,
+                              password: e.target.value,
+                            });
+                            if (registerErrors.password)
+                              setRegisterErrors((p) => ({
+                                ...p,
+                                password: "",
+                              }));
                           }}
-                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${registerErrors.password ? "border-red-400" : "border-[#E5E5E5]"
-                            }`}
+                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${
+                            registerErrors.password
+                              ? "border-red-400"
+                              : "border-[#E5E5E5]"
+                          }`}
                         />
                         <button
                           type="button"
-                          onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                          onClick={() =>
+                            setShowRegisterPassword(!showRegisterPassword)
+                          }
                           className="absolute right-3 top-2 text-gray-500"
                         >
-                          {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showRegisterPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
                         </button>
                       </div>
                       {registerForm.password.length > 0 && (
@@ -697,10 +880,15 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                               style={{ width: passwordStrength.width }}
                             />
                           </div>
-                          <p className={`text-xs font-medium pl-1 ${passwordStrength.label === "Weak" ? "text-red-500"
-                            : passwordStrength.label === "Fair" ? "text-yellow-500"
-                              : "text-green-600"
-                            }`}>
+                          <p
+                            className={`text-xs font-medium pl-1 ${
+                              passwordStrength.label === "Weak"
+                                ? "text-red-500"
+                                : passwordStrength.label === "Fair"
+                                ? "text-yellow-500"
+                                : "text-green-600"
+                            }`}
+                          >
                             {passwordStrength.label} password
                           </p>
                         </div>
@@ -708,6 +896,7 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                       <FieldError msg={registerErrors.password} />
                     </div>
 
+                    {/* Referral code — also used for Google sign-in */}
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-semibold text-[#1C1C1C]">
                         Referral Code (Optional)
@@ -716,10 +905,14 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                         type="text"
                         placeholder="Enter Referral Code"
                         value={registerForm.referCode}
-                        onChange={(e) => setRegisterForm({ ...registerForm, referCode: e.target.value })}
+                        onChange={(e) =>
+                          setRegisterForm({
+                            ...registerForm,
+                            referCode: e.target.value,
+                          })
+                        }
                         className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
                       />
-                      <FieldError msg={registerErrors.referCode} />
                     </div>
 
                     <div>
@@ -728,26 +921,34 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
                           type="checkbox"
                           checked={registerForm.agree}
                           onChange={(e) => {
-                            setRegisterForm({ ...registerForm, agree: e.target.checked });
-                            if (registerErrors.agree) setRegisterErrors((p) => ({ ...p, agree: "" }));
+                            setRegisterForm({
+                              ...registerForm,
+                              agree: e.target.checked,
+                            });
+                            if (registerErrors.agree)
+                              setRegisterErrors((p) => ({ ...p, agree: "" }));
                           }}
                           className="mt-0.5 mr-1"
                         />
                         <span className="text-xs">
                           I agree to all{" "}
-                          <a href="#" className="underline font-medium">Terms & Conditions</a>
+                          <a href="#" className="underline font-medium">
+                            Terms & Conditions
+                          </a>
                         </span>
                       </label>
                       <FieldError msg={registerErrors.agree} />
                     </div>
 
                     {registerErrors.general && (
-                      <p className="text-red-500 text-xs text-center">{registerErrors.general}</p>
+                      <p className="text-red-500 text-xs text-center">
+                        {registerErrors.general}
+                      </p>
                     )}
 
                     <button
                       type="submit"
-                      disabled={registerLoading}
+                      disabled={registerLoading || !signUpLoaded}
                       className="w-full rounded-full bg-red-600 py-2 text-white text-sm font-semibold disabled:opacity-60"
                     >
                       {registerLoading ? (
@@ -776,7 +977,6 @@ export default function AuthModal({ trigger, open: controlledOpen, onOpenChange 
             </>
           )}
 
-          <div id="clerk-captcha" />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

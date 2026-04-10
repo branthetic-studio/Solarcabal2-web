@@ -1,10 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useRef, useMemo, useState } from "react";
-import { useMutation, useQuery } from "@apollo/client/react";
-import { useAuth } from "@clerk/nextjs";
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
+import { useMutation, useQuery, useApolloClient } from "@apollo/client/react";
 import { GET_CURRENT_USER, LOGIN, LOGOUT } from "@/graphql/queries";
-import { toast } from "sonner";
 import type {
   GetCurrentUserData,
   LoginData,
@@ -23,23 +28,28 @@ type UserCtx = {
 const Ctx = createContext<UserCtx>({
   loading: false,
   customer: undefined,
-  login: async () => { },
-  logout: async () => { },
-  refetchUser: async () => { },
-  retryGoogleLogin: async () => { },
+  login: async () => {},
+  logout: async () => {},
+  refetchUser: async () => {},
+  retryGoogleLogin: async () => {},
 });
 
 export const useUser = () => useContext(Ctx);
 
 const UserProvider = ({ children }: { children: React.ReactNode }) => {
-  const { isSignedIn, getToken } = useAuth();
+  const apollo = useApolloClient();
+  const [isActing, setIsActing] = useState(false);
 
   const { data, loading, refetch } = useQuery<GetCurrentUserData>(
     GET_CURRENT_USER,
-    { fetchPolicy: "network-only" }
+    {
+      // cache-and-network: serves cached value instantly (so navbar
+      // doesn't flicker) AND re-validates in the background.
+      // Critically, writes results back to cache so all consumers update.
+      fetchPolicy: "cache-and-network",
+      notifyOnNetworkStatusChange: true,
+    }
   );
-
-  const [isActing, setIsActing] = useState(false);
 
   const [loginMut] = useMutation<LoginData, LoginVars>(LOGIN, {
     refetchQueries: [{ query: GET_CURRENT_USER }],
@@ -51,110 +61,6 @@ const UserProvider = ({ children }: { children: React.ReactNode }) => {
     awaitRefetchQueries: true,
   });
 
-  const processedToken = useRef<string | null>(null);
-  const isBridging = useRef(false);
-
-  // ---------------------------------------------------------------------------
-  // Core bridge function — extracted so retryGoogleLogin can call it too
-  // ---------------------------------------------------------------------------
-  const bridgeToVendure = async (showToasts = true) => {
-    if (!isSignedIn) return;
-    if (data?.activeCustomer) return;
-    if (isBridging.current) return;
-
-    try {
-      isBridging.current = true;
-
-      const clerkToken = await getToken();
-      if (!clerkToken) return;
-
-      const res = await fetch("/api/auth/google-login", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: clerkToken }),
-      });
-
-      const json = await res.json();
-
-      // Email verification required — account was just created
-      if (res.status === 403 && json.error === "VERIFICATION_REQUIRED") {
-        if (showToasts) {
-          toast.error("Please verify your email to continue.", {
-            description: (
-              <span>
-                We sent a verification link to your inbox.
-                Once verified, click{" "}
-                <strong>Retry sign-in</strong> below.
-              </span>
-            ) as any,
-            action: {
-              label: "Retry sign-in",
-              onClick: () => {
-                // Reset processed token so bridge runs again
-                processedToken.current = null;
-                bridgeToVendure(true);
-              },
-            },
-            duration: 30000, // keep visible for 30s
-          });
-        }
-        return;
-      }
-
-      if (res.status === 409) {
-        if (showToasts) {
-          toast.error("An account with this email already exists.", {
-            description: "Please log in with your email and password instead.",
-            duration: 8000,
-          });
-        }
-        return;
-      }
-
-      if (!res.ok || json.error) {
-        console.error("Vendure Google auth failed:", json.error);
-        return;
-      }
-
-      processedToken.current = clerkToken;
-      await refetch();
-
-      if (showToasts) {
-        toast.success("✅ Signed in with Google");
-      }
-    } catch (err) {
-      console.error("Vendure Google auth error:", err);
-    } finally {
-      isBridging.current = false;
-    }
-  };
-
-  // ---------------------------------------------------------------------------
-  // Auto-bridge when Clerk signs in
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    if (!isSignedIn) {
-      processedToken.current = null;
-      isBridging.current = false;
-      return;
-    }
-    if (data?.activeCustomer) return;
-
-    bridgeToVendure(true);
-  }, [isSignedIn, data?.activeCustomer]);
-
-  // ---------------------------------------------------------------------------
-  // Public retry — called from the toast action button
-  // ---------------------------------------------------------------------------
-  const retryGoogleLogin = async () => {
-    processedToken.current = null;
-    await bridgeToVendure(true);
-  };
-
-  // ---------------------------------------------------------------------------
-  // Login / Logout
-  // ---------------------------------------------------------------------------
   const login = async (username: string, password: string, rememberMe = true) => {
     setIsActing(true);
     try {
@@ -179,15 +85,33 @@ const UserProvider = ({ children }: { children: React.ReactNode }) => {
       await logoutMut({
         context: { fetchOptions: { credentials: "include" } },
       });
+      // Clear entire Apollo cache on logout so stale customer data
+      // doesn't linger across sessions
+      await apollo.clearStore();
       await refetch();
     } finally {
       setIsActing(false);
     }
   };
 
-  const refetchUser = async () => {
+  // Retry with backoff — gives Vendure time to set the session cookie.
+  // Called by AuthModal after Clerk setActive() and by sso-callback.
+  const refetchUser = useCallback(async () => {
+    // Attempt 1 — immediate
+    const r1 = await refetch();
+    if (r1.data?.activeCustomer) return;
+
+    // Attempt 2 — wait 600ms then retry
+    await new Promise((res) => setTimeout(res, 600));
+    const r2 = await refetch();
+    if (r2.data?.activeCustomer) return;
+
+    // Attempt 3 — wait another 1s then final retry
+    await new Promise((res) => setTimeout(res, 1000));
     await refetch();
-  };
+  }, [refetch]);
+
+  const retryGoogleLogin = async () => {};
 
   const value = useMemo<UserCtx>(
     () => ({
@@ -198,7 +122,7 @@ const UserProvider = ({ children }: { children: React.ReactNode }) => {
       refetchUser,
       retryGoogleLogin,
     }),
-    [loading, isActing, data]
+    [loading, isActing, data, refetchUser]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

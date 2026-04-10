@@ -10,3 +10,5 @@ declare module "@paystack/inline-js" {
     }): void;
   }
 }
+
+declare module "*.css";

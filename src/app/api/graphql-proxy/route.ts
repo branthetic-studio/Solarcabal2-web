@@ -1,62 +1,98 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// app/api/graphql/route.ts
+
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const cookies = request.headers.get("cookie") ?? "";
-    const auth = request.headers.get("authorization");
+    // Forward incoming cookies + auth header
+    const incomingCookies = request.headers.get("cookie") ?? "";
+    const authHeader = request.headers.get("authorization");
 
     const headers = new Headers();
     headers.set("Content-Type", "application/json");
-    if (cookies) headers.set("Cookie", cookies);
-    if (auth) headers.set("Authorization", auth);
 
+    if (incomingCookies) {
+      headers.set("Cookie", incomingCookies);
+    }
+
+    if (authHeader) {
+      headers.set("Authorization", authHeader);
+    }
+
+    // Call your Vendure backend
     const response = await fetch(process.env.NEXT_PUBLIC_API_URL!, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
+      credentials: "include", // 🔥 important
     });
 
-    // ✅ Always try to parse and forward the real Vendure response,
-    //    even on 4xx/5xx — this exposes the actual error message
+    // Parse response safely
     let data: unknown;
     const contentType = response.headers.get("content-type") ?? "";
+
     if (contentType.includes("application/json")) {
       data = await response.json();
     } else {
-      // Non-JSON body (rare) — capture as text so you can read it
       const text = await response.text();
-      console.error("Vendure non-JSON response:", text);
+      console.error("❌ Vendure returned non-JSON:", text);
       data = { errors: [{ message: text || "Upstream error" }] };
     }
 
-    // ✅ Log when Vendure itself returns an error status
     if (!response.ok) {
-      console.error("Vendure error status:", response.status, JSON.stringify(data));
+      console.error(
+        "❌ Vendure error:",
+        response.status,
+        JSON.stringify(data, null, 2)
+      );
     }
 
-    const nextResponse = NextResponse.json(data, { status: response.status });
+    // Create Next response
+    const nextResponse = NextResponse.json(data, {
+      status: response.status,
+    });
 
-    const setCookieHeader = response.headers.get("set-cookie");
-    if (setCookieHeader) {
-      nextResponse.headers.set("Set-Cookie", setCookieHeader);
+    // 🔥 CRITICAL FIX: Forward ALL cookies correctly
+    // Works in modern Node / Next
+    const setCookies = (response.headers as any).getSetCookie?.();
+
+    if (setCookies && setCookies.length > 0) {
+      setCookies.forEach((cookie: string) => {
+        nextResponse.headers.append("Set-Cookie", cookie);
+      });
+    } else {
+      // 🔁 Fallback (older environments)
+      const raw = response.headers.get("set-cookie");
+
+      if (raw) {
+        raw.split(/,(?=\s*\w+=)/).forEach((cookie) => {
+          nextResponse.headers.append("Set-Cookie", cookie);
+        });
+      }
     }
 
     return nextResponse;
-  } catch (error) {
-    // ✅ Log the full error so you can actually debug it
-    console.error("GraphQL Proxy Error:", error);
+  } catch (error: any) {
+    console.error("🔥 GraphQL Proxy Error:", error);
+
     return NextResponse.json(
-      { errors: [{ message: "Failed to fetch from GraphQL endpoint" }] },
+      {
+        errors: [
+          {
+            message:
+              error?.message ||
+              "Failed to fetch from GraphQL endpoint",
+          },
+        ],
+      },
       { status: 500 }
     );
   }
 }
 
-// ✅ Handle OPTIONS for CORS preflight if needed
+// ✅ Handle OPTIONS (CORS / preflight)
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,

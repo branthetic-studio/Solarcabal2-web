@@ -428,8 +428,8 @@ export const REGISTER_CUSTOMER = gql`
 // queries.ts
 
 export const CLERK_AUTHENTICATE = gql`
-  mutation Authenticate($input: ClerkAuthInput!) {
-    authenticate(input: { clerk: $input }) {
+  mutation Authenticate($token: String!, $referralCode: String) {
+    authenticate(input: { clerk: { token: $token, referralCode: $referralCode } }) {
       ... on CurrentUser {
         id
         identifier

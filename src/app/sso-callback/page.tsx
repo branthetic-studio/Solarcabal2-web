@@ -1,28 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AuthenticateWithRedirectCallback, useAuth } from "@clerk/nextjs";
 import { useApolloClient, useMutation } from "@apollo/client/react";
-import { gql } from "@apollo/client";
-import { GET_ACTIVE_ORDER } from "@/graphql/queries";
+import { GET_ACTIVE_ORDER, CLERK_AUTHENTICATE } from "@/graphql/queries";
 import { useUser } from "@/context/UserContext";
 import { toast } from "sonner";
-
-const CLERK_AUTHENTICATE = gql`
-  mutation Authenticate($input: ClerkAuthInput!) {
-    authenticate(input: { clerk: $input }) {
-      ... on CurrentUser {
-        id
-        identifier
-      }
-      ... on ErrorResult {
-        errorCode
-        message
-      }
-    }
-  }
-`;
 
 type AuthenticateResult = {
   authenticate:
@@ -31,49 +15,51 @@ type AuthenticateResult = {
 };
 
 type AuthenticateVars = {
-  input: {
-    token: string;
-    referralCode?: string;
-  };
+  token: string;
+  referralCode?: string;
 };
 
 export default function SSOCallback() {
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, isLoaded } = useAuth();
   const { refetchUser } = useUser();
   const apollo = useApolloClient();
   const router = useRouter();
-  const [authenticate] = useMutation<AuthenticateResult, AuthenticateVars>(
-    CLERK_AUTHENTICATE
-  );
+
+  const [authenticate] = useMutation<AuthenticateResult, AuthenticateVars>(CLERK_AUTHENTICATE);
+
+  const hasRunRef = useRef(false);
 
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isLoaded || !isSignedIn || hasRunRef.current) return;
+    hasRunRef.current = true;
 
-    const handleAfterSignInOrUp = async () => {
+    const run = async () => {
       try {
         const token = await getToken();
-        if (!token) throw new Error("No Clerk token available after OAuth redirect");
+        if (!token) throw new Error("No Clerk token available");
 
-        const referralCode = sessionStorage.getItem("pendingReferralCode") ?? undefined;
+        const urlParams = new URLSearchParams(window.location.search);
+        const referralCode =
+          urlParams.get("ref")?.trim() ||
+          sessionStorage.getItem("pendingReferralCode")?.trim() ||
+          undefined;
+
         sessionStorage.removeItem("pendingReferralCode");
 
         const { data } = await authenticate({
           variables: {
-            input: {
-              token,
-              ...(referralCode ? { referralCode } : {}),
-            },
+            token,
+            ...(referralCode ? { referralCode } : {}),
           },
         });
 
         const result = data?.authenticate;
         if (result?.__typename === "ErrorResult") {
-          throw new Error(result.message ?? "Vendure authentication failed");
+          throw new Error(result.message ?? "Authentication failed");
         }
 
         await refetchUser();
         await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
-
         toast.success("Signed in successfully!");
       } catch (err: any) {
         console.error("SSO callback error:", err);
@@ -83,13 +69,13 @@ export default function SSOCallback() {
       }
     };
 
-    handleAfterSignInOrUp();
-  }, [isSignedIn]);
+    run();
+  }, [isLoaded, isSignedIn, getToken, authenticate, apollo, refetchUser, router]);
 
   return (
-  <AuthenticateWithRedirectCallback
-    signInFallbackRedirectUrl="/"
-    signUpFallbackRedirectUrl="/"
-  />
-);
+    <AuthenticateWithRedirectCallback
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+    />
+  );
 }
