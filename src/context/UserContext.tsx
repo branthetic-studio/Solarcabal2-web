@@ -40,10 +40,10 @@ type UserCtx = {
 const Ctx = createContext<UserCtx>({
   loading: false,
   customer: undefined,
-  login: async () => {},
-  logout: async () => {},
-  refetchUser: async () => {},
-  retryGoogleLogin: async () => {},
+  login: async () => { },
+  logout: async () => { },
+  refetchUser: async () => { },
+  retryGoogleLogin: async () => { },
 });
 
 export const useUser = () => useContext(Ctx);
@@ -99,19 +99,21 @@ const UserProvider = ({ children }: { children: React.ReactNode }) => {
     setIsActing(true);
 
     try {
-      // 1. backend logout (Vendure)
+      // 1. Vendure logout
       await logoutMut({
         context: { fetchOptions: { credentials: "include" } },
       });
 
-      // 2. clear Apollo cache + reset store (VERY IMPORTANT)
-      await apollo.clearStore();
-      await apollo.resetStore();
-
-      // 3. logout Clerk safely (ONLY here, NOT during login)
+      // 2. Sign out of Clerk first — before clearing Apollo
       await clerk.signOut();
 
-      // 4. refetch user
+      // 3. Clear Apollo cache (don't resetStore — it re-runs queries immediately)
+      await apollo.clearStore();
+
+      // 4. Small delay to let Clerk session fully clear
+      await new Promise((r) => setTimeout(r, 300));
+
+      // 5. Refetch to confirm null user
       await refetch();
     } finally {
       setIsActing(false);
@@ -133,7 +135,7 @@ const UserProvider = ({ children }: { children: React.ReactNode }) => {
     await refetch();
   }, [refetch]);
 
-  const retryGoogleLogin = async () => {};
+  const retryGoogleLogin = async () => { };
 
   const value = useMemo(
     () => ({

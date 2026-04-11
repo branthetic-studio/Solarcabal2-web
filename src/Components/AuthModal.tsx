@@ -13,8 +13,8 @@ import { GET_ACTIVE_ORDER, CLERK_AUTHENTICATE } from "@/graphql/queries";
 
 type AuthenticateResult = {
   authenticate:
-    | { __typename: "CurrentUser"; id: string; identifier: string }
-    | { __typename: "ErrorResult"; errorCode: string; message: string };
+  | { __typename: "CurrentUser"; id: string; identifier: string }
+  | { __typename: "ErrorResult"; errorCode: string; message: string };
 };
 
 type AuthenticateVars = {
@@ -185,7 +185,16 @@ export default function AuthModal({
 
     try {
       console.log("🔑 [1] handleLogin called");
-      console.log("🔑 [2] signIn exists?", !!signIn, "loaded?", signInLoaded);
+
+      // If already signed into Clerk, just authenticate with Vendure directly
+      const existingToken = await getToken();
+      if (existingToken) {
+        console.log("🔑 [2] Already signed into Clerk, authenticating with Vendure...");
+        await authenticateWithVendure();
+        toast.success("Welcome back!");
+        onOpenChange?.(false);
+        return;
+      }
 
       if (!signIn || !signInLoaded) throw new Error("Auth not ready. Please wait.");
 
@@ -199,7 +208,11 @@ export default function AuthModal({
 
       if (result.status === "complete") {
         console.log("🔑 [5] Setting active session...");
-        await clerk.setActive({ session: result.createdSessionId });
+        try {
+          await clerk.setActive({ session: result.createdSessionId });
+        } catch (e: any) {
+          if (!e?.message?.includes("plain objects")) throw e;
+        }
         await new Promise((r) => setTimeout(r, 300));
         console.log("🔑 [6] Authenticating with Vendure...");
         await authenticateWithVendure();
@@ -345,9 +358,9 @@ export default function AuthModal({
       console.error("✉️ ❌ VERIFY ERROR:", err);
       setOtpError(
         err?.errors?.[0]?.longMessage ??
-          err?.errors?.[0]?.message ??
-          err?.message ??
-          "Invalid code. Please try again."
+        err?.errors?.[0]?.message ??
+        err?.message ??
+        "Invalid code. Please try again."
       );
     } finally {
       setOtpLoading(false);
@@ -399,15 +412,29 @@ export default function AuthModal({
         sessionStorage.removeItem("pendingReferralCode");
       }
 
+      // If already signed into Clerk, skip OAuth and go straight to Vendure auth
+      const existingToken = await getToken();
+      if (existingToken) {
+        await authenticateWithVendure(trimmedReferCode || undefined);
+        toast.success("Signed in!");
+        onOpenChange?.(false);
+        setGoogleLoading(false);
+        return;
+      }
+
       if (!signIn || !signInLoaded) throw new Error("Auth not ready.");
 
-      const baseUrl = window.location.origin;
+      const baseUrl = typeof window !== "undefined"
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_APP_URL!;
+
       const referral = registerForm.referCode?.trim();
+      const callbackUrl = `${baseUrl}/sso-callback${referral ? `?ref=${referral}` : ""}`;
 
       await signIn.authenticateWithRedirect({
         strategy: "oauth_google",
-        redirectUrl: `${baseUrl}/sso-callback${referral ? `?ref=${referral}` : ""}`,
-        redirectUrlComplete: `${baseUrl}/`,
+        redirectUrl: callbackUrl,
+        redirectUrlComplete: callbackUrl,
       });
     } catch (err: any) {
       console.error("🌐 ❌ GOOGLE ERROR:", err);
@@ -607,9 +634,8 @@ export default function AuthModal({
                       );
                       if (otpError) setOtpError(null);
                     }}
-                    className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-3 text-center text-xl font-bold tracking-[0.4em] focus:outline-none ${
-                      otpError ? "border-red-400" : "border-[#E5E5E5]"
-                    }`}
+                    className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-3 text-center text-xl font-bold tracking-[0.4em] focus:outline-none ${otpError ? "border-red-400" : "border-[#E5E5E5]"
+                      }`}
                   />
                   {otpError && (
                     <p className="text-red-500 text-xs mt-1 text-center">
@@ -665,21 +691,19 @@ export default function AuthModal({
               <div className="flex mb-6 border-b">
                 <button
                   onClick={() => setActiveTab("login")}
-                  className={`flex-1 py-2 text-center ${
-                    activeTab === "login"
+                  className={`flex-1 py-2 text-center ${activeTab === "login"
                       ? "border-b border-[#3C3C3C] font-semibold"
                       : "text-gray-500"
-                  }`}
+                    }`}
                 >
                   Log in
                 </button>
                 <button
                   onClick={() => setActiveTab("register")}
-                  className={`flex-1 py-2 text-center ${
-                    activeTab === "register"
+                  className={`flex-1 py-2 text-center ${activeTab === "register"
                       ? "border-b border-black font-semibold"
                       : "text-gray-500"
-                  }`}
+                    }`}
                 >
                   Create Account
                 </button>
@@ -798,11 +822,10 @@ export default function AuthModal({
                               fullName: "",
                             }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
-                          registerErrors.fullName
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.fullName
                             ? "border-red-400"
                             : "border-[#E5E5E5]"
-                        }`}
+                          }`}
                       />
                       <FieldError msg={registerErrors.fullName} />
                     </div>
@@ -823,11 +846,10 @@ export default function AuthModal({
                           if (registerErrors.email)
                             setRegisterErrors((p) => ({ ...p, email: "" }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${
-                          registerErrors.email
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.email
                             ? "border-red-400"
                             : "border-[#E5E5E5]"
-                        }`}
+                          }`}
                       />
                       <FieldError msg={registerErrors.email} />
                     </div>
@@ -852,11 +874,10 @@ export default function AuthModal({
                                 password: "",
                               }));
                           }}
-                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${
-                            registerErrors.password
+                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${registerErrors.password
                               ? "border-red-400"
                               : "border-[#E5E5E5]"
-                          }`}
+                            }`}
                         />
                         <button
                           type="button"
@@ -881,13 +902,12 @@ export default function AuthModal({
                             />
                           </div>
                           <p
-                            className={`text-xs font-medium pl-1 ${
-                              passwordStrength.label === "Weak"
+                            className={`text-xs font-medium pl-1 ${passwordStrength.label === "Weak"
                                 ? "text-red-500"
                                 : passwordStrength.label === "Fair"
-                                ? "text-yellow-500"
-                                : "text-green-600"
-                            }`}
+                                  ? "text-yellow-500"
+                                  : "text-green-600"
+                              }`}
                           >
                             {passwordStrength.label} password
                           </p>

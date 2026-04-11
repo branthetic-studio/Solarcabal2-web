@@ -1,10 +1,12 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isPublicRoute = createRouteMatcher(["/", "/sso-callback(.*)"]);
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/sso-callback(.*)",
+  "/api/graphql",
+]);
 
-export default clerkMiddleware((auth, request) => {
-  // No protection needed — all routes are public by default
-});
+export default clerkMiddleware((auth, request) => {});
 
 export const config = {
   matcher: [
