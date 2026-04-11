@@ -122,18 +122,29 @@ const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   // ---------------- REFRESH USER ----------------
   const refetchUser = useCallback(async () => {
-    const r1 = await refetch();
-    if (r1.data?.activeCustomer) return;
+    const result = await apollo.query<GetCurrentUserData>({
+      query: GET_CURRENT_USER,
+      fetchPolicy: "network-only",
+    });
+
+    if (result.data?.activeCustomer) return;
 
     await new Promise((r) => setTimeout(r, 500));
+    const r2 = await apollo.query<GetCurrentUserData>({
+      query: GET_CURRENT_USER,
+      fetchPolicy: "network-only",
+    });
 
-    const r2 = await refetch();
     if (r2.data?.activeCustomer) return;
 
     await new Promise((r) => setTimeout(r, 1000));
+    await apollo.query<GetCurrentUserData>({
+      query: GET_CURRENT_USER,
+      fetchPolicy: "network-only",
+    });
 
     await refetch();
-  }, [refetch]);
+  }, [apollo, refetch]);
 
   const retryGoogleLogin = async () => { };
 

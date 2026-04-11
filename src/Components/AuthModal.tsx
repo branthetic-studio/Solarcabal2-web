@@ -412,14 +412,22 @@ export default function AuthModal({
         sessionStorage.removeItem("pendingReferralCode");
       }
 
-      // If already signed into Clerk, skip OAuth and go straight to Vendure auth
       const existingToken = await getToken();
+
       if (existingToken) {
-        await authenticateWithVendure(trimmedReferCode || undefined);
-        toast.success("Signed in!");
-        onOpenChange?.(false);
-        setGoogleLoading(false);
-        return;
+        // Already signed into Clerk — try Vendure auth directly
+        try {
+          await authenticateWithVendure(trimmedReferCode || undefined);
+          toast.success("Signed in!");
+          onOpenChange?.(false);
+          setGoogleLoading(false);
+          return;
+        } catch {
+          // Vendure auth failed with existing token — sign out of Clerk
+          // and do a fresh Google OAuth flow
+          await clerk.signOut();
+          await new Promise((r) => setTimeout(r, 300));
+        }
       }
 
       if (!signIn || !signInLoaded) throw new Error("Auth not ready.");
@@ -429,12 +437,11 @@ export default function AuthModal({
         : process.env.NEXT_PUBLIC_APP_URL!;
 
       const referral = registerForm.referCode?.trim();
-      const callbackUrl = `${baseUrl}/sso-callback${referral ? `?ref=${referral}` : ""}`;
 
       await signIn.authenticateWithRedirect({
         strategy: "oauth_google",
-        redirectUrl: callbackUrl,
-        redirectUrlComplete: callbackUrl,
+        redirectUrl: `${baseUrl}/sso-callback${referral ? `?ref=${referral}` : ""}`,
+        redirectUrlComplete: `${baseUrl}/`,
       });
     } catch (err: any) {
       console.error("🌐 ❌ GOOGLE ERROR:", err);
@@ -692,8 +699,8 @@ export default function AuthModal({
                 <button
                   onClick={() => setActiveTab("login")}
                   className={`flex-1 py-2 text-center ${activeTab === "login"
-                      ? "border-b border-[#3C3C3C] font-semibold"
-                      : "text-gray-500"
+                    ? "border-b border-[#3C3C3C] font-semibold"
+                    : "text-gray-500"
                     }`}
                 >
                   Log in
@@ -701,8 +708,8 @@ export default function AuthModal({
                 <button
                   onClick={() => setActiveTab("register")}
                   className={`flex-1 py-2 text-center ${activeTab === "register"
-                      ? "border-b border-black font-semibold"
-                      : "text-gray-500"
+                    ? "border-b border-black font-semibold"
+                    : "text-gray-500"
                     }`}
                 >
                   Create Account
@@ -823,8 +830,8 @@ export default function AuthModal({
                             }));
                         }}
                         className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.fullName
-                            ? "border-red-400"
-                            : "border-[#E5E5E5]"
+                          ? "border-red-400"
+                          : "border-[#E5E5E5]"
                           }`}
                       />
                       <FieldError msg={registerErrors.fullName} />
@@ -847,8 +854,8 @@ export default function AuthModal({
                             setRegisterErrors((p) => ({ ...p, email: "" }));
                         }}
                         className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.email
-                            ? "border-red-400"
-                            : "border-[#E5E5E5]"
+                          ? "border-red-400"
+                          : "border-[#E5E5E5]"
                           }`}
                       />
                       <FieldError msg={registerErrors.email} />
@@ -875,8 +882,8 @@ export default function AuthModal({
                               }));
                           }}
                           className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${registerErrors.password
-                              ? "border-red-400"
-                              : "border-[#E5E5E5]"
+                            ? "border-red-400"
+                            : "border-[#E5E5E5]"
                             }`}
                         />
                         <button
@@ -903,10 +910,10 @@ export default function AuthModal({
                           </div>
                           <p
                             className={`text-xs font-medium pl-1 ${passwordStrength.label === "Weak"
-                                ? "text-red-500"
-                                : passwordStrength.label === "Fair"
-                                  ? "text-yellow-500"
-                                  : "text-green-600"
+                              ? "text-red-500"
+                              : passwordStrength.label === "Fair"
+                                ? "text-yellow-500"
+                                : "text-green-600"
                               }`}
                           >
                             {passwordStrength.label} password
