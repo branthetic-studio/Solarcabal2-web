@@ -6,44 +6,39 @@ import React, {
   useMemo,
   useState,
   useCallback,
+  useEffect,
+  useRef,
 } from "react";
 
-import {
-  useMutation,
-  useQuery,
-  useApolloClient,
-} from "@apollo/client/react";
-
-import {
-  GET_CURRENT_USER,
-  LOGIN,
-  LOGOUT,
-} from "@/graphql/queries";
-
+import { useMutation, useApolloClient } from "@apollo/client/react";
+import { GET_CURRENT_USER, LOGIN, LOGOUT } from "@/graphql/queries";
 import type {
   GetCurrentUserData,
   LoginData,
   LoginVars,
 } from "@/graphql/auth.types.manual";
-
 import { useClerk } from "@clerk/nextjs";
+
+type Customer = GetCurrentUserData["activeCustomer"];
 
 type UserCtx = {
   loading: boolean;
-  customer: GetCurrentUserData["activeCustomer"] | null | undefined;
+  customer: Customer | null | undefined;
   login: (u: string, p: string, remember?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refetchUser: () => Promise<void>;
+  setCustomerFromSSO: () => Promise<void>;
   retryGoogleLogin: () => Promise<void>;
 };
 
 const Ctx = createContext<UserCtx>({
   loading: false,
   customer: undefined,
-  login: async () => { },
-  logout: async () => { },
-  refetchUser: async () => { },
-  retryGoogleLogin: async () => { },
+  login: async () => {},
+  logout: async () => {},
+  refetchUser: async () => {},
+  setCustomerFromSSO: async () => {},
+  retryGoogleLogin: async () => {},
 });
 
 export const useUser = () => useContext(Ctx);
@@ -53,111 +48,100 @@ const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const clerk = useClerk();
 
   const [isActing, setIsActing] = useState(false);
+  const [customer, setCustomer] = useState<Customer | null | undefined>(undefined);
+  const initialFetchDone = useRef(false);
 
-  const { data, loading, refetch } = useQuery<GetCurrentUserData>(
-    GET_CURRENT_USER,
-    {
-      fetchPolicy: "cache-and-network",
-      notifyOnNetworkStatusChange: true,
-    }
-  );
+  // ─── Initial fetch on mount (once) ───────────────────────────────────────
+  useEffect(() => {
+    if (initialFetchDone.current) return;
+    initialFetchDone.current = true;
+
+    apollo
+      .query<GetCurrentUserData>({
+        query: GET_CURRENT_USER,
+        fetchPolicy: "network-only",
+      })
+      .then((result) => {
+        setCustomer(result.data?.activeCustomer ?? null);
+      })
+      .catch(() => setCustomer(null));
+  }, [apollo]);
 
   const [loginMut] = useMutation<LoginData, LoginVars>(LOGIN);
-
   const [logoutMut] = useMutation(LOGOUT);
 
-  // ---------------- LOGIN ----------------
-  const login = async (
-    username: string,
-    password: string,
-    rememberMe = true
-  ) => {
+  // ─── LOGIN ────────────────────────────────────────────────────────────────
+  const login = async (username: string, password: string, rememberMe = true) => {
     setIsActing(true);
-
     try {
       const res = await loginMut({
         variables: { username, password, rememberMe },
-        context: { fetchOptions: { credentials: "include" } },
       });
-
       const payload: any = res.data?.login;
-
-      if (payload?.errorCode) {
-        throw new Error(payload.message ?? "Login failed");
-      }
-
-      // 🔥 IMPORTANT: refresh everything after login
-      await refetch();
-      await apollo.resetStore();
+      if (payload?.errorCode) throw new Error(payload.message ?? "Login failed");
+      await refetchUser();
     } finally {
       setIsActing(false);
     }
   };
 
-  // ---------------- LOGOUT ----------------
+  // ─── LOGOUT ───────────────────────────────────────────────────────────────
   const logout = async () => {
     setIsActing(true);
-
     try {
-      // 1. Vendure logout
-      await logoutMut({
-        context: { fetchOptions: { credentials: "include" } },
-      });
-
-      // 2. Sign out of Clerk first — before clearing Apollo
+      await logoutMut();
       await clerk.signOut();
-
-      // 3. Clear Apollo cache (don't resetStore — it re-runs queries immediately)
       await apollo.clearStore();
-
-      // 4. Small delay to let Clerk session fully clear
-      await new Promise((r) => setTimeout(r, 300));
-
-      // 5. Refetch to confirm null user
-      await refetch();
+      setCustomer(null);
     } finally {
       setIsActing(false);
     }
   };
 
-  // ---------------- REFRESH USER ----------------
+  // ─── REFETCH USER ─────────────────────────────────────────────────────────
   const refetchUser = useCallback(async () => {
     const result = await apollo.query<GetCurrentUserData>({
       query: GET_CURRENT_USER,
       fetchPolicy: "network-only",
     });
+    const newCustomer = result.data?.activeCustomer ?? null;
+    setCustomer(newCustomer);
+    apollo.writeQuery({ query: GET_CURRENT_USER, data: result.data });
+  }, [apollo]);
 
-    if (result.data?.activeCustomer) return;
+  // ─── CALLED AFTER SSO (cookie is guaranteed set before this runs) ─────────
+  // Retries up to 5x with 400ms gaps in case the cookie needs a moment
+  const setCustomerFromSSO = useCallback(async () => {
+    for (let i = 0; i < 5; i++) {
+      const result = await apollo.query<GetCurrentUserData>({
+        query: GET_CURRENT_USER,
+        fetchPolicy: "network-only",
+      });
+      const found = result.data?.activeCustomer ?? null;
+      if (found) {
+        setCustomer(found);
+        apollo.writeQuery({ query: GET_CURRENT_USER, data: result.data });
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    // Fallback: set null so UI doesn't stay in loading limbo
+    setCustomer(null);
+  }, [apollo]);
 
-    await new Promise((r) => setTimeout(r, 500));
-    const r2 = await apollo.query<GetCurrentUserData>({
-      query: GET_CURRENT_USER,
-      fetchPolicy: "network-only",
-    });
-
-    if (r2.data?.activeCustomer) return;
-
-    await new Promise((r) => setTimeout(r, 1000));
-    await apollo.query<GetCurrentUserData>({
-      query: GET_CURRENT_USER,
-      fetchPolicy: "network-only",
-    });
-
-    await refetch();
-  }, [apollo, refetch]);
-
-  const retryGoogleLogin = async () => { };
+  const retryGoogleLogin = async () => {};
 
   const value = useMemo(
     () => ({
-      loading: loading || isActing,
-      customer: data?.activeCustomer,
+      loading: isActing,
+      customer,
       login,
       logout,
       refetchUser,
+      setCustomerFromSSO,
       retryGoogleLogin,
     }),
-    [loading, isActing, data, refetchUser]
+    [isActing, customer, refetchUser, setCustomerFromSSO]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

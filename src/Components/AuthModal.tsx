@@ -64,7 +64,7 @@ export default function AuthModal({
   const { signIn, isLoaded: signInLoaded } = useSignIn() as any;
   const { signUp, isLoaded: signUpLoaded } = useSignUp() as any;
   const clerk = useClerk() as any;
-  const { getToken } = useAuth() as any;
+  const { getToken, isSignedIn } = useAuth() as any;
 
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -104,51 +104,26 @@ export default function AuthModal({
 
   // ─── Core: Clerk JWT → Vendure session ──────────────────────────────────
   const authenticateWithVendure = async (referralCode?: string) => {
-    try {
-      console.log("🔐 [1] Getting Clerk token...");
-      const token = await getToken();
-      console.log(
-        "🔐 [2] Token:",
-        token ? `✅ Got token (${String(token).slice(0, 20)}...)` : "❌ NULL"
-      );
+    const token = await getToken();
+    if (!token) throw new Error("No Clerk token available");
 
-      if (!token) throw new Error("No Clerk token available");
+    const response = await authenticate({
+      variables: {
+        token,
+        ...(referralCode && referralCode.trim().length >= 3
+          ? { referralCode: referralCode.trim() }
+          : {}),
+      },
+    });
 
-      console.log("🔐 [3] Calling authenticate mutation...", { referralCode });
-
-      const response = await authenticate({
-        variables: {
-          token,
-          ...(referralCode && referralCode.trim().length >= 3
-            ? { referralCode: referralCode.trim() }
-            : {}),
-        },
-      });
-
-      console.log("🔐 [4] Full response:", JSON.stringify(response, null, 2));
-      console.log("🔐 [4b] data:", JSON.stringify(response.data, null, 2));
-
-      const result = response.data?.authenticate;
-      console.log("🔐 [5] Result typename:", result?.__typename);
-
-      if (!result) throw new Error("No response from server");
-
-      if (result.__typename === "ErrorResult") {
-        console.error("🔐 [6] ❌ ErrorResult:", result);
-        throw new Error(result.message || "Authentication failed");
-      }
-
-      console.log("🔐 [6] ✅ Auth success, refetching user...");
-      await refetchUser();
-      console.log("🔐 [7] ✅ User refetched");
-      await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
-      console.log("🔐 [8] ✅ All done");
-    } catch (err: any) {
-      console.error("🔐 ❌ FULL ERROR:", err);
-      console.error("🔐 ❌ message:", err?.message);
-      console.error("🔐 ❌ stack:", err?.stack);
-      throw err;
+    const result = response.data?.authenticate;
+    if (!result) throw new Error("No response from server");
+    if (result.__typename === "ErrorResult") {
+      throw new Error(result.message || "Authentication failed");
     }
+
+    await refetchUser();
+    await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
   };
 
   // ─── Validation ─────────────────────────────────────────────────────────
@@ -184,12 +159,8 @@ export default function AuthModal({
     setLoginSubmitting(true);
 
     try {
-      console.log("🔑 [1] handleLogin called");
-
-      // If already signed into Clerk, just authenticate with Vendure directly
       const existingToken = await getToken();
       if (existingToken) {
-        console.log("🔑 [2] Already signed into Clerk, authenticating with Vendure...");
         await authenticateWithVendure();
         toast.success("Welcome back!");
         onOpenChange?.(false);
@@ -198,23 +169,18 @@ export default function AuthModal({
 
       if (!signIn || !signInLoaded) throw new Error("Auth not ready. Please wait.");
 
-      console.log("🔑 [3] Calling signIn.create...");
       const result = await signIn.create({
         identifier: loginForm.email.trim(),
         password: loginForm.password,
       });
 
-      console.log("🔑 [4] signIn.create result status:", result.status);
-
       if (result.status === "complete") {
-        console.log("🔑 [5] Setting active session...");
         try {
           await clerk.setActive({ session: result.createdSessionId });
         } catch (e: any) {
           if (!e?.message?.includes("plain objects")) throw e;
         }
         await new Promise((r) => setTimeout(r, 300));
-        console.log("🔑 [6] Authenticating with Vendure...");
         await authenticateWithVendure();
         toast.success("Welcome back!");
         onOpenChange?.(false);
@@ -223,7 +189,6 @@ export default function AuthModal({
 
       throw new Error("Login could not be completed. Please try again.");
     } catch (err: any) {
-      console.error("🔑 ❌ LOGIN ERROR:", err);
       const msg =
         err?.errors?.[0]?.longMessage ??
         err?.errors?.[0]?.message ??
@@ -244,13 +209,7 @@ export default function AuthModal({
   // ─── REGISTER ────────────────────────────────────────────────────────────
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("📝 [1] handleRegister called");
-
-    if (!validateRegisterForm()) {
-      console.log("📝 [2] ❌ Validation failed:", registerErrors);
-      return;
-    }
-    console.log("📝 [3] ✅ Validation passed");
+    if (!validateRegisterForm()) return;
 
     setRegisterLoading(true);
 
@@ -259,14 +218,7 @@ export default function AuthModal({
     const lastName = nameParts.slice(1).join(" ");
 
     try {
-      console.log("📝 [4] signUp exists?", !!signUp, "loaded?", signUpLoaded);
       if (!signUp || !signUpLoaded) throw new Error("Auth not ready. Please wait.");
-
-      console.log("📝 [5] Calling signUp.create with:", {
-        emailAddress: registerForm.email.trim(),
-        firstName,
-        lastName,
-      });
 
       const result = await signUp.create({
         emailAddress: registerForm.email.trim(),
@@ -275,11 +227,7 @@ export default function AuthModal({
         lastName,
       });
 
-      console.log("📝 [6] signUp.create result:", JSON.stringify(result, null, 2));
-      console.log("📝 [7] status:", result.status);
-
       if (result.status === "missing_requirements") {
-        console.log("📝 [8] Preparing email verification...");
         await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
         setVerifyStep(true);
         toast.info("Check your email for a 6-digit verification code.");
@@ -287,10 +235,8 @@ export default function AuthModal({
       }
 
       if (result.status === "complete") {
-        console.log("📝 [8] Setting active session...");
         await clerk.setActive({ session: result.createdSessionId });
         await new Promise((r) => setTimeout(r, 300));
-        console.log("📝 [9] Authenticating with Vendure...");
         await authenticateWithVendure(registerForm.referCode.trim() || undefined);
         toast.success("Account created! Welcome 🎉", { duration: 5000 });
         onOpenChange?.(false);
@@ -299,10 +245,6 @@ export default function AuthModal({
 
       throw new Error("Registration incomplete. Please try again.");
     } catch (err: any) {
-      console.error("📝 ❌ REGISTER ERROR:", err);
-      console.error("📝 ❌ message:", err?.message);
-      console.error("📝 ❌ clerk errors:", JSON.stringify(err?.errors, null, 2));
-
       const message =
         err?.errors?.[0]?.longMessage ??
         err?.errors?.[0]?.message ??
@@ -334,28 +276,22 @@ export default function AuthModal({
     setOtpError(null);
 
     try {
-      console.log("✉️ [1] handleVerify called, code:", otpCode);
       if (!signUp || !signUpLoaded) throw new Error("Auth not ready.");
 
       const result = await signUp.attemptEmailAddressVerification({
         code: otpCode,
       });
 
-      console.log("✉️ [2] verify result status:", result.status);
-
       if (result.status !== "complete") {
         throw new Error("Verification incomplete. Please try again.");
       }
 
-      console.log("✉️ [3] Setting active session...");
       await clerk.setActive({ session: result.createdSessionId });
       await new Promise((r) => setTimeout(r, 300));
-      console.log("✉️ [4] Authenticating with Vendure...");
       await authenticateWithVendure(registerForm.referCode.trim() || undefined);
       toast.success("Account created! Welcome 🎉", { duration: 5000 });
       onOpenChange?.(false);
     } catch (err: any) {
-      console.error("✉️ ❌ VERIFY ERROR:", err);
       setOtpError(
         err?.errors?.[0]?.longMessage ??
         err?.errors?.[0]?.message ??
@@ -403,8 +339,19 @@ export default function AuthModal({
 
   // ─── GOOGLE SSO ───────────────────────────────────────────────────────────
   const handleGoogleSignIn = async () => {
+    if (googleLoading) return;
     setGoogleLoading(true);
+
     try {
+      if (isSignedIn) {
+        toast.success("You're already signed in!");
+        onOpenChange?.(false);
+        return;
+      }
+
+      if (!signIn || !signInLoaded) throw new Error("Auth not ready.");
+
+      // ✅ Capture referral code from whichever tab is active
       const trimmedReferCode = registerForm.referCode?.trim();
       if (trimmedReferCode) {
         sessionStorage.setItem("pendingReferralCode", trimmedReferCode);
@@ -412,42 +359,22 @@ export default function AuthModal({
         sessionStorage.removeItem("pendingReferralCode");
       }
 
-      const existingToken = await getToken();
-
-      if (existingToken) {
-        // Already signed into Clerk — try Vendure auth directly
-        try {
-          await authenticateWithVendure(trimmedReferCode || undefined);
-          toast.success("Signed in!");
-          onOpenChange?.(false);
-          setGoogleLoading(false);
-          return;
-        } catch {
-          // Vendure auth failed with existing token — sign out of Clerk
-          // and do a fresh Google OAuth flow
-          await clerk.signOut();
-          await new Promise((r) => setTimeout(r, 300));
-        }
-      }
-
-      if (!signIn || !signInLoaded) throw new Error("Auth not ready.");
-
-      const baseUrl = typeof window !== "undefined"
-        ? window.location.origin
-        : process.env.NEXT_PUBLIC_APP_URL!;
-
-      const referral = registerForm.referCode?.trim();
+      const baseUrl = window.location.origin; // http://localhost:3000
 
       await signIn.authenticateWithRedirect({
         strategy: "oauth_google",
-        redirectUrl: `${baseUrl}/sso-callback${referral ? `?ref=${referral}` : ""}`,
+        redirectUrl: `${baseUrl}/sso-callback`,
         redirectUrlComplete: `${baseUrl}/`,
       });
+
+      // browser leaves here — no code below runs
     } catch (err: any) {
-      console.error("🌐 ❌ GOOGLE ERROR:", err);
-      toast.error(
-        err?.errors?.[0]?.message ?? err?.message ?? "Google sign-in failed."
-      );
+      if (err?.message?.includes("already signed in")) {
+        toast.success("You're already signed in!");
+        onOpenChange?.(false);
+        return;
+      }
+      toast.error(err?.message ?? "Google sign-in failed.");
       setGoogleLoading(false);
     }
   };
@@ -542,12 +469,9 @@ export default function AuthModal({
                     <span className="font-semibold text-neutral-800">
                       {forgotEmail}
                     </span>
-                    , we've sent a password reset link. Check your spam folder
-                    too.
+                    , we've sent a password reset link. Check your spam folder too.
                   </p>
-                  <p className="text-xs text-gray-400">
-                    The link expires in 1 hour.
-                  </p>
+                  <p className="text-xs text-gray-400">The link expires in 1 hour.</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -563,17 +487,12 @@ export default function AuthModal({
               ) : (
                 <>
                   <div className="flex flex-col items-center gap-2 text-center">
-                    <h2 className="font-semibold text-lg">
-                      Reset your password
-                    </h2>
+                    <h2 className="font-semibold text-lg">Reset your password</h2>
                     <p className="text-sm text-gray-500">
                       Enter your email and we'll send you a reset link.
                     </p>
                   </div>
-                  <form
-                    onSubmit={handleForgotPassword}
-                    className="flex flex-col gap-4"
-                  >
+                  <form onSubmit={handleForgotPassword} className="flex flex-col gap-4">
                     <input
                       type="email"
                       placeholder="Enter your email"
@@ -592,10 +511,7 @@ export default function AuthModal({
                   </form>
                   <button
                     type="button"
-                    onClick={() => {
-                      setForgotStep(false);
-                      setForgotEmail("");
-                    }}
+                    onClick={() => { setForgotStep(false); setForgotEmail(""); }}
                     className="flex items-center justify-center gap-1 text-sm text-gray-400 hover:text-gray-600"
                   >
                     <ArrowLeft className="h-4 w-4" /> Back to login
@@ -614,9 +530,7 @@ export default function AuthModal({
                   <h2 className="font-semibold text-[#1C1C1C] text-lg">
                     Check your email
                   </h2>
-                  <p className="text-gray-500 text-sm mt-1">
-                    We sent a 6-digit code to
-                  </p>
+                  <p className="text-gray-500 text-sm mt-1">We sent a 6-digit code to</p>
                   <p className="font-semibold text-sm text-[#1C1C1C] mt-0.5">
                     {registerForm.email}
                   </p>
@@ -636,18 +550,14 @@ export default function AuthModal({
                     value={otpCode}
                     autoFocus
                     onChange={(e) => {
-                      setOtpCode(
-                        e.target.value.replace(/\D/g, "").slice(0, 6)
-                      );
+                      setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6));
                       if (otpError) setOtpError(null);
                     }}
                     className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-3 text-center text-xl font-bold tracking-[0.4em] focus:outline-none ${otpError ? "border-red-400" : "border-[#E5E5E5]"
                       }`}
                   />
                   {otpError && (
-                    <p className="text-red-500 text-xs mt-1 text-center">
-                      {otpError}
-                    </p>
+                    <p className="text-red-500 text-xs mt-1 text-center">{otpError}</p>
                   )}
                 </div>
 
@@ -681,11 +591,7 @@ export default function AuthModal({
                 </p>
                 <button
                   type="button"
-                  onClick={() => {
-                    setVerifyStep(false);
-                    setOtpCode("");
-                    setOtpError(null);
-                  }}
+                  onClick={() => { setVerifyStep(false); setOtpCode(""); setOtpError(null); }}
                   className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
                 >
                   <ArrowLeft className="h-3 w-3" /> Back to registration
@@ -699,8 +605,8 @@ export default function AuthModal({
                 <button
                   onClick={() => setActiveTab("login")}
                   className={`flex-1 py-2 text-center ${activeTab === "login"
-                    ? "border-b border-[#3C3C3C] font-semibold"
-                    : "text-gray-500"
+                      ? "border-b border-[#3C3C3C] font-semibold"
+                      : "text-gray-500"
                     }`}
                 >
                   Log in
@@ -708,8 +614,8 @@ export default function AuthModal({
                 <button
                   onClick={() => setActiveTab("register")}
                   className={`flex-1 py-2 text-center ${activeTab === "register"
-                    ? "border-b border-black font-semibold"
-                    : "text-gray-500"
+                      ? "border-b border-black font-semibold"
+                      : "text-gray-500"
                     }`}
                 >
                   Create Account
@@ -738,19 +644,14 @@ export default function AuthModal({
                         placeholder="Password"
                         value={loginForm.password}
                         onChange={(e) =>
-                          setLoginForm({
-                            ...loginForm,
-                            password: e.target.value,
-                          })
+                          setLoginForm({ ...loginForm, password: e.target.value })
                         }
                         className="w-full rounded-full border px-4 py-3 pr-10 focus:outline-none focus:border-red-400"
                         required
                       />
                       <button
                         type="button"
-                        onClick={() =>
-                          setShowLoginPassword(!showLoginPassword)
-                        }
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
                         className="absolute right-3 top-3 text-gray-500"
                       >
                         {showLoginPassword ? (
@@ -782,9 +683,7 @@ export default function AuthModal({
                       )}
                     </button>
                     {loginErr && (
-                      <p className="text-red-500 text-sm text-center">
-                        {loginErr}
-                      </p>
+                      <p className="text-red-500 text-sm text-center">{loginErr}</p>
                     )}
                   </form>
                   <p className="text-center text-sm">
@@ -805,11 +704,7 @@ export default function AuthModal({
                 <div className="flex flex-col gap-3">
                   {GoogleButton}
                   {Divider}
-                  <form
-                    onSubmit={handleRegister}
-                    className="flex flex-col gap-3"
-                    noValidate
-                  >
+                  <form onSubmit={handleRegister} className="flex flex-col gap-3" noValidate>
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-semibold text-[#1C1C1C]">
                         Full Name
@@ -819,78 +714,51 @@ export default function AuthModal({
                         placeholder="e.g. John Doe"
                         value={registerForm.fullName}
                         onChange={(e) => {
-                          setRegisterForm({
-                            ...registerForm,
-                            fullName: e.target.value,
-                          });
+                          setRegisterForm({ ...registerForm, fullName: e.target.value });
                           if (registerErrors.fullName)
-                            setRegisterErrors((p) => ({
-                              ...p,
-                              fullName: "",
-                            }));
+                            setRegisterErrors((p) => ({ ...p, fullName: "" }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.fullName
-                          ? "border-red-400"
-                          : "border-[#E5E5E5]"
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.fullName ? "border-red-400" : "border-[#E5E5E5]"
                           }`}
                       />
                       <FieldError msg={registerErrors.fullName} />
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-semibold text-[#1C1C1C]">
-                        Email
-                      </label>
+                      <label className="text-xs font-semibold text-[#1C1C1C]">Email</label>
                       <input
                         type="email"
                         placeholder="name@example.com"
                         value={registerForm.email}
                         onChange={(e) => {
-                          setRegisterForm({
-                            ...registerForm,
-                            email: e.target.value,
-                          });
+                          setRegisterForm({ ...registerForm, email: e.target.value });
                           if (registerErrors.email)
                             setRegisterErrors((p) => ({ ...p, email: "" }));
                         }}
-                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.email
-                          ? "border-red-400"
-                          : "border-[#E5E5E5]"
+                        className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none ${registerErrors.email ? "border-red-400" : "border-[#E5E5E5]"
                           }`}
                       />
                       <FieldError msg={registerErrors.email} />
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-semibold text-[#1C1C1C]">
-                        Password
-                      </label>
+                      <label className="text-xs font-semibold text-[#1C1C1C]">Password</label>
                       <div className="relative">
                         <input
                           type={showRegisterPassword ? "text" : "password"}
                           placeholder="Min 8 chars, upper, lower, number, symbol"
                           value={registerForm.password}
                           onChange={(e) => {
-                            setRegisterForm({
-                              ...registerForm,
-                              password: e.target.value,
-                            });
+                            setRegisterForm({ ...registerForm, password: e.target.value });
                             if (registerErrors.password)
-                              setRegisterErrors((p) => ({
-                                ...p,
-                                password: "",
-                              }));
+                              setRegisterErrors((p) => ({ ...p, password: "" }));
                           }}
-                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${registerErrors.password
-                            ? "border-red-400"
-                            : "border-[#E5E5E5]"
+                          className={`w-full rounded-full border bg-[#FAFAFA] px-4 py-2 text-xs font-semibold pr-10 focus:outline-none ${registerErrors.password ? "border-red-400" : "border-[#E5E5E5]"
                             }`}
                         />
                         <button
                           type="button"
-                          onClick={() =>
-                            setShowRegisterPassword(!showRegisterPassword)
-                          }
+                          onClick={() => setShowRegisterPassword(!showRegisterPassword)}
                           className="absolute right-3 top-2 text-gray-500"
                         >
                           {showRegisterPassword ? (
@@ -910,10 +778,10 @@ export default function AuthModal({
                           </div>
                           <p
                             className={`text-xs font-medium pl-1 ${passwordStrength.label === "Weak"
-                              ? "text-red-500"
-                              : passwordStrength.label === "Fair"
-                                ? "text-yellow-500"
-                                : "text-green-600"
+                                ? "text-red-500"
+                                : passwordStrength.label === "Fair"
+                                  ? "text-yellow-500"
+                                  : "text-green-600"
                               }`}
                           >
                             {passwordStrength.label} password
@@ -923,7 +791,7 @@ export default function AuthModal({
                       <FieldError msg={registerErrors.password} />
                     </div>
 
-                    {/* Referral code — also used for Google sign-in */}
+                    {/* ✅ Referral code — shared between email and Google signup */}
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-semibold text-[#1C1C1C]">
                         Referral Code (Optional)
@@ -933,10 +801,7 @@ export default function AuthModal({
                         placeholder="Enter Referral Code"
                         value={registerForm.referCode}
                         onChange={(e) =>
-                          setRegisterForm({
-                            ...registerForm,
-                            referCode: e.target.value,
-                          })
+                          setRegisterForm({ ...registerForm, referCode: e.target.value })
                         }
                         className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
                       />
@@ -948,10 +813,7 @@ export default function AuthModal({
                           type="checkbox"
                           checked={registerForm.agree}
                           onChange={(e) => {
-                            setRegisterForm({
-                              ...registerForm,
-                              agree: e.target.checked,
-                            });
+                            setRegisterForm({ ...registerForm, agree: e.target.checked });
                             if (registerErrors.agree)
                               setRegisterErrors((p) => ({ ...p, agree: "" }));
                           }}
@@ -1003,7 +865,6 @@ export default function AuthModal({
               )}
             </>
           )}
-
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

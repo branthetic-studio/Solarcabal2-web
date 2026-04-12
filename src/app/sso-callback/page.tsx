@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { AuthenticateWithRedirectCallback, useAuth } from "@clerk/nextjs";
 import { useApolloClient, useMutation } from "@apollo/client/react";
 import { GET_ACTIVE_ORDER, CLERK_AUTHENTICATE } from "@/graphql/queries";
@@ -10,8 +9,8 @@ import { toast } from "sonner";
 
 type AuthenticateResult = {
   authenticate:
-    | { __typename: "CurrentUser"; id: string; identifier: string }
-    | { __typename: "ErrorResult"; errorCode: string; message: string };
+    | { __typename: "CurrentUser"; id: string }
+    | { __typename: "ErrorResult"; message: string };
 };
 
 type AuthenticateVars = {
@@ -21,25 +20,30 @@ type AuthenticateVars = {
 
 function PostAuthHandler() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
-  const { refetchUser } = useUser();
+  const { setCustomerFromSSO } = useUser(); // ✅ correct — no "user" in this context
   const apollo = useApolloClient();
-  const router = useRouter();
-  const [authenticate] = useMutation<AuthenticateResult, AuthenticateVars>(CLERK_AUTHENTICATE);
-  const hasRunRef = useRef(false);
+  const hasRun = useRef(false);
+
+  const [authenticate] = useMutation<AuthenticateResult, AuthenticateVars>(
+    CLERK_AUTHENTICATE
+  );
+
+  const getTokenSafe = async (): Promise<string> => {
+    for (let i = 0; i < 15; i++) {
+      const token = await getToken({ skipCache: true });
+      if (token) return token;
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    throw new Error("Unable to get Clerk token after retries");
+  };
 
   useEffect(() => {
-    // Wait until Clerk is fully loaded AND user is signed in
-    if (!isLoaded || !isSignedIn || hasRunRef.current) return;
-    hasRunRef.current = true;
+    if (!isLoaded || !isSignedIn || hasRun.current) return;
+    hasRun.current = true;
 
     const run = async () => {
       try {
-        // Give Clerk a moment to fully commit the session
-        await new Promise((r) => setTimeout(r, 800));
-
-        const token = await getToken();
-        console.log("🔵 [1] token:", token ? "✅" : "❌ null");
-        if (!token) throw new Error("No Clerk token available");
+        const token = await getTokenSafe();
 
         const urlParams = new URLSearchParams(window.location.search);
         const referralCode =
@@ -52,46 +56,41 @@ function PostAuthHandler() {
           variables: { token, ...(referralCode ? { referralCode } : {}) },
         });
 
-        console.log("🔵 [2] authenticate result:", JSON.stringify(data, null, 2));
-
         const result = data?.authenticate;
         if (result?.__typename === "ErrorResult") {
           throw new Error(result.message ?? "Authentication failed");
         }
 
-        await refetchUser();
         await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
-        toast.success("Signed in successfully!");
+        await setCustomerFromSSO(); // ✅ this retries up to 5x until customer is set
+
+        window.location.href = "/";
       } catch (err: any) {
-        console.error("🔵 ❌ SSO error:", err);
         toast.error(err?.message ?? "Sign-in failed. Please try again.");
-      } finally {
-        router.replace("/");
+        window.location.href = "/";
       }
     };
 
     run();
-  }, [isLoaded, isSignedIn]); // ← watch both, run when BOTH are true
+  }, [isLoaded, isSignedIn]);
 
   return null;
 }
 
-// Separate wrapper that only mounts PostAuthHandler
-// after AuthenticateWithRedirectCallback signals completion
 export default function SSOCallback() {
-  const [clerkDone, setClerkDone] = useState(false);
-
   return (
     <>
       <AuthenticateWithRedirectCallback
-        signInFallbackRedirectUrl="/"
-        signUpFallbackRedirectUrl="/"
-        // Called when Clerk finishes processing the OAuth callback
-        afterSignInUrl="/sso-callback?clerk_done=1"
-        afterSignUpUrl="/sso-callback?clerk_done=1"
+        signInFallbackRedirectUrl="/sso-callback"
+        signUpFallbackRedirectUrl="/sso-callback"
       />
-      {/* Only mount PostAuthHandler after clerk signals done */}
       <PostAuthHandler />
+      <div className="h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-black border-t-transparent" />
+          <p className="text-sm text-gray-500">Signing you in...</p>
+        </div>
+      </div>
     </>
   );
 }
