@@ -22,10 +22,12 @@ type Order = {
 };
 
 type GetCustomerOrdersResponse = {
-  orders: {
-    totalItems: number;
-    items: Order[];
-  };
+  activeCustomer: {
+    orders: {
+      totalItems: number;
+      items: Order[];
+    };
+  } | null;
 };
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
@@ -77,8 +79,8 @@ export default function OrdersPage() {
     }
   );
 
-  const orders = data?.orders?.items ?? [];
-  const totalItems = data?.orders?.totalItems ?? 0;
+  const orders = data?.activeCustomer?.orders?.items ?? [];
+  const totalItems = data?.activeCustomer?.orders?.totalItems ?? 0;
   const totalPages = Math.ceil(totalItems / pageSize);
 
   /* ── Not logged in ── */
@@ -137,19 +139,19 @@ export default function OrdersPage() {
   }
 
   /* ── Error ── */
- /* ── Error ── */
-if (error && !data) {
-  return (
-    <main className="min-h-screen bg-neutral-50">
-      <Navbar />
-      <div className="mx-auto max-w-3xl px-4 py-10 text-center">
-        <p className="text-red-500 text-sm">Failed to load orders. Please try again later.</p>
-      </div>
-      <Suscribe />
-      <Footer />
-    </main>
-  );
-}
+  /* ── Error ── */
+  if (error && !data) {
+    return (
+      <main className="min-h-screen bg-neutral-50">
+        <Navbar />
+        <div className="mx-auto max-w-3xl px-4 py-10 text-center">
+          <p className="text-red-500 text-sm">Failed to load orders. Please try again later.</p>
+        </div>
+        <Suscribe />
+        <Footer />
+      </main>
+    );
+  }
 
   /* ── Empty state ── */
   if (orders.length === 0) {
@@ -197,7 +199,7 @@ if (error && !data) {
             return (
               <li key={order.id}>
                 <button
-                  onClick={() => router.push(`/orders/${order.code}`)}
+                  // onClick={() => router.push(`/orders/${order.code}`)}
                   className="w-full text-left rounded-2xl border border-neutral-200 bg-white p-5 hover:border-neutral-300 hover:shadow-sm transition-all group"
                 >
                   <div className="flex items-start justify-between gap-4">

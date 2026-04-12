@@ -212,15 +212,17 @@ export const GET_ACTIVE_ORDER = gql`
 
 export const GET_CUSTOMER_ORDERS = gql`
   query GetCustomerOrders($options: OrderListOptions) {
-    orders(options: $options) {
-      totalItems
-      items {
-        id
-        code
-        state
-        totalWithTax
-        currencyCode
-        createdAt
+    activeCustomer {
+      orders(options: $options) {
+        totalItems
+        items {
+          id
+          code
+          state
+          totalWithTax
+          currencyCode
+          createdAt
+        }
       }
     }
   }
