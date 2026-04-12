@@ -21,7 +21,7 @@ type AuthenticateVars = {
 export function VendureAuthSync() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const apollo = useApolloClient();
-  const { user, refetchUser } = useUser();
+  const { customer, refetchUser } = useUser();
   const [authenticate] = useMutation<AuthenticateResult, AuthenticateVars>(
     CLERK_AUTHENTICATE
   );
@@ -36,7 +36,7 @@ export function VendureAuthSync() {
     // User is signed into Clerk but NOT into Vendure yet
     // This is exactly the state after a Google OAuth redirect
     const isClerkSignedIn = isSignedIn;
-    const isVendureSignedIn = !!user?.id; // adjust to your UserContext shape
+    const isVendureSignedIn = !!customer?.id; // adjust to your UserContext shape
 
     if (!isClerkSignedIn || isVendureSignedIn || hasSynced.current) return;
 
@@ -75,7 +75,7 @@ export function VendureAuthSync() {
         await refetchUser();
         await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
 
-        toast.success("Welcome! You're signed in 🎉");
+        toast.success("Welcome! You're signed in");
       } catch (err: any) {
         console.error("[VendureAuthSync] Failed to sync:", err);
         hasSynced.current = false; // allow retry on next render
@@ -83,7 +83,7 @@ export function VendureAuthSync() {
     };
 
     sync();
-  }, [isLoaded, isSignedIn, user?.id]); // re-evaluates when auth state changes
+  }, [isLoaded, isSignedIn, customer?.id]); // re-evaluates when auth state changes
 
   return null;
 }
