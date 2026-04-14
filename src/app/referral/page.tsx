@@ -27,6 +27,17 @@ const MY_REFERRAL_EARNING = gql`
   }
 `;
 
+const GET_MY_REFERRAL_CODE = gql`
+  query GetMyReferralCode {
+    activeCustomer {
+      id
+      customFields {
+        referralCode
+      }
+    }
+  }
+`;
+
 type ReferralEarning = {
   id: string;
   amount: number;
@@ -47,9 +58,20 @@ const ReferralPage = () => {
     MY_REFERRAL_EARNING,
     {
       fetchPolicy: "network-only",
-      skip: !customer, // ✅ don’t query when logged out
+      skip: !customer,
     }
   );
+
+  const { data: referralCodeData, loading: codeLoading } = useQuery(
+    GET_MY_REFERRAL_CODE,
+    {
+      skip: !customer,
+      fetchPolicy: "cache-and-network",
+    }
+  );
+
+  const referralCode = (referralCodeData as any)?.activeCustomer?.customFields
+    ?.referralCode as string | undefined;
 
   const referrals = data?.myReferralEarnings ?? [];
 
@@ -73,22 +95,14 @@ const ReferralPage = () => {
         text: "Active invites",
         num: activeInvites.toString(),
       },
-      // {
-      //   title: "Premium 3 Earning",
-      //   price: `₦${activeInvites * 630}`,
-      //   text: "Active invites",
-      //   num: activeInvites.toString(),
-      // },
     ],
     [totalInvites, activeInvites]
   );
 
   const [copied, setCopied] = useState(false);
 
-  // Replace later with real user referral code if you have it on customer
-  const referralCode = "Solarcabal/jhondea";
-
   const handleCopy = () => {
+    if (!referralCode) return;
     navigator.clipboard.writeText(referralCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -134,29 +148,40 @@ const ReferralPage = () => {
             Share your referral code and earn rewards when your friends order.
           </p>
 
-          {/* ✅ Auth-gated: show code only when logged in */}
-          {customer ? (
-            <div className="w-full max-w-md bg-[#2c2929] rounded-xl flex items-center justify-between px-5 py-4 mt-2">
-              <span className="text-white text-base md:text-lg font-medium">
-                {referralCode}
-              </span>
-
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-2 text-white hover:text-gray-300 transition-colors"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-5 h-5" />
-                    <span className="text-sm font-medium">Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-5 h-5" />
-                    <span className="text-sm font-medium">Copy</span>
-                  </>
-                )}
-              </button>
+          {/* Auth-gated: show code only when logged in */}
+          {authLoading ? null : customer ? (
+            <div className="w-full max-w-md bg-[#2c2929] rounded-xl flex items-center justify-between px-5 py-4 mt-2 min-h-16">
+              {codeLoading ? (
+                <span className="text-white/70 text-sm animate-pulse">
+                  Loading your referral code...
+                </span>
+              ) : referralCode ? (
+                <>
+                  <span className="text-white text-base md:text-lg font-medium break-all">
+                    {referralCode}
+                  </span>
+                  <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-2 text-white hover:text-gray-300 transition-colors ml-4 shrink-0"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-5 h-5" />
+                        <span className="text-sm font-medium">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-5 h-5" />
+                        <span className="text-sm font-medium">Copy</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <span className="text-white/70 text-sm">
+                  No referral code available.
+                </span>
+              )}
             </div>
           ) : (
             <div className="w-full max-w-md bg-[#2c2929] rounded-xl px-5 py-4 mt-2 text-white/90">
@@ -164,7 +189,6 @@ const ReferralPage = () => {
                 Log in to view and copy your referral code, and to see your
                 earnings.
               </p>
-
               <div className="mt-4 flex justify-center">
                 <AuthModal
                   trigger={
@@ -179,7 +203,7 @@ const ReferralPage = () => {
         </div>
       </div>
 
-      {/* ✅ Earnings: only show when logged in */}
+      {/* Earnings: only show when logged in */}
       {customer && (
         <>
           <h3 className="text-center mt-8 py-3">Earnings Overview</h3>
@@ -201,19 +225,28 @@ const ReferralPage = () => {
           </section>
 
           {loading && (
-            <p style={{ textAlign: "center", marginTop: "20px" }} className="my-12 text-xl pt-6 font-semibold">
+            <p
+              style={{ textAlign: "center", marginTop: "20px" }}
+              className="my-12 text-xl pt-6 font-semibold"
+            >
               Loading referral data...
             </p>
           )}
 
           {error && (
-            <p style={{ color: "red", textAlign: "center" }} className="my-12 text-xl pt-6 font-semibold">
+            <p
+              style={{ color: "red", textAlign: "center" }}
+              className="my-12 text-xl pt-6 font-semibold"
+            >
               Failed to load referral data.
             </p>
           )}
 
           {!loading && !error && referrals.length === 0 && (
-            <p style={{ textAlign: "center", marginTop: "20px" }} className="my-12 text-xl pt-6 font-semibold">
+            <p
+              style={{ textAlign: "center", marginTop: "20px" }}
+              className="my-12 text-xl pt-6 font-semibold"
+            >
               No referral earnings yet.
             </p>
           )}
