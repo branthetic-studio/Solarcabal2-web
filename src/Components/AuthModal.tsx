@@ -605,8 +605,8 @@ export default function AuthModal({
                 <button
                   onClick={() => setActiveTab("login")}
                   className={`flex-1 py-2 text-center ${activeTab === "login"
-                      ? "border-b border-[#3C3C3C] font-semibold"
-                      : "text-gray-500"
+                    ? "border-b border-[#3C3C3C] font-semibold"
+                    : "text-gray-500"
                     }`}
                 >
                   Log in
@@ -614,8 +614,8 @@ export default function AuthModal({
                 <button
                   onClick={() => setActiveTab("register")}
                   className={`flex-1 py-2 text-center ${activeTab === "register"
-                      ? "border-b border-black font-semibold"
-                      : "text-gray-500"
+                    ? "border-b border-black font-semibold"
+                    : "text-gray-500"
                     }`}
                 >
                   Create Account
@@ -778,10 +778,10 @@ export default function AuthModal({
                           </div>
                           <p
                             className={`text-xs font-medium pl-1 ${passwordStrength.label === "Weak"
-                                ? "text-red-500"
-                                : passwordStrength.label === "Fair"
-                                  ? "text-yellow-500"
-                                  : "text-green-600"
+                              ? "text-red-500"
+                              : passwordStrength.label === "Fair"
+                                ? "text-yellow-500"
+                                : "text-green-600"
                               }`}
                           >
                             {passwordStrength.label} password
@@ -800,11 +800,17 @@ export default function AuthModal({
                         type="text"
                         placeholder="Enter Referral Code"
                         value={registerForm.referCode}
-                        onChange={(e) =>
-                          setRegisterForm({ ...registerForm, referCode: e.target.value })
-                        }
+                        onChange={(e) => {
+                          // Sanitize: only alphanumeric + hyphens, uppercase, max 20 chars
+                          const sanitized = e.target.value
+                            .replace(/[^a-zA-Z0-9-]/g, "")
+                            .toUpperCase()
+                            .slice(0, 20);
+                          setRegisterForm({ ...registerForm, referCode: sanitized });
+                        }}
                         className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
                       />
+                      {/* No error shown — invalid/empty codes are silently ignored on the backend */}
                     </div>
 
                     <div>
