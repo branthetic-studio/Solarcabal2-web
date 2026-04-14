@@ -478,10 +478,12 @@ export default function AuthModal({
                       setForgotStep(false);
                       setForgotSent(false);
                       setForgotEmail("");
+                      onOpenChange?.(false);
+                      window.location.href = "/reset-password";
                     }}
                     className="flex items-center gap-1 text-sm text-red-600 font-medium mt-2"
                   >
-                    <ArrowLeft className="h-4 w-4" /> Back to login
+                    <ArrowLeft className="h-4 w-4" /> Change Password
                   </button>
                 </div>
               ) : (
