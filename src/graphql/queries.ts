@@ -510,16 +510,19 @@ export const SEARCH_PRODUCTS = gql`
 
 export const MY_REFERRAL_EARNING = gql`
   query MyReferralEarnings {
-    myReferralEarningsDetails {
+    myReferralEarnings {
       id
       amount
       level
-      orderCode
       status
       createdAt
+      order {
+        code
+      }
     }
   }
 `;
+ 
 
 export const REQUEST_PASSWORD_RESET = gql`
   mutation RequestPasswordReset($emailAddress: String!) {

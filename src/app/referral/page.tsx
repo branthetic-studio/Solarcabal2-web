@@ -11,21 +11,7 @@ import { useQuery } from "@apollo/client/react";
 import { Copy, Check } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import AuthModal from "@/Components/AuthModal";
-
-const MY_REFERRAL_EARNING = gql`
-  query MyReferralEarnings {
-    myReferralEarnings {
-      id
-      amount
-      level
-      status
-      createdAt
-      order {
-        code
-      }
-    }
-  }
-`;
+import { MY_REFERRAL_EARNING } from "@/graphql/queries";
 
 const GET_MY_REFERRAL_CODE = gql`
   query GetMyReferralCode {
@@ -58,14 +44,14 @@ const ReferralPage = () => {
     MY_REFERRAL_EARNING,
     {
       fetchPolicy: "network-only",
-      skip: !customer,
+      skip: authLoading || !customer,
     }
   );
 
   const { data: referralCodeData, loading: codeLoading } = useQuery(
     GET_MY_REFERRAL_CODE,
     {
-      skip: !customer,
+      skip: authLoading || !customer,
       fetchPolicy: "cache-and-network",
     }
   );
@@ -76,8 +62,25 @@ const ReferralPage = () => {
   const referrals = data?.myReferralEarnings ?? [];
 
   const totalInvites = useMemo(() => referrals.length, [referrals]);
+
   const activeInvites = useMemo(
-    () => referrals.filter((r) => r.status === "active").length,
+    () => referrals.filter((r) => r.status.toLowerCase() === "active").length,
+    [referrals]
+  );
+
+  const level1Earnings = useMemo(
+    () =>
+      referrals
+        .filter((r) => r.level === 1)
+        .reduce((sum, r) => sum + r.amount, 0),
+    [referrals]
+  );
+
+  const level2Earnings = useMemo(
+    () =>
+      referrals
+        .filter((r) => r.level === 2)
+        .reduce((sum, r) => sum + r.amount, 0),
     [referrals]
   );
 
@@ -85,18 +88,18 @@ const ReferralPage = () => {
     () => [
       {
         title: "Premium 1 Earning",
-        price: `₦${totalInvites * 1005}`,
+        price: `₦${level1Earnings.toLocaleString()}`,
         text: "Total invites",
         num: totalInvites.toString(),
       },
       {
         title: "Premium 2 Earning",
-        price: `₦${activeInvites * 630}`,
+        price: `₦${level2Earnings.toLocaleString()}`,
         text: "Active invites",
         num: activeInvites.toString(),
       },
     ],
-    [totalInvites, activeInvites]
+    [level1Earnings, level2Earnings, totalInvites, activeInvites]
   );
 
   const [copied, setCopied] = useState(false);
@@ -114,21 +117,10 @@ const ReferralPage = () => {
 
       <div className="relative bg-[#181818] py-10 md:py-16 pt-20 md:pt-30 px-4 overflow-hidden">
         <div className="absolute bottom-0 left-0 opacity-100 z-10">
-          <Image
-            src="/footershadow2.png"
-            alt="Background decoration"
-            width={300}
-            height={300}
-          />
+          <Image src="/footershadow2.png" alt="Background decoration" width={300} height={300} />
         </div>
-
         <div className="absolute top-0 right-0 opacity-100 z-100">
-          <Image
-            src="/footershadow1.png"
-            alt="Background decoration"
-            width={300}
-            height={300}
-          />
+          <Image src="/footershadow1.png" alt="Background decoration" width={300} height={300} />
         </div>
 
         <div className="relative max-w-3xl mx-auto flex flex-col items-center text-center gap-6 md:gap-8">
@@ -139,56 +131,38 @@ const ReferralPage = () => {
             width={60}
             height={60}
           />
-
           <h4 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight">
             Refer a Friend & Earn Rewards
           </h4>
-
           <p className="text-xl md:text-xl text-[#ffffff] leading-relaxed max-w-4xl">
             Share your referral code and earn rewards when your friends order.
           </p>
 
-          {/* Auth-gated: show code only when logged in */}
           {authLoading ? null : customer ? (
             <div className="w-full max-w-md bg-[#2c2929] rounded-xl flex items-center justify-between px-5 py-4 mt-2 min-h-16">
               {codeLoading ? (
-                <span className="text-white/70 text-sm animate-pulse">
-                  Loading your referral code...
-                </span>
+                <span className="text-white/70 text-sm animate-pulse">Loading your referral code...</span>
               ) : referralCode ? (
                 <>
-                  <span className="text-white text-base md:text-lg font-medium break-all">
-                    {referralCode}
-                  </span>
+                  <span className="text-white text-base md:text-lg font-medium break-all">{referralCode}</span>
                   <button
                     onClick={handleCopy}
                     className="flex items-center gap-2 text-white hover:text-gray-300 transition-colors ml-4 shrink-0"
                   >
                     {copied ? (
-                      <>
-                        <Check className="w-5 h-5" />
-                        <span className="text-sm font-medium">Copied!</span>
-                      </>
+                      <><Check className="w-5 h-5" /><span className="text-sm font-medium">Copied!</span></>
                     ) : (
-                      <>
-                        <Copy className="w-5 h-5" />
-                        <span className="text-sm font-medium">Copy</span>
-                      </>
+                      <><Copy className="w-5 h-5" /><span className="text-sm font-medium">Copy</span></>
                     )}
                   </button>
                 </>
               ) : (
-                <span className="text-white/70 text-sm">
-                  No referral code available.
-                </span>
+                <span className="text-white/70 text-sm">No referral code available.</span>
               )}
             </div>
           ) : (
             <div className="w-full max-w-md bg-[#2c2929] rounded-xl px-5 py-4 mt-2 text-white/90">
-              <p className="text-sm">
-                Log in to view and copy your referral code, and to see your
-                earnings.
-              </p>
+              <p className="text-sm">Log in to view and copy your referral code, and to see your earnings.</p>
               <div className="mt-4 flex justify-center">
                 <AuthModal
                   trigger={
@@ -203,7 +177,6 @@ const ReferralPage = () => {
         </div>
       </div>
 
-      {/* Earnings: only show when logged in */}
       {customer && (
         <>
           <h3 className="text-center mt-8 py-3">Earnings Overview</h3>
@@ -225,32 +198,20 @@ const ReferralPage = () => {
           </section>
 
           {loading && (
-            <p
-              style={{ textAlign: "center", marginTop: "20px" }}
-              className="my-12 text-xl pt-6 font-semibold"
-            >
+            <p style={{ textAlign: "center", marginTop: "20px" }} className="my-12 text-xl pt-6 font-semibold">
               Loading referral data...
             </p>
           )}
-
           {error && (
-            <p
-              style={{ color: "red", textAlign: "center" }}
-              className="my-12 text-xl pt-6 font-semibold"
-            >
+            <p style={{ color: "red", textAlign: "center" }} className="my-12 text-xl pt-6 font-semibold">
               Failed to load referral data.
             </p>
           )}
-
           {!loading && !error && referrals.length === 0 && (
-            <p
-              style={{ textAlign: "center", marginTop: "20px" }}
-              className="my-12 text-xl pt-6 font-semibold"
-            >
+            <p style={{ textAlign: "center", marginTop: "20px" }} className="my-12 text-xl pt-6 font-semibold">
               No referral earnings yet.
             </p>
           )}
-
           {!loading && !error && referrals.length > 0 && (
             <table>
               <thead>
@@ -267,10 +228,10 @@ const ReferralPage = () => {
                 {referrals.map((ref) => (
                   <tr key={ref.id}>
                     <td className="table-id">{ref.id}</td>
-                    <td className="table-price">₦{ref.amount}</td>
+                    <td className="table-price">₦{ref.amount.toLocaleString()}</td>
                     <td>{ref.level}</td>
                     <td>{ref.order?.code ?? "-"}</td>
-                    <td className={ref.status}>{ref.status}</td>
+                    <td className={ref.status.toLowerCase()}>{ref.status}</td>
                     <td>{new Date(ref.createdAt).toLocaleDateString()}</td>
                   </tr>
                 ))}
