@@ -116,10 +116,11 @@ const ReferralPage = () => {
       <Navbar />
 
       <div className="relative bg-[#181818] py-10 md:py-16 pt-20 md:pt-30 px-4 overflow-hidden">
-        <div className="absolute bottom-0 left-0 opacity-100 z-10">
+        {/* ✅ FIX: added pointer-events-none to both decoration divs */}
+        <div className="absolute bottom-0 left-0 opacity-100 z-10 pointer-events-none">
           <Image src="/footershadow2.png" alt="Background decoration" width={300} height={300} />
         </div>
-        <div className="absolute top-0 right-0 opacity-100 z-100">
+        <div className="absolute top-0 right-0 opacity-100 z-100 pointer-events-none">
           <Image src="/footershadow1.png" alt="Background decoration" width={300} height={300} />
         </div>
 

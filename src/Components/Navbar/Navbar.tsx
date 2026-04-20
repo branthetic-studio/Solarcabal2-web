@@ -22,10 +22,8 @@ const Navbar = () => {
   const { cart } = useCart();
   const { items: localItems } = useLocalCart();
 
-  // ✅ IMPORTANT: include loading
   const { customer, logout, loading } = useUser();
 
-  // ✅ Auto-close auth modal when login completes
   useEffect(() => {
     if (customer && authOpen) {
       setAuthOpen(false);
@@ -54,7 +52,7 @@ const Navbar = () => {
     <>
       <nav className="w-full flex items-center justify-center py-6 bg-[#FAFAFA]">
         <div className="w-full flex items-center justify-between bg-white px-5 mx-12 py-3.5">
-          
+
           {/* Logo */}
           <Link href="/" className="shrink-0">
             <Image
@@ -100,12 +98,10 @@ const Navbar = () => {
               <Search className="w-5 h-5 text-gray-700" />
             </button>
 
-            {/* ✅ AUTH AREA (FIXED) */}
+            {/* AUTH AREA */}
             {loading ? (
-              // 🔥 prevents flicker
               <div className="w-10 h-10 animate-pulse rounded-full bg-gray-200" />
             ) : customer ? (
-              // ✅ Logged in UI
               <div className="relative">
                 <button
                   className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-full"
@@ -121,11 +117,13 @@ const Navbar = () => {
 
                 {showUserMenu && (
                   <>
+                    {/* ✅ FIX: raised from z-10 → z-[60] to sit above referral page decorations */}
                     <div
-                      className="fixed inset-0 z-10"
+                      className="fixed inset-0 z-[60]"
                       onClick={() => setShowUserMenu(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-20">
+                    {/* ✅ FIX: raised from z-20 → z-[70] */}
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-[70]">
                       <div className="p-3 border-b">
                         <p className="text-sm font-medium">
                           {customer.firstName} {customer.lastName}
@@ -162,7 +160,6 @@ const Navbar = () => {
                 )}
               </div>
             ) : (
-              // ❌ Logged out
               <AuthModal
                 open={authOpen}
                 onOpenChange={setAuthOpen}
