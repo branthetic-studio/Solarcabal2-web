@@ -219,12 +219,12 @@ export default function OrdersPage() {
                     </div>
 
                     {/* Right */}
-                    <div className="flex items-center gap-3 shrink-0">
+                    {/* <div className="flex items-center gap-3 shrink-0">
                       <span className={`rounded-full px-3 py-1 text-xs font-medium ${classes}`}>
                         {label}
                       </span>
                       <ChevronRight className="h-4 w-4 text-neutral-300 group-hover:text-neutral-500 transition-colors" />
-                    </div>
+                    </div> */}
                   </div>
 
                   {/* Footer */}

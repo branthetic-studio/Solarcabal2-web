@@ -11,6 +11,7 @@ import safetyImage from "../../Assets/Vector (3).png";
 import BannerImg from "../../../public/hero.png";
 import Image from "next/image";
 import Suscribe from "@/Components/Suscribe/Suscribe";
+import Link from "next/link";
 
 const steps = [
   {
@@ -74,7 +75,11 @@ const page = () => {
           ))}
         </div>
         <div className="flex w-full justify-center align-middle my-16">
-          <button className="request-btn">Book a Free Consultation</button>
+          <Link href="/enquiries">
+            <button className="request-btn">
+              Book a Free Consultation
+            </button>
+          </Link>
         </div>
       </section>
 

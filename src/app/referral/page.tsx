@@ -7,11 +7,15 @@ import Refer from "../../Components/Suscribe/Suscribe";
 import "./Referral.css";
 import Image from "next/image";
 import { gql } from "@apollo/client";
-import { useQuery } from "@apollo/client/react";
-import { Copy, Check } from "lucide-react";
+import { useQuery, useMutation } from "@apollo/client/react";
+import { Copy, Check, ChevronDown, Loader2 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import AuthModal from "@/Components/AuthModal";
 import { MY_REFERRAL_EARNING } from "@/graphql/queries";
+import { X } from "lucide-react";
+import { toast } from "sonner";
+
+// ─── Queries ────────────────────────────────────────────────────────────────
 
 const GET_MY_REFERRAL_CODE = gql`
   query GetMyReferralCode {
@@ -24,23 +28,488 @@ const GET_MY_REFERRAL_CODE = gql`
   }
 `;
 
+const MY_REFERRAL_SUMMARY = gql`
+  query MyReferralSummary {
+    myReferralSummary {
+      totalEarned
+      totalWithdrawn
+      available
+    }
+  }
+`;
+
+const GET_BANK_LIST = gql`
+  query GetBankList {
+    paystackBanks {
+      name
+      code
+      logo
+    }
+  }
+`;
+
+const MY_PAYOUT_ACCOUNTS = gql`
+  query MyPayoutAccounts {
+    myPayoutAccounts {
+      id
+      bankName
+      accountNumber
+      accountName
+      bankCode
+    }
+  }
+`;
+
+// ─── Mutations ───────────────────────────────────────────────────────────────
+
+const VERIFY_BANK_ACCOUNT = gql`
+  mutation verifyBankAccount($accountNumber: String!, $bankCode: String!) {
+    verifyBankAccount(accountNumber: $accountNumber, bankCode: $bankCode) {
+      accountName
+      accountNumber
+      success
+      message
+    }
+  }
+`;
+
+const REQUEST_PAYOUT = gql`
+  mutation RequestPayout($amount: Int!, $payoutAccountId: String!) {
+    requestPayout(amount: $amount, payoutAccountId: $payoutAccountId)
+  }
+`;
+
+const ADD_PAYOUT_ACCOUNT = gql`
+  mutation AddPayoutAccount($input: CreatePayoutAccountInput!) {
+    addPayoutAccount(input: $input) {
+      id
+    }
+  }
+`;
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 type ReferralEarning = {
   id: string;
   amount: number;
   level: number;
-  status: string;
-  createdAt: string;
+  status?: string | null;
+  createdAt?: string;
   order?: { code?: string | null } | null;
 };
 
-type ReferralQueryResponse = {
-  myReferralEarnings: ReferralEarning[];
+type PayoutAccount = {
+  id: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  bankCode: string;
 };
+
+type Bank = {
+  name: string;
+  code: string;
+  logo?: string | null;
+};
+
+// ─── Withdraw Modal ───────────────────────────────────────────────────────────
+
+type WithdrawModalProps = {
+  available: number;
+  onClose: () => void;
+};
+
+const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
+  // Step: "select" = pick saved account or add new | "new" = add new account form
+  const [step, setStep] = useState<"select" | "new">("select");
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+  const [amount, setAmount] = useState<string>("");
+
+  // New account form state
+  const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
+  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
+  const [bankSearch, setBankSearch] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [verifiedAccountName, setVerifiedAccountName] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const { data: accountsData, loading: accountsLoading, refetch: refetchAccounts } =
+    useQuery<{ myPayoutAccounts: PayoutAccount[] }>(MY_PAYOUT_ACCOUNTS, {
+      fetchPolicy: "network-only",
+    });
+
+  const { data: banksData, loading: banksLoading } =
+    useQuery<{ paystackBanks: Bank[] }>(GET_BANK_LIST);
+
+  const [verifyBankAccount] = useMutation<{
+    verifyBankAccount: {
+      accountName: string;
+      accountNumber: string;
+      success: boolean;
+      message: string;
+    };
+  }>(VERIFY_BANK_ACCOUNT);
+
+  const [addPayoutAccount] = useMutation<{
+    addPayoutAccount: { id: string };
+  }>(ADD_PAYOUT_ACCOUNT);
+
+  const [requestPayout] = useMutation<{
+    requestPayout: boolean;
+  }>(REQUEST_PAYOUT);
+
+  const savedAccounts = accountsData?.myPayoutAccounts ?? [];
+  const banks = banksData?.paystackBanks ?? [];
+
+  const filteredBanks = useMemo(
+    () =>
+      banks.filter((b) =>
+        b.name.toLowerCase().includes(bankSearch.toLowerCase())
+      ),
+    [banks, bankSearch]
+  );
+
+  // Auto-verify when account number reaches 10 digits and a bank is selected
+  const handleAccountNumberChange = async (val: string) => {
+    const digits = val.replace(/\D/g, "").slice(0, 10);
+    setAccountNumber(digits);
+    setVerifiedAccountName(null);
+
+    if (digits.length === 10 && selectedBank) {
+      try {
+        setVerifying(true);
+        const { data } = await verifyBankAccount({
+          variables: { accountNumber: digits, bankCode: selectedBank.code },
+        });
+        const result = data?.verifyBankAccount;
+        if (result?.success) {
+          setVerifiedAccountName(result.accountName);
+        } else {
+          toast.error(result?.message ?? "Account verification failed.");
+        }
+      } catch {
+        toast.error("Could not verify account. Try again.");
+      } finally {
+        setVerifying(false);
+      }
+    }
+  };
+
+  // Re-verify when bank changes (if account number is already 10 digits)
+  const handleBankSelect = async (bank: Bank) => {
+    setSelectedBank(bank);
+    setBankDropdownOpen(false);
+    setBankSearch("");
+    setVerifiedAccountName(null);
+
+    if (accountNumber.length === 10) {
+      try {
+        setVerifying(true);
+        const { data } = await verifyBankAccount({
+          variables: { accountNumber, bankCode: bank.code },
+        });
+        const result = data?.verifyBankAccount;
+        if (result?.success) {
+          setVerifiedAccountName(result.accountName);
+        } else {
+          toast.error(result?.message ?? "Account verification failed.");
+        }
+      } catch {
+        toast.error("Could not verify account. Try again.");
+      } finally {
+        setVerifying(false);
+      }
+    }
+  };
+
+  const handleSaveAccount = async () => {
+    if (!selectedBank || !accountNumber || !verifiedAccountName) return;
+    try {
+      setSaving(true);
+      await addPayoutAccount({
+        variables: {
+          input: {
+            bankName: selectedBank.name,
+            bankCode: selectedBank.code,
+            accountNumber,
+            accountName: verifiedAccountName,
+          },
+        },
+      });
+      toast.success("Account saved!");
+      await refetchAccounts();
+      setStep("select");
+      // Reset new account form
+      setSelectedBank(null);
+      setAccountNumber("");
+      setVerifiedAccountName(null);
+    } catch {
+      toast.error("Failed to save account. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSubmitPayout = async () => {
+    const amountInt = parseInt(amount, 10);
+    if (!amountInt || amountInt <= 0) return toast.error("Enter a valid amount.");
+    if (amountInt > available) return toast.error("Amount exceeds your available balance.");
+    if (!selectedAccountId) return toast.error("Please select a payout account.");
+
+    try {
+      setSubmitting(true);
+      await requestPayout({
+        variables: { amount: amountInt, payoutAccountId: selectedAccountId },
+      });
+      toast.success("Withdrawal request submitted!");
+      onClose();
+    } catch {
+      toast.error("Withdrawal request failed. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-lg">
+            {step === "new" ? "Add Payout Account" : "Withdraw Commission"}
+          </h3>
+          <button onClick={onClose} className="text-neutral-500 hover:text-black">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* ── SELECT STEP ── */}
+        {step === "select" && (
+          <>
+            <p className="text-sm text-neutral-500">
+              Available balance:{" "}
+              <span className="font-semibold text-black">₦{available.toLocaleString()}</span>
+            </p>
+
+            {/* Amount input */}
+            <div>
+              <label className="text-xs text-neutral-500 mb-1 block">Amount (₦)</label>
+              <input
+                type="number"
+                placeholder="Enter amount"
+                className="w-full border rounded-lg p-2 text-sm"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+
+            {/* Saved accounts */}
+            <div>
+              <label className="text-xs text-neutral-500 mb-2 block">Payout Account</label>
+              {accountsLoading ? (
+                <p className="text-sm text-neutral-400 animate-pulse">Loading accounts...</p>
+              ) : savedAccounts.length === 0 ? (
+                <p className="text-sm text-neutral-400">No saved accounts yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {savedAccounts.map((acc) => (
+                    <label
+                      key={acc.id}
+                      className={`flex items-center gap-3 border rounded-lg p-3 cursor-pointer transition-colors ${
+                        selectedAccountId === acc.id
+                          ? "border-red-500 bg-red-50"
+                          : "border-neutral-200 hover:border-neutral-400"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="payoutAccount"
+                        value={acc.id}
+                        checked={selectedAccountId === acc.id}
+                        onChange={() => setSelectedAccountId(acc.id)}
+                        className="accent-red-500"
+                      />
+                      <div className="text-sm">
+                        <p className="font-medium">{acc.accountName}</p>
+                        <p className="text-neutral-500">
+                          {acc.bankName} · {acc.accountNumber}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={() => setStep("new")}
+                className="mt-3 text-sm text-red-500 hover:underline font-medium"
+              >
+                + Add new account
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                className="px-4 py-2 rounded-lg border text-sm"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 disabled:opacity-50"
+                onClick={handleSubmitPayout}
+                disabled={submitting || !selectedAccountId || !amount}
+              >
+                {submitting ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Submitting...
+                  </span>
+                ) : (
+                  "Submit Request"
+                )}
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── NEW ACCOUNT STEP ── */}
+        {step === "new" && (
+          <>
+            {/* Bank selector dropdown */}
+            <div>
+              <label className="text-xs text-neutral-500 mb-1 block">Bank</label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setBankDropdownOpen((v) => !v)}
+                  className="w-full border rounded-lg p-2 text-sm flex items-center justify-between text-left"
+                >
+                  <span className={selectedBank ? "text-black" : "text-neutral-400"}>
+                    {selectedBank ? selectedBank.name : "Select a bank"}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-neutral-400" />
+                </button>
+
+                {bankDropdownOpen && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-56 overflow-hidden flex flex-col">
+                    <div className="p-2 border-b">
+                      <input
+                        type="text"
+                        placeholder="Search bank..."
+                        className="w-full text-sm p-1.5 border rounded"
+                        value={bankSearch}
+                        onChange={(e) => setBankSearch(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="overflow-y-auto">
+                      {banksLoading ? (
+                        <p className="text-sm text-neutral-400 p-3 animate-pulse">Loading banks...</p>
+                      ) : filteredBanks.length === 0 ? (
+                        <p className="text-sm text-neutral-400 p-3">No banks found.</p>
+                      ) : (
+                        filteredBanks.map((bank) => (
+                          <button
+                            key={bank.code}
+                            type="button"
+                            onClick={() => handleBankSelect(bank)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2"
+                          >
+                            {bank.logo && (
+                              <img
+                                src={bank.logo}
+                                alt={bank.name}
+                                className="w-5 h-5 rounded-full object-contain"
+                              />
+                            )}
+                            {bank.name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Account number */}
+            <div>
+              <label className="text-xs text-neutral-500 mb-1 block">Account Number</label>
+              <input
+                type="text"
+                placeholder="10-digit account number"
+                maxLength={10}
+                className="w-full border rounded-lg p-2 text-sm"
+                value={accountNumber}
+                onKeyDown={(e) => {
+                  const allowed = ["Backspace", "Delete", "Tab", "ArrowLeft", "ArrowRight"];
+                  if (!allowed.includes(e.key) && !/^\d$/.test(e.key)) e.preventDefault();
+                }}
+                onChange={(e) => handleAccountNumberChange(e.target.value)}
+              />
+            </div>
+
+            {/* Verification status */}
+            <div className="min-h-[28px]">
+              {verifying && (
+                <p className="text-sm text-neutral-400 flex items-center gap-2 animate-pulse">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Verifying account...
+                </p>
+              )}
+              {!verifying && verifiedAccountName && (
+                <div className="flex items-center gap-2 text-sm text-green-600 font-medium bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <Check className="w-4 h-4" />
+                  {verifiedAccountName}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                className="px-4 py-2 rounded-lg border text-sm"
+                onClick={() => setStep("select")}
+              >
+                Back
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 disabled:opacity-50"
+                onClick={handleSaveAccount}
+                disabled={saving || !verifiedAccountName}
+              >
+                {saving ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                  </span>
+                ) : (
+                  "Save Account"
+                )}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 const ReferralPage = () => {
   const { customer, loading: authLoading } = useUser();
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
 
-  const { data, loading, error } = useQuery<ReferralQueryResponse>(
+  // ── Referral summary (replaces manual totalEarnings calc) ──
+  const { data: summaryData, loading: summaryLoading } = useQuery<{
+    myReferralSummary: { totalEarned: number; totalWithdrawn: number; available: number };
+  }>(MY_REFERRAL_SUMMARY, {
+    fetchPolicy: "network-only",
+    skip: authLoading || !customer,
+  });
+
+  // ── Referral earnings table ──
+  const { data, loading, error } = useQuery<{ myReferralEarnings: ReferralEarning[] }>(
     MY_REFERRAL_EARNING,
     {
       fetchPolicy: "network-only",
@@ -48,41 +517,36 @@ const ReferralPage = () => {
     }
   );
 
-  const { data: referralCodeData, loading: codeLoading } = useQuery(
-    GET_MY_REFERRAL_CODE,
-    {
-      skip: authLoading || !customer,
-      fetchPolicy: "cache-and-network",
-    }
-  );
+  // ── Referral code ──
+  const { data: referralCodeData, loading: codeLoading } = useQuery(GET_MY_REFERRAL_CODE, {
+    skip: authLoading || !customer,
+    fetchPolicy: "cache-and-network",
+  });
 
   const referralCode = (referralCodeData as any)?.activeCustomer?.customFields
     ?.referralCode as string | undefined;
 
   const referrals = data?.myReferralEarnings ?? [];
+  const summary = summaryData?.myReferralSummary;
 
-  const totalInvites = useMemo(() => referrals.length, [referrals]);
-
+  const totalInvites = referrals.length;
   const activeInvites = useMemo(
-    () => referrals.filter((r) => r.status.toLowerCase() === "active").length,
+    () => referrals.filter((r) => (r.status ?? "").toLowerCase() === "active").length,
     [referrals]
   );
 
+  // ── Derived display from summary ──
   const level1Earnings = useMemo(
-    () =>
-      referrals
-        .filter((r) => r.level === 1)
-        .reduce((sum, r) => sum + r.amount, 0),
+    () => referrals.filter((r) => r.level === 1).reduce((sum, r) => sum + r.amount, 0),
+    [referrals]
+  );
+  const level2Earnings = useMemo(
+    () => referrals.filter((r) => r.level === 2).reduce((sum, r) => sum + r.amount, 0),
     [referrals]
   );
 
-  const level2Earnings = useMemo(
-    () =>
-      referrals
-        .filter((r) => r.level === 2)
-        .reduce((sum, r) => sum + r.amount, 0),
-    [referrals]
-  );
+  // Available balance comes from the summary query — the authoritative source
+  const availableBalance = summary?.available ?? 0;
 
   const premiumData = useMemo(
     () => [
@@ -116,7 +580,6 @@ const ReferralPage = () => {
       <Navbar />
 
       <div className="relative bg-[#181818] py-10 md:py-16 pt-20 md:pt-30 px-4 overflow-hidden">
-        {/* ✅ FIX: added pointer-events-none to both decoration divs */}
         <div className="absolute bottom-0 left-0 opacity-100 z-10 pointer-events-none">
           <Image src="/footershadow2.png" alt="Background decoration" width={300} height={300} />
         </div>
@@ -180,7 +643,35 @@ const ReferralPage = () => {
 
       {customer && (
         <>
-          <h3 className="text-center mt-8 py-3">Earnings Overview</h3>
+          {/* ── Earnings Overview header + summary ── */}
+          <h3 className="text-center mt-8 py-3">
+            Earnings Overview
+            <button
+              onClick={() => setWithdrawOpen(true)}
+              disabled={availableBalance === 0 || summaryLoading}
+              className="ml-4 px-4 py-1.5 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Withdraw
+            </button>
+          </h3>
+
+          {/* Summary strip */}
+          {summary && (
+            <div className="flex justify-center gap-6 flex-wrap text-sm text-center mb-2">
+              <div>
+                <p className="text-neutral-500">Total Earned</p>
+                <p className="font-semibold text-lg">₦{summary.totalEarned.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-neutral-500">Total Withdrawn</p>
+                <p className="font-semibold text-lg">₦{summary.totalWithdrawn.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-neutral-500">Available</p>
+                <p className="font-semibold text-lg text-green-600">₦{summary.available.toLocaleString()}</p>
+              </div>
+            </div>
+          )}
 
           <section className="premium-data relative bg-[#181818]">
             {premiumData.map((item, index) => (
@@ -232,14 +723,24 @@ const ReferralPage = () => {
                     <td className="table-price">₦{ref.amount.toLocaleString()}</td>
                     <td>{ref.level}</td>
                     <td>{ref.order?.code ?? "-"}</td>
-                    <td className={ref.status.toLowerCase()}>{ref.status}</td>
-                    <td>{new Date(ref.createdAt).toLocaleDateString()}</td>
+                    <td className={(ref.status ?? "unknown").toLowerCase()}>
+                      {ref.status ?? "Unknown"}
+                    </td>
+                    <td>{ref.createdAt ? new Date(ref.createdAt).toLocaleDateString() : "-"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
         </>
+      )}
+
+      {/* ── Withdraw Modal ── */}
+      {withdrawOpen && (
+        <WithdrawModal
+          available={availableBalance}
+          onClose={() => setWithdrawOpen(false)}
+        />
       )}
 
       <Refer />
