@@ -11,7 +11,6 @@ import { useQuery, useMutation } from "@apollo/client/react";
 import { Copy, Check, ChevronDown, Loader2 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import AuthModal from "@/Components/AuthModal";
-import { MY_REFERRAL_EARNING } from "@/graphql/queries";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +33,19 @@ const MY_REFERRAL_SUMMARY = gql`
       totalEarned
       totalWithdrawn
       available
+    }
+  }
+`;
+
+// Defined inline so we control the exact fields — "code" is top-level on ReferralEarning
+const MY_REFERRAL_EARNING = gql`
+  query MyReferralEarnings {
+    myReferralEarnings {
+      id
+      amount
+      level
+      createdAt
+      code
     }
   }
 `;
@@ -93,9 +105,8 @@ type ReferralEarning = {
   id: string;
   amount: number;
   level: number;
-  status?: string | null;
-  createdAt?: string;
-  order?: { code?: string | null } | null;
+  createdAt?: string | null;
+  code?: string | null;
 };
 
 type PayoutAccount = {
@@ -112,6 +123,34 @@ type Bank = {
   logo?: string | null;
 };
 
+// ─── Earnings Table ───────────────────────────────────────────────────────────
+
+const EarningsTable = ({ rows, title }: { rows: ReferralEarning[]; title: string }) => (
+  <>
+    <h4 className="text-center font-semibold mt-8 mb-2 text-lg">{title}</h4>
+    <table>
+      <thead>
+        <tr>
+          <th>Referral ID</th>
+          <th>Amount</th>
+          <th>Order Code</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((ref) => (
+          <tr key={ref.id}>
+            <td className="table-id">{ref.id}</td>
+            <td className="table-price">₦{ref.amount.toLocaleString()}</td>
+            <td>{ref.code ?? "-"}</td>
+            <td>{ref.createdAt ? new Date(ref.createdAt).toLocaleDateString() : "-"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </>
+);
+
 // ─── Withdraw Modal ───────────────────────────────────────────────────────────
 
 type WithdrawModalProps = {
@@ -120,12 +159,10 @@ type WithdrawModalProps = {
 };
 
 const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
-  // Step: "select" = pick saved account or add new | "new" = add new account form
   const [step, setStep] = useState<"select" | "new">("select");
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
 
-  // New account form state
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
   const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
   const [bankSearch, setBankSearch] = useState("");
@@ -164,64 +201,43 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
   const banks = banksData?.paystackBanks ?? [];
 
   const filteredBanks = useMemo(
-    () =>
-      banks.filter((b) =>
-        b.name.toLowerCase().includes(bankSearch.toLowerCase())
-      ),
+    () => banks.filter((b) => b.name.toLowerCase().includes(bankSearch.toLowerCase())),
     [banks, bankSearch]
   );
 
-  // Auto-verify when account number reaches 10 digits and a bank is selected
+  const runVerify = async (accNum: string, bank: Bank) => {
+    try {
+      setVerifying(true);
+      setVerifiedAccountName(null);
+      const { data } = await verifyBankAccount({
+        variables: { accountNumber: accNum, bankCode: bank.code },
+      });
+      const result = data?.verifyBankAccount;
+      if (result?.success) {
+        setVerifiedAccountName(result.accountName);
+      } else {
+        toast.error(result?.message ?? "Account verification failed.");
+      }
+    } catch {
+      toast.error("Could not verify account. Try again.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const handleAccountNumberChange = async (val: string) => {
     const digits = val.replace(/\D/g, "").slice(0, 10);
     setAccountNumber(digits);
     setVerifiedAccountName(null);
-
-    if (digits.length === 10 && selectedBank) {
-      try {
-        setVerifying(true);
-        const { data } = await verifyBankAccount({
-          variables: { accountNumber: digits, bankCode: selectedBank.code },
-        });
-        const result = data?.verifyBankAccount;
-        if (result?.success) {
-          setVerifiedAccountName(result.accountName);
-        } else {
-          toast.error(result?.message ?? "Account verification failed.");
-        }
-      } catch {
-        toast.error("Could not verify account. Try again.");
-      } finally {
-        setVerifying(false);
-      }
-    }
+    if (digits.length === 10 && selectedBank) await runVerify(digits, selectedBank);
   };
 
-  // Re-verify when bank changes (if account number is already 10 digits)
   const handleBankSelect = async (bank: Bank) => {
     setSelectedBank(bank);
     setBankDropdownOpen(false);
     setBankSearch("");
     setVerifiedAccountName(null);
-
-    if (accountNumber.length === 10) {
-      try {
-        setVerifying(true);
-        const { data } = await verifyBankAccount({
-          variables: { accountNumber, bankCode: bank.code },
-        });
-        const result = data?.verifyBankAccount;
-        if (result?.success) {
-          setVerifiedAccountName(result.accountName);
-        } else {
-          toast.error(result?.message ?? "Account verification failed.");
-        }
-      } catch {
-        toast.error("Could not verify account. Try again.");
-      } finally {
-        setVerifying(false);
-      }
-    }
+    if (accountNumber.length === 10) await runVerify(accountNumber, bank);
   };
 
   const handleSaveAccount = async () => {
@@ -241,7 +257,6 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
       toast.success("Account saved!");
       await refetchAccounts();
       setStep("select");
-      // Reset new account form
       setSelectedBank(null);
       setAccountNumber("");
       setVerifiedAccountName(null);
@@ -257,7 +272,6 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
     if (!amountInt || amountInt <= 0) return toast.error("Enter a valid amount.");
     if (amountInt > available) return toast.error("Amount exceeds your available balance.");
     if (!selectedAccountId) return toast.error("Please select a payout account.");
-
     try {
       setSubmitting(true);
       await requestPayout({
@@ -275,7 +289,6 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-lg">
             {step === "new" ? "Add Payout Account" : "Withdraw Commission"}
@@ -293,7 +306,6 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
               <span className="font-semibold text-black">₦{available.toLocaleString()}</span>
             </p>
 
-            {/* Amount input */}
             <div>
               <label className="text-xs text-neutral-500 mb-1 block">Amount (₦)</label>
               <input
@@ -305,7 +317,6 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
               />
             </div>
 
-            {/* Saved accounts */}
             <div>
               <label className="text-xs text-neutral-500 mb-2 block">Payout Account</label>
               {accountsLoading ? (
@@ -333,15 +344,12 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
                       />
                       <div className="text-sm">
                         <p className="font-medium">{acc.accountName}</p>
-                        <p className="text-neutral-500">
-                          {acc.bankName} · {acc.accountNumber}
-                        </p>
+                        <p className="text-neutral-500">{acc.bankName} · {acc.accountNumber}</p>
                       </div>
                     </label>
                   ))}
                 </div>
               )}
-
               <button
                 onClick={() => setStep("new")}
                 className="mt-3 text-sm text-red-500 hover:underline font-medium"
@@ -351,10 +359,7 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                className="px-4 py-2 rounded-lg border text-sm"
-                onClick={onClose}
-              >
+              <button className="px-4 py-2 rounded-lg border text-sm" onClick={onClose}>
                 Cancel
               </button>
               <button
@@ -366,9 +371,7 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" /> Submitting...
                   </span>
-                ) : (
-                  "Submit Request"
-                )}
+                ) : "Submit Request"}
               </button>
             </div>
           </>
@@ -377,7 +380,6 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
         {/* ── NEW ACCOUNT STEP ── */}
         {step === "new" && (
           <>
-            {/* Bank selector dropdown */}
             <div>
               <label className="text-xs text-neutral-500 mb-1 block">Bank</label>
               <div className="relative">
@@ -396,12 +398,12 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
                   <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-56 overflow-hidden flex flex-col">
                     <div className="p-2 border-b">
                       <input
+                        autoFocus
                         type="text"
                         placeholder="Search bank..."
                         className="w-full text-sm p-1.5 border rounded"
                         value={bankSearch}
                         onChange={(e) => setBankSearch(e.target.value)}
-                        autoFocus
                       />
                     </div>
                     <div className="overflow-y-auto">
@@ -418,11 +420,7 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
                             className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2"
                           >
                             {bank.logo && (
-                              <img
-                                src={bank.logo}
-                                alt={bank.name}
-                                className="w-5 h-5 rounded-full object-contain"
-                              />
+                              <img src={bank.logo} alt={bank.name} className="w-5 h-5 rounded-full object-contain" />
                             )}
                             {bank.name}
                           </button>
@@ -434,7 +432,6 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
               </div>
             </div>
 
-            {/* Account number */}
             <div>
               <label className="text-xs text-neutral-500 mb-1 block">Account Number</label>
               <input
@@ -451,8 +448,7 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
               />
             </div>
 
-            {/* Verification status */}
-            <div className="min-h-[28px]">
+            <div className="min-h-7">
               {verifying && (
                 <p className="text-sm text-neutral-400 flex items-center gap-2 animate-pulse">
                   <Loader2 className="w-4 h-4 animate-spin" /> Verifying account...
@@ -467,10 +463,7 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                className="px-4 py-2 rounded-lg border text-sm"
-                onClick={() => setStep("select")}
-              >
+              <button className="px-4 py-2 rounded-lg border text-sm" onClick={() => setStep("select")}>
                 Back
               </button>
               <button
@@ -482,9 +475,7 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" /> Saving...
                   </span>
-                ) : (
-                  "Save Account"
-                )}
+                ) : "Save Account"}
               </button>
             </div>
           </>
@@ -500,7 +491,6 @@ const ReferralPage = () => {
   const { customer, loading: authLoading } = useUser();
   const [withdrawOpen, setWithdrawOpen] = useState(false);
 
-  // ── Referral summary (replaces manual totalEarnings calc) ──
   const { data: summaryData, loading: summaryLoading } = useQuery<{
     myReferralSummary: { totalEarned: number; totalWithdrawn: number; available: number };
   }>(MY_REFERRAL_SUMMARY, {
@@ -508,16 +498,20 @@ const ReferralPage = () => {
     skip: authLoading || !customer,
   });
 
-  // ── Referral earnings table ──
-  const { data, loading, error } = useQuery<{ myReferralEarnings: ReferralEarning[] }>(
+  const { data, loading, error: earningsError } = useQuery<{ myReferralEarnings: ReferralEarning[] }>(
     MY_REFERRAL_EARNING,
     {
       fetchPolicy: "network-only",
+      errorPolicy: "all",
       skip: authLoading || !customer,
     }
   );
 
-  // ── Referral code ──
+  // Log without causing a UI error — errorPolicy:"all" already keeps partial data
+  if (earningsError) {
+    console.error("[myReferralEarnings]", earningsError.message);
+  }
+
   const { data: referralCodeData, loading: codeLoading } = useQuery(GET_MY_REFERRAL_CODE, {
     skip: authLoading || !customer,
     fetchPolicy: "cache-and-network",
@@ -526,44 +520,39 @@ const ReferralPage = () => {
   const referralCode = (referralCodeData as any)?.activeCustomer?.customFields
     ?.referralCode as string | undefined;
 
-  const referrals = data?.myReferralEarnings ?? [];
+  const referrals: ReferralEarning[] = (data?.myReferralEarnings ?? []).filter(Boolean) as ReferralEarning[];
   const summary = summaryData?.myReferralSummary;
+  const availableBalance = summary?.available ?? 0;
 
-  const totalInvites = referrals.length;
-  const activeInvites = useMemo(
-    () => referrals.filter((r) => (r.status ?? "").toLowerCase() === "active").length,
-    [referrals]
-  );
+  // Split by level
+  const level1Referrals = useMemo(() => referrals.filter((r) => r.level === 1), [referrals]);
+  const level2Referrals = useMemo(() => referrals.filter((r) => r.level === 2), [referrals]);
 
-  // ── Derived display from summary ──
   const level1Earnings = useMemo(
-    () => referrals.filter((r) => r.level === 1).reduce((sum, r) => sum + r.amount, 0),
-    [referrals]
+    () => level1Referrals.reduce((sum, r) => sum + (r.amount ?? 0), 0),
+    [level1Referrals]
   );
   const level2Earnings = useMemo(
-    () => referrals.filter((r) => r.level === 2).reduce((sum, r) => sum + r.amount, 0),
-    [referrals]
+    () => level2Referrals.reduce((sum, r) => sum + (r.amount ?? 0), 0),
+    [level2Referrals]
   );
-
-  // Available balance comes from the summary query — the authoritative source
-  const availableBalance = summary?.available ?? 0;
 
   const premiumData = useMemo(
     () => [
       {
         title: "Premium 1 Earning",
         price: `₦${level1Earnings.toLocaleString()}`,
-        text: "Total invites",
-        num: totalInvites.toString(),
+        text: "Total referrals",
+        num: level1Referrals.length.toString(),
       },
       {
         title: "Premium 2 Earning",
         price: `₦${level2Earnings.toLocaleString()}`,
-        text: "Active invites",
-        num: activeInvites.toString(),
+        text: "Total referrals",
+        num: level2Referrals.length.toString(),
       },
     ],
-    [level1Earnings, level2Earnings, totalInvites, activeInvites]
+    [level1Earnings, level2Earnings, level1Referrals.length, level2Referrals.length]
   );
 
   const [copied, setCopied] = useState(false);
@@ -598,7 +587,7 @@ const ReferralPage = () => {
           <h4 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight">
             Refer a Friend & Earn Rewards
           </h4>
-          <p className="text-xl md:text-xl text-[#ffffff] leading-relaxed max-w-4xl">
+          <p className="text-xl text-[#ffffff] leading-relaxed max-w-4xl">
             Share your referral code and earn rewards when your friends order.
           </p>
 
@@ -643,7 +632,6 @@ const ReferralPage = () => {
 
       {customer && (
         <>
-          {/* ── Earnings Overview header + summary ── */}
           <h3 className="text-center mt-8 py-3">
             Earnings Overview
             <button
@@ -673,6 +661,7 @@ const ReferralPage = () => {
             </div>
           )}
 
+          {/* Premium cards */}
           <section className="premium-data relative bg-[#181818]">
             {premiumData.map((item, index) => (
               <div key={index} className={index === 1 ? "data" : "data1"}>
@@ -689,53 +678,34 @@ const ReferralPage = () => {
             ))}
           </section>
 
+          {/* Loading state */}
           {loading && (
             <p style={{ textAlign: "center", marginTop: "20px" }} className="my-12 text-xl pt-6 font-semibold">
               Loading referral data...
             </p>
           )}
-          {error && (
-            <p style={{ color: "red", textAlign: "center" }} className="my-12 text-xl pt-6 font-semibold">
-              Failed to load referral data.
-            </p>
-          )}
-          {!loading && !error && referrals.length === 0 && (
+
+          {/* Empty state */}
+          {!loading && referrals.length === 0 && (
             <p style={{ textAlign: "center", marginTop: "20px" }} className="my-12 text-xl pt-6 font-semibold">
               No referral earnings yet.
             </p>
           )}
-          {!loading && !error && referrals.length > 0 && (
-            <table>
-              <thead>
-                <tr>
-                  <th>Referral ID</th>
-                  <th>Amount</th>
-                  <th>Level</th>
-                  <th>Order Code</th>
-                  <th>Status</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {referrals.map((ref) => (
-                  <tr key={ref.id}>
-                    <td className="table-id">{ref.id}</td>
-                    <td className="table-price">₦{ref.amount.toLocaleString()}</td>
-                    <td>{ref.level}</td>
-                    <td>{ref.order?.code ?? "-"}</td>
-                    <td className={(ref.status ?? "unknown").toLowerCase()}>
-                      {ref.status ?? "Unknown"}
-                    </td>
-                    <td>{ref.createdAt ? new Date(ref.createdAt).toLocaleDateString() : "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          {/* Tables split by level */}
+          {!loading && referrals.length > 0 && (
+            <>
+              {level1Referrals.length > 0 && (
+                <EarningsTable rows={level1Referrals} title="Premium 1 Earnings" />
+              )}
+              {level2Referrals.length > 0 && (
+                <EarningsTable rows={level2Referrals} title="Premium 2 Earnings" />
+              )}
+            </>
           )}
         </>
       )}
 
-      {/* ── Withdraw Modal ── */}
       {withdrawOpen && (
         <WithdrawModal
           available={availableBalance}
