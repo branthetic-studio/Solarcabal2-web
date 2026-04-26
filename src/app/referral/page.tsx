@@ -14,6 +14,10 @@ import AuthModal from "@/Components/AuthModal";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+const toNaira = (kobo: number) => (kobo / 100).toLocaleString();
+
 // ─── Queries ────────────────────────────────────────────────────────────────
 
 const GET_MY_REFERRAL_CODE = gql`
@@ -141,7 +145,7 @@ const EarningsTable = ({ rows, title }: { rows: ReferralEarning[]; title: string
         {rows.map((ref) => (
           <tr key={ref.id}>
             <td className="table-id">{ref.id}</td>
-            <td className="table-price">₦{ref.amount.toLocaleString()}</td>
+            <td className="table-price">₦{toNaira(ref.amount)}</td>
             <td>{ref.code ?? "-"}</td>
             <td>{ref.createdAt ? new Date(ref.createdAt).toLocaleDateString() : "-"}</td>
           </tr>
@@ -199,6 +203,9 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
 
   const savedAccounts = accountsData?.myPayoutAccounts ?? [];
   const banks = banksData?.paystackBanks ?? [];
+
+  // available is in kobo — convert to naira for display and comparison
+  const availableNaira = available / 100;
 
   const filteredBanks = useMemo(
     () => banks.filter((b) => b.name.toLowerCase().includes(bankSearch.toLowerCase())),
@@ -268,14 +275,15 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
   };
 
   const handleSubmitPayout = async () => {
-    const amountInt = parseInt(amount, 10);
-    if (!amountInt || amountInt <= 0) return toast.error("Enter a valid amount.");
-    if (amountInt > available) return toast.error("Amount exceeds your available balance.");
+    const amountNaira = parseInt(amount, 10);
+    if (!amountNaira || amountNaira <= 0) return toast.error("Enter a valid amount.");
+    if (amountNaira > availableNaira) return toast.error("Amount exceeds your available balance.");
     if (!selectedAccountId) return toast.error("Please select a payout account.");
     try {
       setSubmitting(true);
+      // API expects amount in kobo, so multiply back by 100
       await requestPayout({
-        variables: { amount: amountInt, payoutAccountId: selectedAccountId },
+        variables: { amount: amountNaira * 100, payoutAccountId: selectedAccountId },
       });
       toast.success("Withdrawal request submitted!");
       onClose();
@@ -303,7 +311,7 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
           <>
             <p className="text-sm text-neutral-500">
               Available balance:{" "}
-              <span className="font-semibold text-black">₦{available.toLocaleString()}</span>
+              <span className="font-semibold text-black">₦{availableNaira.toLocaleString()}</span>
             </p>
 
             <div>
@@ -528,6 +536,7 @@ const ReferralPage = () => {
   const level1Referrals = useMemo(() => referrals.filter((r) => r.level === 1), [referrals]);
   const level2Referrals = useMemo(() => referrals.filter((r) => r.level === 2), [referrals]);
 
+  // Amounts from API are in kobo — sum then convert to naira for display
   const level1Earnings = useMemo(
     () => level1Referrals.reduce((sum, r) => sum + (r.amount ?? 0), 0),
     [level1Referrals]
@@ -541,13 +550,13 @@ const ReferralPage = () => {
     () => [
       {
         title: "Premium 1 Earning",
-        price: `₦${level1Earnings.toLocaleString()}`,
+        price: `₦${toNaira(level1Earnings)}`,
         text: "Total referrals",
         num: level1Referrals.length.toString(),
       },
       {
         title: "Premium 2 Earning",
-        price: `₦${level2Earnings.toLocaleString()}`,
+        price: `₦${toNaira(level2Earnings)}`,
         text: "Total referrals",
         num: level2Referrals.length.toString(),
       },
@@ -648,15 +657,15 @@ const ReferralPage = () => {
             <div className="flex justify-center gap-6 flex-wrap text-sm text-center mb-2">
               <div>
                 <p className="text-neutral-500">Total Earned</p>
-                <p className="font-semibold text-lg">₦{summary.totalEarned.toLocaleString()}</p>
+                <p className="font-semibold text-lg">₦{toNaira(summary.totalEarned)}</p>
               </div>
               <div>
                 <p className="text-neutral-500">Total Withdrawn</p>
-                <p className="font-semibold text-lg">₦{summary.totalWithdrawn.toLocaleString()}</p>
+                <p className="font-semibold text-lg">₦{toNaira(summary.totalWithdrawn)}</p>
               </div>
               <div>
                 <p className="text-neutral-500">Available</p>
-                <p className="font-semibold text-lg text-green-600">₦{summary.available.toLocaleString()}</p>
+                <p className="font-semibold text-lg text-green-600">₦{toNaira(summary.available)}</p>
               </div>
             </div>
           )}
