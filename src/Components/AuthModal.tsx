@@ -102,9 +102,22 @@ export default function AuthModal({
 
   const passwordStrength = getPasswordStrength(registerForm.password);
 
+  // ─── FIXED: getToken with retries so it always returns a fresh JWT ──────
+  // After clerk.setActive() the token is not immediately available — poll
+  // until it appears (up to ~3s) before handing it to Vendure.
+  const getTokenWithRetry = async (maxAttempts = 8, delayMs = 400): Promise<string> => {
+    for (let i = 0; i < maxAttempts; i++) {
+      const token = await getToken({ skipCache: true });
+      if (token) return token;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+    throw new Error("Unable to retrieve session token. Please try again.");
+  };
+
   // ─── Core: Clerk JWT → Vendure session ──────────────────────────────────
   const authenticateWithVendure = async (referralCode?: string) => {
-    const token = await getToken();
+    // FIXED: always force-fresh token — never use a cached/stale JWT
+    const token = await getTokenWithRetry();
     if (!token) throw new Error("No Clerk token available");
 
     const response = await authenticate({
@@ -159,8 +172,11 @@ export default function AuthModal({
     setLoginSubmitting(true);
 
     try {
-      const existingToken = await getToken();
-      if (existingToken) {
+      // ── FIXED: check isSignedIn FIRST ────────────────────────────────────
+      // If Clerk already has an active session (e.g. user refreshed the page
+      // while signed in, or previously completed Google SSO), skip signIn.create()
+      // entirely and just exchange the existing JWT for a Vendure session.
+      if (isSignedIn) {
         await authenticateWithVendure();
         toast.success("Welcome back!");
         onOpenChange?.(false);
@@ -175,12 +191,17 @@ export default function AuthModal({
       });
 
       if (result.status === "complete") {
+        // setActive registers the new session with Clerk's internal state.
+        // The plain-objects error is a harmless Next.js serialisation warning — swallow it.
         try {
           await clerk.setActive({ session: result.createdSessionId });
         } catch (e: any) {
           if (!e?.message?.includes("plain objects")) throw e;
         }
-        await new Promise((r) => setTimeout(r, 300));
+
+        // ── FIXED: wait for token via retry instead of a fixed 300ms sleep ─
+        // clerk.setActive() resolves before the JWT is actually available in
+        // getToken(). Polling is more reliable than a static delay.
         await authenticateWithVendure();
         toast.success("Welcome back!");
         onOpenChange?.(false);
@@ -236,7 +257,7 @@ export default function AuthModal({
 
       if (result.status === "complete") {
         await clerk.setActive({ session: result.createdSessionId });
-        await new Promise((r) => setTimeout(r, 300));
+        // FIXED: use retry helper instead of fixed 300ms sleep
         await authenticateWithVendure(registerForm.referCode.trim() || undefined);
         toast.success("Account created! Welcome 🎉", { duration: 5000 });
         onOpenChange?.(false);
@@ -287,7 +308,7 @@ export default function AuthModal({
       }
 
       await clerk.setActive({ session: result.createdSessionId });
-      await new Promise((r) => setTimeout(r, 300));
+      // FIXED: use retry helper instead of fixed 300ms sleep
       await authenticateWithVendure(registerForm.referCode.trim() || undefined);
       toast.success("Account created! Welcome 🎉", { duration: 5000 });
       onOpenChange?.(false);
@@ -343,15 +364,18 @@ export default function AuthModal({
     setGoogleLoading(true);
 
     try {
+      // ── FIXED: if already signed in to Clerk, don't redirect to Google ──
+      // Just use the existing session to authenticate with Vendure directly.
       if (isSignedIn) {
+        await authenticateWithVendure();
         toast.success("You're already signed in!");
         onOpenChange?.(false);
+        setGoogleLoading(false);
         return;
       }
 
       if (!signIn || !signInLoaded) throw new Error("Auth not ready.");
 
-      // ✅ Capture referral code from whichever tab is active
       const trimmedReferCode = registerForm.referCode?.trim();
       if (trimmedReferCode) {
         sessionStorage.setItem("pendingReferralCode", trimmedReferCode);
@@ -359,7 +383,7 @@ export default function AuthModal({
         sessionStorage.removeItem("pendingReferralCode");
       }
 
-      const baseUrl = window.location.origin; // http://localhost:3000
+      const baseUrl = window.location.origin;
 
       await signIn.authenticateWithRedirect({
         strategy: "oauth_google",
@@ -367,7 +391,7 @@ export default function AuthModal({
         redirectUrlComplete: `${baseUrl}/`,
       });
 
-      // browser leaves here — no code below runs
+      // browser navigates away — nothing below runs
     } catch (err: any) {
       if (err?.message?.includes("already signed in")) {
         toast.success("You're already signed in!");
@@ -793,7 +817,6 @@ export default function AuthModal({
                       <FieldError msg={registerErrors.password} />
                     </div>
 
-                    {/* ✅ Referral code — shared between email and Google signup */}
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-semibold text-[#1C1C1C]">
                         Referral Code (Optional)
@@ -803,7 +826,6 @@ export default function AuthModal({
                         placeholder="Enter Referral Code"
                         value={registerForm.referCode}
                         onChange={(e) => {
-                          // Sanitize: only alphanumeric + hyphens, uppercase, max 20 chars
                           const sanitized = e.target.value
                             .replace(/[^a-zA-Z0-9-]/g, "")
                             .toUpperCase()
@@ -812,7 +834,6 @@ export default function AuthModal({
                         }}
                         className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
                       />
-                      {/* No error shown — invalid/empty codes are silently ignored on the backend */}
                     </div>
 
                     <div>
