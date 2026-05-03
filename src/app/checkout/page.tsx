@@ -34,12 +34,11 @@ type ActiveOrderLine = {
   id: string;
   quantity: number;
   linePriceWithTax: number;
+  featuredAsset?: { id?: string; preview?: string | null } | null;
   productVariant?: {
     id?: string;
     name?: string;
-    product?: {
-      featuredAsset?: { preview?: string | null } | null;
-    } | null;
+    product?: { slug?: string } | null;
   } | null;
 };
 
@@ -51,8 +50,20 @@ type ActiveOrder = {
   subTotalWithTax?: number | null;
   lines: ActiveOrderLine[];
   customer?: { emailAddress?: string | null } | null;
-  shippingAddress?: any;
-  shippingLines?: any[];
+  shippingAddress?: {
+    fullName?: string | null;
+    streetLine1?: string | null;
+    streetLine2?: string | null;
+    city?: string | null;
+    province?: string | null;
+    postalCode?: string | null;
+    countryCode?: string | null;
+    phoneNumber?: string | null;
+  } | null;
+  shippingLines?: {
+    shippingMethod?: { description?: string | null } | null;
+    priceWithTax?: number;
+  }[];
 };
 
 type ShippingMethod = {
@@ -63,22 +74,20 @@ type ShippingMethod = {
 };
 
 type SetShippingAddressResponse = {
-  setOrderShippingAddress:
-  | ActiveOrder
-  | { errorCode: string; message: string };
+  setOrderShippingAddress: ActiveOrder | { errorCode: string; message: string };
 };
 
 type TransitionToStateResponse = {
   transitionOrderToState:
-  | ActiveOrder
-  | {
-    __typename: "OrderStateTransitionError";
-    errorCode: string;
-    message: string;
-    transitionError: string;
-    fromState: string;
-    toState: string;
-  };
+    | ActiveOrder
+    | {
+        __typename: "OrderStateTransitionError";
+        errorCode: string;
+        message: string;
+        transitionError: string;
+        fromState: string;
+        toState: string;
+      };
 };
 
 interface InfoRowProps {
@@ -98,6 +107,15 @@ type PaystackTransactionConfig = {
   onCancel?: () => void;
 };
 
+type PaystackIntentData = {
+  createPaystackPaymentIntent: {
+    authorizationUrl: string;
+    accessCode: string;
+    reference: string;
+    amount: number;
+  };
+};
+
 /* ------------------- Helpers ------------------- */
 
 function extractErrorMessage(err: unknown): string {
@@ -110,11 +128,7 @@ function extractErrorMessage(err: unknown): string {
   }
   if (e?.networkError?.message) return `Network error: ${e.networkError.message}`;
   if (e?.message) return e.message;
-  try {
-    return JSON.stringify(err);
-  } catch {
-    return "An unknown error occurred.";
-  }
+  try { return JSON.stringify(err); } catch { return "An unknown error occurred."; }
 }
 
 const NGN = new Intl.NumberFormat("en-NG", {
@@ -124,6 +138,69 @@ const NGN = new Intl.NumberFormat("en-NG", {
 });
 
 const formatNaira = (kobo: number) => NGN.format(kobo / 100);
+
+/**
+ * Determines the correct recovery strategy based on order state:
+ *
+ * - "ArrangingPayment" with NO prior payment attempt
+ *   → transition back to "AddingItems" (the order is fine, just stuck)
+ *
+ * - "ArrangingPayment" after a FAILED payment (PaymentFailed / PaymentAuthorized)
+ *   → recreateFailedOrder (creates a fresh order copying the lines)
+ *
+ * In practice from the UI we can't tell which sub-case we're in, so we try
+ * transitionToState("AddingItems") first — it's safe and reversible.
+ * If that fails (e.g. server only allows recreate), we fall back to recreate.
+ */
+async function recoverArrangingPaymentOrder(
+  order: ActiveOrder,
+  transitionToState: Function,
+  recreateFailedOrder: Function,
+  refetchActiveOrder: Function,
+  setShippingMethodsReady: (v: boolean) => void
+): Promise<ActiveOrder | null> {
+  // Strategy 1: Try to transition back to AddingItems
+  try {
+    const result = await transitionToState({ variables: { state: "AddingItems" } });
+    const response = result.data?.transitionOrderToState;
+
+    // If transition succeeded (response has an id), refetch and return
+    if (response && "id" in response) {
+      const refreshed = await refetchActiveOrder();
+      const recovered = refreshed.data?.activeOrder;
+      if (recovered && recovered.lines.length > 0 && recovered.state !== "ArrangingPayment") {
+        setShippingMethodsReady(true);
+      }
+      return recovered ?? null;
+    }
+
+    // Transition returned an error — fall through to Strategy 2
+    console.warn(
+      "[checkout] transitionToState(AddingItems) failed:",
+      response?.message ?? "unknown error"
+    );
+  } catch (e) {
+    console.warn(
+      "[checkout] transitionToState(AddingItems) threw, trying recreate:",
+      extractErrorMessage(e)
+    );
+  }
+
+  // Strategy 2: recreateFailedOrder — only works for orders that actually had
+  // a failed/cancelled payment (PaymentFailed, PaymentAuthorized states).
+  try {
+    await recreateFailedOrder({ variables: { orderCode: order.code } });
+    const refreshed = await refetchActiveOrder();
+    const recovered = refreshed.data?.activeOrder;
+    if (recovered && recovered.lines.length > 0 && recovered.state !== "ArrangingPayment") {
+      setShippingMethodsReady(true);
+    }
+    return recovered ?? null;
+  } catch (e) {
+    console.error("[checkout] recreateFailedOrder also failed:", extractErrorMessage(e));
+    throw e; // let the caller handle it
+  }
+}
 
 /* ------------------- Inner Page ------------------- */
 function CheckoutPage() {
@@ -150,28 +227,56 @@ function CheckoutPage() {
   const [installmentPlan, setInstallmentPlan] = useState<InstallmentPlan | null>(null);
   const [addItemToOrder] = useMutation(ADD_TO_CART);
 
-  // Track whether we've already recovered the order in this session
+  // Drives the shipping methods query skip condition.
+  // We use a state flag instead of an inline expression because Apollo's
+  // refetch() silently does nothing while skip=true.
+  const [shippingMethodsReady, setShippingMethodsReady] = useState(false);
+
   const hasRecovered = useRef(false);
 
   const { data: activeOrderData, refetch: refetchActiveOrder } = useQuery<{
     activeOrder: ActiveOrder;
-  }>(GET_ACTIVE_ORDER);
+  }>(GET_ACTIVE_ORDER, {
+    fetchPolicy: "network-only",
+  });
 
   const activeOrder = activeOrderData?.activeOrder;
 
-  // ── On mount: if order is stuck in ArrangingPayment, recover it immediately ──
+  const [transitionToState] = useMutation<TransitionToStateResponse>(TRANSITION_TO_STATE);
+  const [recreateFailedOrder] = useMutation(RECREATE_FAILED_ORDER);
+  const [setShippingAddressMutation] = useMutation<SetShippingAddressResponse>(SET_SHIPPING_ADDRESS);
+  const [setShippingMethodMutation] = useMutation(SET_SHIPPING_METHOD);
+  const [createPaystackIntent] = useMutation<PaystackIntentData>(PAYSTACK_INTENT);
+
+  // Sync shippingMethodsReady with order state.
+  // eligibleShippingMethods requires: order exists + has lines + NOT ArrangingPayment.
+  useEffect(() => {
+    const ready =
+      !!activeOrder &&
+      activeOrder.lines.length > 0 &&
+      activeOrder.state !== "ArrangingPayment";
+    setShippingMethodsReady(ready);
+  }, [activeOrder?.state, activeOrder?.lines?.length]);
+
+  // On mount: recover a stuck ArrangingPayment order.
+  // We try transitioning back to AddingItems first (safe), then recreate as fallback.
   useEffect(() => {
     if (hasRecovered.current) return;
     if (!activeOrder) return;
+    if (activeOrder.state !== "ArrangingPayment") return;
 
-    if (activeOrder.state === "ArrangingPayment") {
-      hasRecovered.current = true;
-      recreateFailedOrder({ variables: { orderCode: activeOrder.code } })
-        .then(() => refetchActiveOrder())
-        .catch((e) =>
-          console.error("[checkout] auto-recovery failed:", extractErrorMessage(e))
-        );
-    }
+    hasRecovered.current = true;
+
+    recoverArrangingPaymentOrder(
+      activeOrder,
+      transitionToState,
+      recreateFailedOrder,
+      refetchActiveOrder,
+      setShippingMethodsReady
+    ).catch((e) => {
+      console.error("[checkout] on-mount recovery failed:", extractErrorMessage(e));
+      toast.error("Could not restore your previous order. Please refresh the page.");
+    });
   }, [activeOrder?.state]);
 
   useEffect(() => {
@@ -181,10 +286,11 @@ function CheckoutPage() {
     }
   }, [searchParams]);
 
-  const { data: shippingMethodsData } = useQuery<{
+  const { data: shippingMethodsData, refetch: refetchShippingMethods } = useQuery<{
     eligibleShippingMethods: ShippingMethod[];
   }>(GET_SHIPPING_METHODS, {
-    skip: !activeOrder,
+    skip: !shippingMethodsReady,
+    fetchPolicy: "network-only",
   });
 
   const shippingMethods = (shippingMethodsData?.eligibleShippingMethods ?? []).filter(
@@ -196,13 +302,6 @@ function CheckoutPage() {
       setSelectedShippingMethod(shippingMethods[0].id);
     }
   }, [shippingMethods, selectedShippingMethod]);
-
-  const [setShippingAddressMutation] =
-    useMutation<SetShippingAddressResponse>(SET_SHIPPING_ADDRESS);
-  const [setShippingMethodMutation] = useMutation(SET_SHIPPING_METHOD);
-  const [transitionToState] = useMutation<TransitionToStateResponse>(TRANSITION_TO_STATE);
-  const [createPaystackIntent] = useMutation(PAYSTACK_INTENT);
-  const [recreateFailedOrder] = useMutation(RECREATE_FAILED_ORDER);
 
   const quantityMap = useMemo<Record<string, number>>(() => {
     const map: Record<string, number> = {};
@@ -247,11 +346,8 @@ function CheckoutPage() {
       if (customer) {
         const orderLineId = getOrderLineIdByVariantId(variantId) ?? lineId;
         if (orderLineId) {
-          try {
-            await removeFromCartMutation(orderLineId);
-          } catch (e) {
-            console.error("[checkout] removeFromCart failed:", extractErrorMessage(e));
-          }
+          try { await removeFromCartMutation(orderLineId); }
+          catch (e) { console.error("[checkout] removeFromCart failed:", extractErrorMessage(e)); }
         }
       }
       return;
@@ -260,9 +356,8 @@ function CheckoutPage() {
     if (customer) {
       const orderLineId = getOrderLineIdByVariantId(variantId) ?? lineId;
       if (orderLineId) {
-        try {
-          await handleAdjustQuantity(orderLineId, newQty);
-        } catch (e) {
+        try { await handleAdjustQuantity(orderLineId, newQty); }
+        catch (e) {
           console.error("[checkout] handleAdjustQuantity failed:", extractErrorMessage(e));
           toast.error("Failed to update quantity.");
         }
@@ -312,7 +407,11 @@ function CheckoutPage() {
           variables: { productVariantId: item.id, quantity: item.quantity },
         });
       }
-      await refetchActiveOrder();
+      const refreshed = await refetchActiveOrder();
+      const refreshedOrder = refreshed.data?.activeOrder;
+      if (refreshedOrder && refreshedOrder.lines.length > 0 && refreshedOrder.state !== "ArrangingPayment") {
+        setShippingMethodsReady(true);
+      }
       return true;
     } catch (err) {
       console.error("[checkout] cart sync failed:", extractErrorMessage(err));
@@ -330,15 +429,24 @@ function CheckoutPage() {
       let { data: freshData } = await refetchActiveOrder();
       let order = freshData?.activeOrder;
 
-      // STEP 0a: If order is still stuck in ArrangingPayment, recover it first
+      // STEP 0a: Recover if stuck in ArrangingPayment
       if (order?.state === "ArrangingPayment") {
         try {
-          await recreateFailedOrder({ variables: { orderCode: order.code } });
-          const recovered = await refetchActiveOrder();
-          order = recovered.data?.activeOrder;
+          const recovered = await recoverArrangingPaymentOrder(
+            order,
+            transitionToState,
+            recreateFailedOrder,
+            refetchActiveOrder,
+            setShippingMethodsReady
+          );
+          if (!recovered) {
+            toast.error("Could not restore your order. Please refresh the page.");
+            return;
+          }
+          order = recovered;
+          await refetchShippingMethods();
         } catch (e) {
-          console.error("[checkout] recovery failed:", extractErrorMessage(e));
-          toast.error("Could not recover your previous order. Please refresh the page.");
+          toast.error("Could not restore your previous order. Please refresh the page.");
           return;
         }
       }
@@ -367,8 +475,7 @@ function CheckoutPage() {
         return;
       }
 
-      // STEP 1: Set shipping address again if we just recovered the order
-      // (the new order won't have the address from the previous attempt)
+      // STEP 1: Re-apply shipping address if order was recreated (address lost)
       if (shippingAddress && !order.shippingAddress) {
         await setShippingAddressMutation({
           variables: {
@@ -387,9 +494,7 @@ function CheckoutPage() {
       }
 
       // STEP 2: Set shipping method
-      await setShippingMethodMutation({
-        variables: { id: [selectedShippingMethod] },
-      });
+      await setShippingMethodMutation({ variables: { id: [selectedShippingMethod] } });
 
       // STEP 3: Refetch after shipping to get confirmed total
       const afterShipping = await refetchActiveOrder();
@@ -401,10 +506,7 @@ function CheckoutPage() {
       }
 
       // STEP 4: Transition to ArrangingPayment
-      const transitionResult = await transitionToState({
-        variables: { state: "ArrangingPayment" },
-      });
-
+      const transitionResult = await transitionToState({ variables: { state: "ArrangingPayment" } });
       const transitionResponse = transitionResult.data?.transitionOrderToState;
 
       if (
@@ -416,41 +518,48 @@ function CheckoutPage() {
         const friendly = raw.includes("empty")
           ? "Your cart is empty. Please add items before paying."
           : raw.includes("address")
-            ? "Please complete your shipping address."
-            : raw;
+          ? "Please complete your shipping address."
+          : raw;
         toast.error(friendly);
         return;
       }
 
-      // STEP 5: Create Paystack intent — use order code from the
-      // post-transition refetch to ensure it's fresh
+      // STEP 5: Refetch after transition to get fresh order code
       const afterTransition = await refetchActiveOrder();
       order = afterTransition.data?.activeOrder ?? order;
 
-      let paystackIntentResult;
+      // STEP 5b: Create Paystack intent — use SERVER-PROVIDED reference
+      let paystackIntentResult: { data?: PaystackIntentData };
       try {
-        paystackIntentResult = await createPaystackIntent({
-          variables: { orderCode: order.code },
-        });
+        paystackIntentResult = await createPaystackIntent({ variables: { orderCode: order.code } });
       } catch (intentErr) {
         console.error("[checkout] createPaystackIntent failed:", extractErrorMessage(intentErr));
         toast.error("Failed to initialise payment. Please try again.");
-        // Recover order so next attempt works cleanly
-        await recreateFailedOrder({ variables: { orderCode: order.code } }).catch(() => {});
-        await refetchActiveOrder();
+        // Recover so the next attempt starts clean
+        await recoverArrangingPaymentOrder(
+          order, transitionToState, recreateFailedOrder, refetchActiveOrder, setShippingMethodsReady
+        ).catch(() => {});
         return;
       }
 
-      // STEP 6: Determine charge amount
-      const serverTotal = order.totalWithTax; // kobo, confirmed by server
+      const intentData = paystackIntentResult.data?.createPaystackPaymentIntent;
+      if (!intentData?.reference) {
+        toast.error("Failed to get payment reference from server. Please try again.");
+        console.error("[checkout] intentData missing reference:", intentData);
+        await recoverArrangingPaymentOrder(
+          order, transitionToState, recreateFailedOrder, refetchActiveOrder, setShippingMethodsReady
+        ).catch(() => {});
+        return;
+      }
 
+      // STEP 6: Determine charge amount — prefer server-confirmed amount
+      const serverTotal = intentData.amount ?? order.totalWithTax;
       const chargeAmount =
         method === "installment" && installmentPlan
           ? Math.round(installmentPlan.depositAmount * 100)
           : serverTotal;
 
       const email = order.customer?.emailAddress ?? "";
-
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         toast.error("A valid email address is required to complete payment. Please log in.");
         return;
@@ -473,12 +582,10 @@ function CheckoutPage() {
         return;
       }
 
-      const uniqueReference = `${order.code}-${Date.now()}`;
-
       console.log("[checkout] Paystack params →", {
         amount: chargeAmount,
         email,
-        reference: uniqueReference,
+        reference: intentData.reference,
         serverTotal,
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY?.slice(0, 10) + "...",
       });
@@ -491,33 +598,35 @@ function CheckoutPage() {
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
         amount: chargeAmount,
         email,
-        reference: uniqueReference,
-
+        reference: intentData.reference,
         channels:
           method === "bank"
             ? ["bank_transfer"]
             : ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
-
         metadata: {
           order_id: order.id,
           order_code: order.code,
           payment_method: method,
         },
-
         onSuccess: () => {
           router.replace(
             `/main/checkout/paystack-redirect?reference=${order!.id}&status=success&amount=${chargeAmount}`
           );
         },
-
         onCancel: async () => {
-          // Recover the order so the user can try again without getting "cart empty"
+          // Recover so the user can try again cleanly
           try {
-            await recreateFailedOrder({ variables: { orderCode: order!.code } });
-            await refetchActiveOrder();
-            hasRecovered.current = false; // allow auto-recovery to run again if needed
+            await recoverArrangingPaymentOrder(
+              order!,
+              transitionToState,
+              recreateFailedOrder,
+              refetchActiveOrder,
+              setShippingMethodsReady
+            );
+            await refetchShippingMethods();
+            hasRecovered.current = false;
           } catch (e) {
-            console.error("[checkout] recreateFailedOrder on cancel failed:", extractErrorMessage(e));
+            console.error("[checkout] recovery on cancel failed:", extractErrorMessage(e));
           }
           toast.error("Payment cancelled. You can try again.");
         },
@@ -543,6 +652,14 @@ function CheckoutPage() {
     return "Pay with Paystack";
   }, [isPaying, method, installmentPlan]);
 
+  const shippingLoadingMessage = useMemo(() => {
+    if (!activeOrder) return "Waiting for order…";
+    if (activeOrder.state === "ArrangingPayment") return "Recovering order, please wait…";
+    if (activeOrder.lines.length === 0) return "Add items to your cart to see shipping options.";
+    if (!shippingMethodsReady) return "Preparing shipping options…";
+    return "Loading shipping methods…";
+  }, [activeOrder?.state, activeOrder?.lines?.length, shippingMethodsReady]);
+
   /* ------------------- Render ------------------- */
   return (
     <main className="min-h-screen bg-neutral-50">
@@ -556,7 +673,6 @@ function CheckoutPage() {
 
           {/* ---------------- LEFT SIDE ---------------- */}
           <section className="space-y-6">
-
             {method === "installment" ? (
               <InstallmentPayment
                 totalAmount={activeOrder?.totalWithTax ?? 0}
@@ -570,10 +686,11 @@ function CheckoutPage() {
                 <div className="flex flex-col gap-4">
                   {/* ── Paystack ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "paystack"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      method === "paystack"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                      }`}
+                    }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -587,23 +704,22 @@ function CheckoutPage() {
                         <p className="text-xs text-neutral-500 mt-0.5">Pay securely via Paystack</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex gap-1 items-center bg-white border border-neutral-200 rounded-lg px-2 py-1">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                          <rect width="24" height="24" rx="4" fill="#ff0000" />
-                          <path d="M4 8h16M4 12h10M4 16h7" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-                        </svg>
-                        <span className="text-xs font-bold text-[#333333]">Paystack</span>
-                      </div>
+                    <div className="flex gap-1 items-center bg-white border border-neutral-200 rounded-lg px-2 py-1">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <rect width="24" height="24" rx="4" fill="#ff0000" />
+                        <path d="M4 8h16M4 12h10M4 16h7" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                      </svg>
+                      <span className="text-xs font-bold text-[#333333]">Paystack</span>
                     </div>
                   </label>
 
                   {/* ── Bank Transfer ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "bank"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      method === "bank"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                      }`}
+                    }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -630,10 +746,11 @@ function CheckoutPage() {
 
                   {/* ── Installment ── */}
                   <label
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${method === "installment"
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      method === "installment"
                         ? "border-[#ff0000] bg-[#f3f3f3]"
                         : "border-[#d1d1d1] bg-neutral-100 hover:border-neutral-300"
-                      }`}
+                    }`}
                   >
                     <div className="flex gap-3 items-center">
                       <input
@@ -699,27 +816,33 @@ function CheckoutPage() {
                   <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5 mt-6">
                     <p className="mb-4 text-lg font-semibold">Shipping Method</p>
                     <div className="space-y-3">
-                      {shippingMethods.map((m) => (
-                        <label
-                          key={m.id}
-                          className="flex items-center justify-between p-3 bg-neutral-100 rounded-lg cursor-pointer hover:bg-neutral-200"
-                        >
-                          <div className="flex gap-3 items-center">
-                            <input
-                              type="radio"
-                              name="shipping"
-                              checked={selectedShippingMethod === m.id}
-                              onChange={() => setSelectedShippingMethod(m.id)}
-                              className="accent-red-500"
-                            />
-                            <div>
-                              <p className="font-medium text-sm">{m.name}</p>
-                              <p className="text-xs text-neutral-600">{m.description}</p>
+                      {shippingMethods.length === 0 ? (
+                        <p className="text-xs text-neutral-500 text-center py-2">
+                          {shippingLoadingMessage}
+                        </p>
+                      ) : (
+                        shippingMethods.map((m) => (
+                          <label
+                            key={m.id}
+                            className="flex items-center justify-between p-3 bg-neutral-100 rounded-lg cursor-pointer hover:bg-neutral-200"
+                          >
+                            <div className="flex gap-3 items-center">
+                              <input
+                                type="radio"
+                                name="shipping"
+                                checked={selectedShippingMethod === m.id}
+                                onChange={() => setSelectedShippingMethod(m.id)}
+                                className="accent-red-500"
+                              />
+                              <div>
+                                <p className="font-medium text-sm">{m.name}</p>
+                                <p className="text-xs text-neutral-600">{m.description}</p>
+                              </div>
                             </div>
-                          </div>
-                          <span className="text-sm font-semibold">{formatNaira(m.price)}</span>
-                        </label>
-                      ))}
+                            <span className="text-sm font-semibold">{formatNaira(m.price)}</span>
+                          </label>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -768,7 +891,7 @@ function CheckoutPage() {
                   return (
                     <div key={ln.id} className="flex gap-3 items-start">
                       <Image
-                        src={ln.productVariant?.product?.featuredAsset?.preview || "/placeholder.png"}
+                        src={ln.featuredAsset?.preview || "/placeholder.png"}
                         alt="preview"
                         width={75}
                         height={75}
@@ -833,10 +956,11 @@ function CheckoutPage() {
               <button
                 onClick={handleCheckout}
                 disabled={isPaying || !activeOrder?.lines?.length}
-                className={`mt-5 w-full py-3 rounded-full text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all ${isPaying || !activeOrder?.lines?.length
+                className={`mt-5 w-full py-3 rounded-full text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
+                  isPaying || !activeOrder?.lines?.length
                     ? "bg-red-300 cursor-not-allowed opacity-70"
                     : "bg-[#ff0000] hover:bg-red-700 active:scale-[0.98]"
-                  }`}
+                }`}
               >
                 {!isPaying && (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
