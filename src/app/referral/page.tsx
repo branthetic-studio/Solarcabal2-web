@@ -1,24 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRef } from "react"; 
+import { useMemo, useState, useEffect } from "react";
 import Navbar from "../../Components/Navbar/Navbar";
 import Footer from "../../Components/Footer/Footer";
 import Refer from "../../Components/Suscribe/Suscribe";
 import "./Referral.css";
 import Image from "next/image";
 import { gql } from "@apollo/client";
-import { useQuery, useMutation } from "@apollo/client/react";
+import { useQuery, useMutation, useLazyQuery } from "@apollo/client/react";
 import { Copy, Check, ChevronDown, Loader2 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import AuthModal from "@/Components/AuthModal";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
-
 const toNaira = (kobo: number) => (kobo / 100).toLocaleString();
 
-// ─── Queries ────────────────────────────────────────────────────────────────
+// ─── Queries ─────────────────────────────────────────────────────────────────
 
 const GET_MY_REFERRAL_CODE = gql`
   query GetMyReferralCode {
@@ -41,7 +40,6 @@ const MY_REFERRAL_SUMMARY = gql`
   }
 `;
 
-// Defined inline so we control the exact fields — "code" is top-level on ReferralEarning
 const MY_REFERRAL_EARNING = gql`
   query MyReferralEarnings {
     myReferralEarnings {
@@ -178,11 +176,13 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
 
   const { data: accountsData, loading: accountsLoading, refetch: refetchAccounts } =
     useQuery<{ myPayoutAccounts: PayoutAccount[] }>(MY_PAYOUT_ACCOUNTS, {
-      fetchPolicy: "network-only",
+      fetchPolicy: "cache-and-network",
     });
 
   const { data: banksData, loading: banksLoading } =
-    useQuery<{ paystackBanks: Bank[] }>(GET_BANK_LIST);
+    useQuery<{ paystackBanks: Bank[] }>(GET_BANK_LIST, {
+      fetchPolicy: "cache-first", // banks list rarely changes
+    });
 
   const [verifyBankAccount] = useMutation<{
     verifyBankAccount: {
@@ -203,8 +203,6 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
 
   const savedAccounts = accountsData?.myPayoutAccounts ?? [];
   const banks = banksData?.paystackBanks ?? [];
-
-  // available is in kobo — convert to naira for display and comparison
   const availableNaira = available / 100;
 
   const filteredBanks = useMemo(
@@ -281,7 +279,6 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
     if (!selectedAccountId) return toast.error("Please select a payout account.");
     try {
       setSubmitting(true);
-      // API expects amount in kobo, so multiply back by 100
       await requestPayout({
         variables: { amount: amountNaira * 100, payoutAccountId: selectedAccountId },
       });
@@ -306,7 +303,6 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
           </button>
         </div>
 
-        {/* ── SELECT STEP ── */}
         {step === "select" && (
           <>
             <p className="text-sm text-neutral-500">
@@ -385,7 +381,6 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
           </>
         )}
 
-        {/* ── NEW ACCOUNT STEP ── */}
         {step === "new" && (
           <>
             <div>
@@ -494,53 +489,80 @@ const WithdrawModal = ({ available, onClose }: WithdrawModalProps) => {
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-
 const ReferralPage = () => {
   const { customer, loading: authLoading } = useUser();
   const [withdrawOpen, setWithdrawOpen] = useState(false);
 
-  const { data: summaryData, loading: summaryLoading } = useQuery<{
-    myReferralSummary: { totalEarned: number; totalWithdrawn: number; available: number };
-  }>(MY_REFERRAL_SUMMARY, {
-    fetchPolicy: "network-only",
-    skip: authLoading || !customer,
-  });
+  // ✅ useLazyQuery for all auth-dependent queries
+  const [fetchSummary, { data: summaryData, loading: summaryLoading }] =
+    useLazyQuery<{
+      myReferralSummary: {
+        totalEarned: number;
+        totalWithdrawn: number;
+        available: number;
+      };
+    }>(MY_REFERRAL_SUMMARY, {
+      fetchPolicy: "cache-and-network",
+    });
 
-  const { data, loading, error: earningsError } = useQuery<{ myReferralEarnings: ReferralEarning[] }>(
-    MY_REFERRAL_EARNING,
-    {
+  const [fetchEarnings, { data, loading }] =
+    useLazyQuery<{ myReferralEarnings: ReferralEarning[] }>(
+      MY_REFERRAL_EARNING,
+      {
+        fetchPolicy: "cache-and-network",
+        errorPolicy: "all",
+      }
+    );
+
+  const [fetchReferralCode, { data: referralCodeData, loading: codeLoading }] =
+    useLazyQuery(GET_MY_REFERRAL_CODE, {
       fetchPolicy: "network-only",
-      errorPolicy: "all",
-      skip: authLoading || !customer,
+    });
+
+  const prevCustomerId = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const currentId = customer?.id ?? null;
+
+    if (customer === undefined) return; // still loading auth
+
+    if (currentId !== prevCustomerId.current) {
+      prevCustomerId.current = currentId;
+
+      if (currentId) {
+        // ✅ Fire queries when user becomes available
+        fetchSummary();
+        fetchEarnings();
+        fetchReferralCode();
+      }
     }
-  );
-
-  // Log without causing a UI error — errorPolicy:"all" already keeps partial data
-  if (earningsError) {
-    console.error("[myReferralEarnings]", earningsError.message);
-  }
-
-  const { data: referralCodeData, loading: codeLoading } = useQuery(GET_MY_REFERRAL_CODE, {
-    skip: authLoading || !customer,
-    fetchPolicy: "cache-and-network",
-  });
+  }, [customer, fetchSummary, fetchEarnings, fetchReferralCode]);
 
   const referralCode = (referralCodeData as any)?.activeCustomer?.customFields
     ?.referralCode as string | undefined;
 
-  const referrals: ReferralEarning[] = (data?.myReferralEarnings ?? []).filter(Boolean) as ReferralEarning[];
+  const referrals: ReferralEarning[] = (data?.myReferralEarnings ?? []).filter(
+    Boolean
+  ) as ReferralEarning[];
+
   const summary = summaryData?.myReferralSummary;
   const availableBalance = summary?.available ?? 0;
 
-  // Split by level
-  const level1Referrals = useMemo(() => referrals.filter((r) => r.level === 1), [referrals]);
-  const level2Referrals = useMemo(() => referrals.filter((r) => r.level === 2), [referrals]);
+  const level1Referrals = useMemo(
+    () => referrals.filter((r) => r.level === 1),
+    [referrals]
+  );
 
-  // Amounts from API are in kobo — sum then convert to naira for display
+  const level2Referrals = useMemo(
+    () => referrals.filter((r) => r.level === 2),
+    [referrals]
+  );
+
   const level1Earnings = useMemo(
     () => level1Referrals.reduce((sum, r) => sum + (r.amount ?? 0), 0),
     [level1Referrals]
   );
+
   const level2Earnings = useMemo(
     () => level2Referrals.reduce((sum, r) => sum + (r.amount ?? 0), 0),
     [level2Referrals]
@@ -561,7 +583,12 @@ const ReferralPage = () => {
         num: level2Referrals.length.toString(),
       },
     ],
-    [level1Earnings, level2Earnings, level1Referrals.length, level2Referrals.length]
+    [
+      level1Earnings,
+      level2Earnings,
+      level1Referrals.length,
+      level2Referrals.length,
+    ]
   );
 
   const [copied, setCopied] = useState(false);
@@ -573,9 +600,24 @@ const ReferralPage = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // ✅ Full-page loader while auth resolves
+  if (customer === undefined) {
+    return (
+      <main>
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-neutral-400" />
+        </div>
+        <Footer />
+      </main>
+    );
+  }
+
   return (
     <main>
       <Navbar />
+
+      
 
       <div className="relative bg-[#181818] py-10 md:py-16 pt-20 md:pt-30 px-4 overflow-hidden">
         <div className="absolute bottom-0 left-0 opacity-100 z-10 pointer-events-none">
@@ -600,7 +642,7 @@ const ReferralPage = () => {
             Share your referral code and earn rewards when your friends order.
           </p>
 
-          {authLoading ? null : customer ? (
+          {customer ? (
             <div className="w-full max-w-md bg-[#2c2929] rounded-xl flex items-center justify-between px-5 py-4 mt-2 min-h-16">
               {codeLoading ? (
                 <span className="text-white/70 text-sm animate-pulse">Loading your referral code...</span>
@@ -652,7 +694,6 @@ const ReferralPage = () => {
             </button>
           </h3>
 
-          {/* Summary strip */}
           {summary && (
             <div className="flex justify-center gap-6 flex-wrap text-sm text-center mb-2">
               <div>
@@ -670,7 +711,6 @@ const ReferralPage = () => {
             </div>
           )}
 
-          {/* Premium cards */}
           <section className="premium-data relative bg-[#181818]">
             {premiumData.map((item, index) => (
               <div key={index} className={index === 1 ? "data" : "data1"}>
@@ -687,21 +727,18 @@ const ReferralPage = () => {
             ))}
           </section>
 
-          {/* Loading state */}
           {loading && (
             <p style={{ textAlign: "center", marginTop: "20px" }} className="my-12 text-xl pt-6 font-semibold">
               Loading referral data...
             </p>
           )}
 
-          {/* Empty state */}
           {!loading && referrals.length === 0 && (
             <p style={{ textAlign: "center", marginTop: "20px" }} className="my-12 text-xl pt-6 font-semibold">
               No referral earnings yet.
             </p>
           )}
 
-          {/* Tables split by level */}
           {!loading && referrals.length > 0 && (
             <>
               {level1Referrals.length > 0 && (

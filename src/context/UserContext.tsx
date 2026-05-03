@@ -17,7 +17,8 @@ import type {
   LoginData,
   LoginVars,
 } from "@/graphql/auth.types.manual";
-import { useClerk } from "@clerk/nextjs";
+import { useClerk, useAuth } from "@clerk/nextjs";
+import { clearPersistedCache } from "../lib/apolloClient";
 
 type Customer = GetCurrentUserData["activeCustomer"];
 
@@ -43,105 +44,164 @@ const Ctx = createContext<UserCtx>({
 
 export const useUser = () => useContext(Ctx);
 
+// ✅ SAFETY: ensure plain objects only
+function toPlain<T>(data: T): T {
+  return data ? JSON.parse(JSON.stringify(data)) : data;
+}
+
 const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const apollo = useApolloClient();
   const clerk = useClerk();
+  const { isLoaded, isSignedIn } = useAuth();
 
-  const [isActing, setIsActing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [customer, setCustomer] = useState<Customer | null | undefined>(undefined);
-  const initialFetchDone = useRef(false);
 
-  // ─── Initial fetch on mount (once) ───────────────────────────────────────
+  const hasInitialized = useRef(false);
+
+  // 🚀 SINGLE SOURCE OF TRUTH INIT
   useEffect(() => {
-    if (initialFetchDone.current) return;
-    initialFetchDone.current = true;
+    if (!isLoaded) return;
 
+    // prevent duplicate runs
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    // 1. Instant UI from cache (no flicker)
+    const cached = apollo.readQuery<GetCurrentUserData>({
+      query: GET_CURRENT_USER,
+    });
+
+    if (cached?.activeCustomer !== undefined) {
+      setCustomer(toPlain(cached.activeCustomer ?? null));
+      setLoading(false);
+    }
+
+    // 2. If NOT signed in → stop here (no backend call)
+    if (!isSignedIn) {
+      setCustomer(null);
+      setLoading(false);
+      return;
+    }
+
+    // 3. If signed in → validate once (no duplicate queries)
     apollo
       .query<GetCurrentUserData>({
         query: GET_CURRENT_USER,
         fetchPolicy: "network-only",
       })
-      .then((result) => {
-        setCustomer(result.data?.activeCustomer ?? null);
+      .then((res) => {
+        const fresh = res.data?.activeCustomer ?? null;
+
+        setCustomer(toPlain(fresh));
+
+        apollo.writeQuery({
+          query: GET_CURRENT_USER,
+          data: toPlain(res.data),
+        });
       })
-      .catch(() => setCustomer(null));
-  }, [apollo]);
+      .catch(() => {
+        setCustomer(null);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [isLoaded, isSignedIn, apollo]);
 
   const [loginMut] = useMutation<LoginData, LoginVars>(LOGIN);
   const [logoutMut] = useMutation(LOGOUT);
 
-  // ─── LOGIN ────────────────────────────────────────────────────────────────
+  // 🔐 LOGIN
   const login = async (username: string, password: string, rememberMe = true) => {
-    setIsActing(true);
+    setLoading(true);
     try {
       const res = await loginMut({
         variables: { username, password, rememberMe },
       });
+
       const payload: any = res.data?.login;
       if (payload?.errorCode) throw new Error(payload.message ?? "Login failed");
-      await refetchUser();
+
+      await refetchUser(); // single refresh
     } finally {
-      setIsActing(false);
+      setLoading(false);
     }
   };
 
-  // ─── LOGOUT ───────────────────────────────────────────────────────────────
+  // 🔓 LOGOUT (clean + stable)
   const logout = async () => {
-    setIsActing(true);
+    setLoading(true);
     try {
       await logoutMut();
+
+      clearPersistedCache(); // wipe local cache
+      await apollo.clearStore(); // clear memory cache
+
+      setCustomer(null); // MUST be null
+
       await clerk.signOut();
-      await apollo.clearStore();
-      setCustomer(null);
+
+      hasInitialized.current = false; // allow fresh init next time
     } finally {
-      setIsActing(false);
+      setLoading(false);
     }
   };
 
-  // ─── REFETCH USER ─────────────────────────────────────────────────────────
+  // 🔄 REFETCH (used after login)
   const refetchUser = useCallback(async () => {
-    const result = await apollo.query<GetCurrentUserData>({
+    const res = await apollo.query<GetCurrentUserData>({
       query: GET_CURRENT_USER,
       fetchPolicy: "network-only",
     });
-    const newCustomer = result.data?.activeCustomer ?? null;
-    setCustomer(newCustomer);
-    apollo.writeQuery({ query: GET_CURRENT_USER, data: result.data });
+
+    const fresh = res.data?.activeCustomer ?? null;
+
+    setCustomer(toPlain(fresh));
+
+    apollo.writeQuery({
+      query: GET_CURRENT_USER,
+      data: toPlain(res.data),
+    });
   }, [apollo]);
 
-  // ─── CALLED AFTER SSO (cookie is guaranteed set before this runs) ─────────
-  // Retries up to 5x with 400ms gaps in case the cookie needs a moment
+  // 🔁 SSO (retry-safe)
   const setCustomerFromSSO = useCallback(async () => {
     for (let i = 0; i < 5; i++) {
-      const result = await apollo.query<GetCurrentUserData>({
+      const res = await apollo.query<GetCurrentUserData>({
         query: GET_CURRENT_USER,
         fetchPolicy: "network-only",
       });
-      const found = result.data?.activeCustomer ?? null;
+
+      const found = res.data?.activeCustomer ?? null;
+
       if (found) {
-        setCustomer(found);
-        apollo.writeQuery({ query: GET_CURRENT_USER, data: result.data });
+        setCustomer(toPlain(found));
+
+        apollo.writeQuery({
+          query: GET_CURRENT_USER,
+          data: toPlain(res.data),
+        });
+
         return;
       }
+
       await new Promise((r) => setTimeout(r, 400));
     }
-    // Fallback: set null so UI doesn't stay in loading limbo
+
     setCustomer(null);
   }, [apollo]);
 
-  const retryGoogleLogin = async () => {};
-
   const value = useMemo(
     () => ({
-      loading: isActing,
+      loading,
       customer,
       login,
       logout,
       refetchUser,
       setCustomerFromSSO,
-      retryGoogleLogin,
+      retryGoogleLogin: async () => {},
     }),
-    [isActing, customer, refetchUser, setCustomerFromSSO]
+    [loading, customer, refetchUser, setCustomerFromSSO]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -26,18 +26,27 @@ export function VendureAuthSync() {
     CLERK_AUTHENTICATE
   );
 
-  // Prevent double-firing on strict mode / re-renders
   const hasSynced = useRef(false);
 
+  // ✅ Reset sync flag when user signs out so next login triggers a fresh sync
+  const prevSignedIn = useRef(isSignedIn);
   useEffect(() => {
-    // Wait for Clerk to finish loading
+    if (prevSignedIn.current && !isSignedIn) {
+      hasSynced.current = false;
+    }
+    prevSignedIn.current = isSignedIn;
+  }, [isSignedIn]);
+
+  useEffect(() => {
     if (!isLoaded) return;
 
-    // User is signed into Clerk but NOT into Vendure yet
-    // This is exactly the state after a Google OAuth redirect
     const isClerkSignedIn = isSignedIn;
-    const isVendureSignedIn = !!customer?.id; // adjust to your UserContext shape
+    const isVendureSignedIn = !!customer?.id;
 
+    // ✅ All three must be true before we attempt sync:
+    // 1. Clerk has a session
+    // 2. Vendure does NOT yet have a matching session (avoid re-syncing)
+    // 3. We haven't already synced this session
     if (!isClerkSignedIn || isVendureSignedIn || hasSynced.current) return;
 
     hasSynced.current = true;
@@ -45,9 +54,11 @@ export function VendureAuthSync() {
     const sync = async () => {
       try {
         const token = await getToken();
-        if (!token) return;
+        if (!token) {
+          hasSynced.current = false;
+          return;
+        }
 
-        // Pull referral code saved before the Google redirect
         const referralCode =
           sessionStorage.getItem("pendingReferralCode") ?? undefined;
 
@@ -61,29 +72,36 @@ export function VendureAuthSync() {
         });
 
         const result = response.data?.authenticate;
-        if (!result) return;
-
-        if (result.__typename === "ErrorResult") {
-          console.error("[VendureAuthSync] Auth error:", result.message);
-          hasSynced.current = false; // allow retry
+        if (!result) {
+          hasSynced.current = false;
           return;
         }
 
-        // Clean up referral code
+        if (result.__typename === "ErrorResult") {
+          console.error("[VendureAuthSync] Auth error:", result.message);
+          hasSynced.current = false;
+          return;
+        }
+
         sessionStorage.removeItem("pendingReferralCode");
 
+        // ✅ refetchUser first — this updates UserContext so customer becomes
+        // non-null, which unblocks CartContext's skip gate and triggers
+        // GET_ACTIVE_ORDER with the now-authenticated session
         await refetchUser();
+
+        // ✅ Then explicitly refetch the cart with the authenticated session
         await apollo.refetchQueries({ include: [GET_ACTIVE_ORDER] });
 
         toast.success("Welcome! You're signed in");
       } catch (err: any) {
         console.error("[VendureAuthSync] Failed to sync:", err);
-        hasSynced.current = false; // allow retry on next render
+        hasSynced.current = false;
       }
     };
 
     sync();
-  }, [isLoaded, isSignedIn, customer?.id]); // re-evaluates when auth state changes
+  }, [isLoaded, isSignedIn, customer?.id]);
 
   return null;
 }

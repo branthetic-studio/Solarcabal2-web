@@ -821,16 +821,20 @@ export default function AuthModal({
                       <label className="text-xs font-semibold text-[#1C1C1C]">
                         Referral Code (Optional)
                       </label>
+
                       <input
                         type="text"
                         placeholder="Enter Referral Code"
                         value={registerForm.referCode}
                         onChange={(e) => {
                           const sanitized = e.target.value
-                            .replace(/[^a-zA-Z0-9-]/g, "")
-                            .toUpperCase()
+                            .replace(/[^a-zA-Z0-9-]/g, "") // keep letters (both cases), numbers, hyphen
                             .slice(0, 20);
-                          setRegisterForm({ ...registerForm, referCode: sanitized });
+
+                          setRegisterForm({
+                            ...registerForm,
+                            referCode: sanitized,
+                          });
                         }}
                         className="w-full rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 text-xs font-semibold focus:outline-none"
                       />

@@ -1,13 +1,14 @@
 "use client";
 
-import {
+import React, {
   createContext,
   PropsWithChildren,
   useContext,
-  useEffect,
   useMemo,
+  useEffect,
+  useRef,
 } from "react";
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation, useLazyQuery } from "@apollo/client/react";
 import {
   GET_ACTIVE_ORDER,
   ADD_TO_CART,
@@ -22,7 +23,6 @@ import {
   AdjustOrderLineMutationVariables,
   ActiveOrder,
 } from "@/graphql/types.manual";
-// ✅ These three were missing
 import { useUser } from "@/context/UserContext";
 import { useLocalCart } from "@/context/LocalCartContext";
 import { useSyncCartOnLogin } from "@/hooks/useSyncCartOnLogin";
@@ -32,13 +32,8 @@ type UseCartContext = {
   activeOrder: ActiveOrder | null | undefined;
   getCount: () => number;
   loading: boolean;
-  addToCartMutation: (
-    variables: AddItemToOrderMutationVariables
-  ) => Promise<any>;
-  handleAdjustQuantity: (
-    orderLineId: string,
-    quantity: number
-  ) => Promise<void>;
+  addToCartMutation: (variables: AddItemToOrderMutationVariables) => Promise<any>;
+  handleAdjustQuantity: (orderLineId: string, quantity: number) => Promise<void>;
   removeFromCartMutation: (orderLineId: string) => Promise<void>;
   getOrderLineIdByVariantId: (variantId: string) => string | undefined;
 };
@@ -48,9 +43,9 @@ const initialCtx: UseCartContext = {
   activeOrder: undefined,
   getCount: () => 0,
   loading: false,
-  addToCartMutation: async () => { },
-  handleAdjustQuantity: async () => { },
-  removeFromCartMutation: async () => { },
+  addToCartMutation: async () => {},
+  handleAdjustQuantity: async () => {},
+  removeFromCartMutation: async () => {},
   getOrderLineIdByVariantId: () => undefined,
 };
 
@@ -58,15 +53,44 @@ const CartContext = createContext<UseCartContext>(initialCtx);
 export const useCart = () => useContext(CartContext);
 
 const CartProvider = ({ children }: PropsWithChildren) => {
-  // ✅ Pull in customer and clearCart for sync
-  const { customer } = useUser();
+  const { customer, loading: authLoading } = useUser();
   const { clearCart } = useLocalCart();
 
-  const { data, refetch, loading } = useQuery<GetActiveOrderData>(
+  // ✅ useLazyQuery instead of useQuery
+  // useQuery with skip=true never re-fires when skip flips to false
+  // if the component was already mounted. useLazyQuery lets us
+  // manually fire the query exactly when we want it.
+  const [fetchCart, { data, loading: cartLoading }] = useLazyQuery<GetActiveOrderData>(
     GET_ACTIVE_ORDER,
     { fetchPolicy: "cache-and-network" }
   );
 
+  const prevCustomerId = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const currentId = customer?.id ?? null;
+    const prevId = prevCustomerId.current;
+
+    // ✅ Only fetch when:
+    // 1. Auth has resolved (customer !== undefined)
+    // 2. Customer ID actually changed (login/logout transition)
+    // This fires on:
+    //   - Page load with existing session (undefined → "123")
+    //   - Login on the page (null → "123")
+    //   - Re-login after logout ("123" → null → "456")
+    if (customer === undefined) return;
+
+    if (currentId !== prevId) {
+      prevCustomerId.current = currentId;
+
+      if (currentId) {
+        // Customer just logged in — fetch their cart
+        fetchCart();
+      }
+      // If currentId is null, user logged out — cart data
+      // naturally becomes undefined since we don't refetch
+    }
+  }, [customer, fetchCart]);
 
   const [addItem] = useMutation<AddItemToOrderMutation>(ADD_TO_CART, {
     refetchQueries: [{ query: GET_ACTIVE_ORDER }],
@@ -96,17 +120,12 @@ const CartProvider = ({ children }: PropsWithChildren) => {
       (line) => line?.productVariant?.id === variantId
     )?.id;
 
-  const addToCartMutation = async (
-    variables: AddItemToOrderMutationVariables
-  ) => {
+  const addToCartMutation = async (variables: AddItemToOrderMutationVariables) => {
     const result = await addItem({ variables });
     return result.data?.addItemToOrder;
   };
 
-  const handleAdjustQuantity = async (
-    orderLineId: string,
-    quantity: number
-  ) => {
+  const handleAdjustQuantity = async (orderLineId: string, quantity: number) => {
     await adjustLine({ variables: { orderLineId, quantity } });
   };
 
@@ -114,11 +133,6 @@ const CartProvider = ({ children }: PropsWithChildren) => {
     await removeLine({ variables: { orderLineId } });
   };
 
-  useEffect(() => {
-    void refetch();
-  }, [refetch]);
-
-  // ✅ This is what was missing — triggers the sync on login
   useSyncCartOnLogin(!!customer, addToCartMutation, clearCart);
 
   return (
@@ -127,7 +141,7 @@ const CartProvider = ({ children }: PropsWithChildren) => {
         cart: data,
         activeOrder: data?.activeOrder,
         getCount,
-        loading,
+        loading: authLoading || cartLoading,
         addToCartMutation,
         handleAdjustQuantity,
         removeFromCartMutation,
