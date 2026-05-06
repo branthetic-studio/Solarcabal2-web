@@ -163,6 +163,11 @@ export const ACTIVE_ORDER_FRAGMENT = gql`
         product {
           id
           name
+          slug
+          collections {
+            id
+            slug
+          }
           featuredAsset {
             id
             preview

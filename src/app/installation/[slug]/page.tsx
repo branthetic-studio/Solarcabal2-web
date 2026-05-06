@@ -325,11 +325,25 @@ export default function InstallationListingPage() {
         product?.featuredAsset?.preview ??
         undefined;
 
-      // Always add to local cart first (instant, optimistic)
+      /**
+       * ✅ Encode collectionSlug, productSlug, and variantId into a single
+       * pipe-separated slug string. CartPage's getItemHref() will decode this
+       * and reconstruct the correct /installation/[collectionSlug]?productSlug=...&variantId=...
+       * URL when the user clicks the item in their cart.
+       *
+       * Format: "collectionSlug|productSlug|variantId"
+       *
+       * collectionSlug must start with "installation-" so getItemHref knows
+       * this is an installation item, not a regular product.
+       */
+      const resolvedCollectionSlug = collectionSlug ?? "";
+      const resolvedProductSlug = productSlug ?? "";
+      const encodedSlug = `${resolvedCollectionSlug}|${resolvedProductSlug}|${activeVariant.id}`;
+
       addLocalItem({
         id: activeVariant.id,
         name: productName || packageTitle,
-        slug: productSlug ?? collectionSlug ?? "",
+        slug: encodedSlug, // ← encoded so CartPage can route back correctly
         priceWithTax: activeVariant.priceWithTax,
         currencyCode: "NGN",
         image,
@@ -547,7 +561,7 @@ export default function InstallationListingPage() {
                   </div>
                 )}
 
-                {/* ✅ Add to Cart / Buy Now / Pay Later */}
+                {/* Add to Cart / Buy Now / Pay Later */}
                 <div className="mt-6 flex items-center justify-between w-100 gap-6 px-4">
                   <button
                     onClick={handleAddToCart}
@@ -564,7 +578,6 @@ export default function InstallationListingPage() {
                     Buy Now
                   </button>
 
-                  {/* Pay Later — routes to checkout with installment pre-selected */}
                   <button
                     onClick={handlePayLater}
                     disabled={addingToCart || !activeVariant}
