@@ -411,7 +411,7 @@ export default function ProductGrid({
                           <Link href={`/products/${item.slug}`}>
                             <img
                               src={item.image || "/placeholder.png"}
-                              className="w-full h-40 object-contain rounded-md"
+                              className="w-full h-full object-contain rounded-md"
                               alt={item.name}
                             />
                           </Link>

@@ -30,12 +30,14 @@ type SidebarProps = {
   currency?: string;
   minPrice: number;
   maxPrice: number;
+  priceStep?: number; // ← NEW: step increment for the price slider
 };
 
 // ─── Dual Range Slider ────────────────────────────────────────────────────────
 type DualRangeSliderProps = {
   min: number;
   max: number;
+  step?: number; // ← NEW
   value: [number, number];
   onChange: (value: [number, number]) => void;
   currency?: string;
@@ -44,6 +46,7 @@ type DualRangeSliderProps = {
 const DualRangeSlider: React.FC<DualRangeSliderProps> = ({
   min,
   max,
+  step = 5000, // ← default step of ₦5,000
   value,
   onChange,
   currency = "NGN",
@@ -53,16 +56,23 @@ const DualRangeSlider: React.FC<DualRangeSliderProps> = ({
   const clamp = (val: number, lo: number, hi: number) =>
     Math.min(Math.max(val, lo), hi);
 
-  // Convert a pixel offset inside the track → a value in [min, max]
+  // Snap a raw value to the nearest step
+  const snapToStep = useCallback(
+    (val: number): number => Math.round(val / step) * step,
+    [step]
+  );
+
+  // Convert a pixel offset inside the track → a value snapped to step
   const pxToVal = useCallback(
     (px: number): number => {
       const track = rangeRef.current;
       if (!track) return min;
       const { left, width } = track.getBoundingClientRect();
       const ratio = clamp((px - left) / width, 0, 1);
-      return Math.round(min + ratio * (max - min));
+      const raw = min + ratio * (max - min);
+      return snapToStep(raw);
     },
-    [min, max]
+    [min, max, snapToStep]
   );
 
   // Percentage helpers for the filled track
@@ -74,7 +84,7 @@ const DualRangeSlider: React.FC<DualRangeSliderProps> = ({
     e.currentTarget.setPointerCapture(e.pointerId);
 
     const move = (ev: PointerEvent) => {
-      const newMin = clamp(pxToVal(ev.clientX), min, value[1] - 1);
+      const newMin = clamp(pxToVal(ev.clientX), min, value[1] - step);
       onChange([newMin, value[1]]);
     };
 
@@ -92,7 +102,7 @@ const DualRangeSlider: React.FC<DualRangeSliderProps> = ({
     e.currentTarget.setPointerCapture(e.pointerId);
 
     const move = (ev: PointerEvent) => {
-      const newMax = clamp(pxToVal(ev.clientX), value[0] + 1, max);
+      const newMax = clamp(pxToVal(ev.clientX), value[0] + step, max);
       onChange([value[0], newMax]);
     };
 
@@ -105,15 +115,24 @@ const DualRangeSlider: React.FC<DualRangeSliderProps> = ({
     window.addEventListener("pointerup", up);
   };
 
-  // ── number input handlers ──
+  // ── number input handlers — snap on blur for clean UX ──
   const handleMinInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = clamp(+e.target.value, min, value[1] - 1);
-    onChange([v, value[1]]);
+    const raw = +e.target.value;
+    const snapped = clamp(snapToStep(raw), min, value[1] - step);
+    onChange([snapped, value[1]]);
   };
 
   const handleMaxInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = clamp(+e.target.value, value[0] + 1, max);
-    onChange([value[0], v]);
+    const raw = +e.target.value;
+    const snapped = clamp(snapToStep(raw), value[0] + step, max);
+    onChange([value[0], snapped]);
+  };
+
+  // Format large numbers for display labels (e.g. 1500000 → "1.5M")
+  const formatLabel = (val: number): string => {
+    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+    if (val >= 1_000) return `${(val / 1_000).toFixed(0)}k`;
+    return val.toLocaleString();
   };
 
   return (
@@ -125,7 +144,8 @@ const DualRangeSlider: React.FC<DualRangeSliderProps> = ({
             type="number"
             value={value[0]}
             min={min}
-            max={value[1] - 1}
+            max={value[1] - step}
+            step={step}
             onChange={handleMinInput}
             className="w-full py-1.5 outline-none text-sm text-neutral-700"
           />
@@ -136,8 +156,9 @@ const DualRangeSlider: React.FC<DualRangeSliderProps> = ({
           <input
             type="number"
             value={value[1]}
-            min={value[0] + 1}
+            min={value[0] + step}
             max={max}
+            step={step}
             onChange={handleMaxInput}
             className="w-full py-1.5 outline-none text-sm text-neutral-700"
           />
@@ -181,8 +202,8 @@ const DualRangeSlider: React.FC<DualRangeSliderProps> = ({
 
       {/* Min / Max labels */}
       <div className="flex justify-between text-xs text-neutral-400">
-        <span>{min.toLocaleString()} {currency}</span>
-        <span>{max.toLocaleString()} {currency}</span>
+        <span>{formatLabel(min)} {currency}</span>
+        <span>{formatLabel(max)} {currency}</span>
       </div>
     </div>
   );
@@ -202,6 +223,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   currency = "NGN",
   minPrice,
   maxPrice,
+  priceStep = 10_000, // ← default ₦10,000 step; override per project needs
 }) => {
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -339,6 +361,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <DualRangeSlider
             min={minPrice}
             max={maxPrice}
+            step={priceStep}
             value={priceRange}
             onChange={setPriceRange}
             currency={currency}
