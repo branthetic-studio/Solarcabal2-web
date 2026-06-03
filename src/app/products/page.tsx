@@ -156,7 +156,7 @@ function PageContent() {
   }
 
   return (
-    <div>
+    <div className="w-full bg-[#FAFAFA] ">
       <Navbar />
       <Topbar
         selectedBrand={selectedBrand}
@@ -174,8 +174,13 @@ function PageContent() {
           }));
 
           return (
-            <div className="flex flex-col lg:flex-row bg-[#f5f5f5] px-3 sm:px-6 md:px-10 lg:px-8 pb-10">
+            <div className="w-full bg-[#f5f5f5]">
+
+  <div className="flex w-[94%] mx-auto gap-8 ">
               {/* Sidebar */}
+
+
+               {/* <div className="flex flex-col lg:flex-row bg-[#f5f5f5] px-3 sm:px-6 md:px-10 lg:px-8 pb-10"></div> */}
               <div className="w-full lg:w-1/4 h-full mb-6 md:mb-0">
                 <Sidebar
                   selectedCategorySlug={selectedCategorySlug}
@@ -198,7 +203,7 @@ function PageContent() {
               </div>
 
               {/* Main content */}
-              <div className="flex w-full h-full items-center gap-8 p-4">
+              <div className="flex w-full h-full  items-center gap-8 pb-10">
                 <ProductGrid
                   categorySlug={selectedCategorySlug}
                   brand={selectedBrand.length === 0 ? null : selectedBrand}
@@ -209,10 +214,13 @@ function PageContent() {
                 />
               </div>
 
-              <div className="w-2/5 product-cart hidden lg:block">
+              <div className="w-2/5 product-cart hidden lg:block ">
                 <CartItems />
               </div>
             </div>
+
+            </div>
+          
           );
         }}
       </BrandsLoader>

@@ -196,9 +196,9 @@ export default function CartPage() {
 
   /* ── Main cart view ──────────────────────────────────────────────────────── */
   return (
-    <main className="w-full">
+    <main className="w-full   bg-[#f5f5f5]">
       <Navbar />
-      <div className="w-full px-18">
+      <div className="mx-auto max-w-[95%] px-4 py-10">
         <div className="flex items-center justify-between">
           <h1 className="text-xl sm:text-2xl font-semibold">Shopping Cart</h1>
         </div>

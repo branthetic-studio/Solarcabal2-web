@@ -28,10 +28,11 @@ const Topbar: React.FC<Props> = ({
   };
 
   return (
-    <div className="w-full bg-[#f5f5f5] px-4 sm:px-8 lg:px-16">
+    <div className="w-full bg-[#f5f5f5] py-8 px-4 sm:px-8 lg:px-0">
       {/* Header Section */}
       <div
         className="
+lg:max-w-[90%] mx-auto
           flex flex-col gap-4
           md:flex-row md:items-center md:justify-between
           py-4

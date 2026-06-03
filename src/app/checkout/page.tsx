@@ -662,12 +662,12 @@ function CheckoutPage() {
 
   /* ------------------- Render ------------------- */
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen  bg-[#f5f5f5]">
       <Navbar />
 
-      <div className="mx-auto max-w-6xl px-4 py-6">
-        <h1 className="text-md font-semibold text-neutral-800">Payment Method</h1>
-        <p className="text-xs text-neutral-500">Showing your selected products</p>
+      <div className="mx-auto max-w-[95%] px-4 py-10">
+        <h1 className="text-[20px] font-semibold text-[#0B0F0E]">Payment Method</h1>
+        <p className="text-[14px] text-[#818B9C] mt-2">Showing your selected products</p>
 
         <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
 
@@ -681,7 +681,48 @@ function CheckoutPage() {
               />
             ) : (
               <div className="rounded-2xl border border-[#d1d1d1] p-5">
-                <p className="mb-4 text-lg font-semibold">Payment</p>
+                  {/* ── Shipping Address ── */}
+                <div className="my-6">
+                  <p className="mb-4 text-[22px] font-[500] text-[#000000]">Billing Address</p>
+
+                  <div className="rounded-2xl border border-[#d1d1d1]  p-5">
+                    <p className="mb-4 text-lg font-semibold">Shipping Address</p>
+                    {activeOrder?.shippingAddress || shippingAddress ? (
+                      <div className="bg-neutral-100 rounded-xl p-3">
+                        <p className="text-sm font-medium">
+                          {activeOrder?.shippingAddress?.fullName || shippingAddress?.fullName}
+                        </p>
+                        <p className="text-xs text-neutral-600">
+                          {activeOrder?.shippingAddress?.streetLine1 || shippingAddress?.streetLine1}
+                        </p>
+                        <p className="text-xs text-neutral-600">
+                          {activeOrder?.shippingAddress?.city || shippingAddress?.city}
+                        </p>
+                        <AddressModal
+                          trigger={
+                            <button className="mt-2 text-xs text-red-500 hover:text-red-600">
+                              Change Address
+                            </button>
+                          }
+                          onSubmit={handleAddressSubmit}
+                        />
+                      </div>
+                    ) : (
+                      <AddressModal
+                        trigger={
+                          <button className="w-full py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600">
+                            Add Shipping Address
+                          </button>
+                        }
+                        onSubmit={handleAddressSubmit}
+                      />
+                    )}
+                  </div>
+
+                 
+                </div>
+
+                <p className="mb-4 text-[22px] font-[500] text-[#000000]">Payment</p>
 
                 <div className="flex flex-col gap-4">
                   {/* ── Paystack ── */}
@@ -772,48 +813,10 @@ function CheckoutPage() {
                       <span className="text-xs font-medium text-neutral-600">Pay Later</span>
                     </div>
                   </label>
-                </div>
 
-                {/* ── Shipping Address ── */}
-                <div className="my-6">
-                  <p className="mb-2 text-sm font-semibold">Billing Address</p>
 
-                  <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5">
-                    <p className="mb-4 text-lg font-semibold">Shipping Address</p>
-                    {activeOrder?.shippingAddress || shippingAddress ? (
-                      <div className="bg-neutral-100 rounded-xl p-3">
-                        <p className="text-sm font-medium">
-                          {activeOrder?.shippingAddress?.fullName || shippingAddress?.fullName}
-                        </p>
-                        <p className="text-xs text-neutral-600">
-                          {activeOrder?.shippingAddress?.streetLine1 || shippingAddress?.streetLine1}
-                        </p>
-                        <p className="text-xs text-neutral-600">
-                          {activeOrder?.shippingAddress?.city || shippingAddress?.city}
-                        </p>
-                        <AddressModal
-                          trigger={
-                            <button className="mt-2 text-xs text-red-500 hover:text-red-600">
-                              Change Address
-                            </button>
-                          }
-                          onSubmit={handleAddressSubmit}
-                        />
-                      </div>
-                    ) : (
-                      <AddressModal
-                        trigger={
-                          <button className="w-full py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600">
-                            Add Shipping Address
-                          </button>
-                        }
-                        onSubmit={handleAddressSubmit}
-                      />
-                    )}
-                  </div>
-
-                  {/* ── Shipping Method ── */}
-                  <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5 mt-6">
+                   {/* ── Shipping Method ── */}
+                  <div className="rounded-2xl border border-[#d1d1d1]  p-5 mt-6">
                     <p className="mb-4 text-lg font-semibold">Shipping Method</p>
                     <div className="space-y-3">
                       {shippingMethods.length === 0 ? (
@@ -845,18 +848,21 @@ function CheckoutPage() {
                       )}
                     </div>
                   </div>
+                  
                 </div>
+
+              
               </div>
             )}
 
             <button
               onClick={() => router.push("/cart")}
-              className="text-red-500 text-sm font-medium flex items-center gap-2"
+              className="text-red-500 text-[16px] font-medium flex items-center gap-2"
             >
-              <Image src="/shopping-cart.png" alt="Back" width={16} height={16} /> Return to Cart
+              <Image src="/shopping-cart.png" alt="Back" width={18} height={18} /> Return to Cart
             </button>
 
-            <div className="rounded-2xl border border-[#d1d1d1] bg-white p-5 pt-8">
+            <div className="rounded-2xl border border-[#d1d1d1] p-5 pt-8">
               <h3 className="text-sm font-semibold mb-4 border-b border-[#d1d1d1] pb-4">
                 Delivery & Products
               </h3>
@@ -870,8 +876,8 @@ function CheckoutPage() {
 
           {/* ---------------- RIGHT SIDE (SUMMARY) ---------------- */}
           <aside className="lg:sticky lg:top-6">
-            <div className="rounded-2xl border border-[#d1d1d1] bg-white p-6">
-              <p className="text-sm font-semibold mb-3">Your Order</p>
+            <div className="rounded-[8px] border-[2px] border-[#EDEDED]  p-6">
+              <p className="text-[24px] font-[500] mb-3 text-[#0C0C0C]">Your Order</p>
 
               {(!activeOrder?.lines || activeOrder.lines.length === 0) && (
                 <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600">
@@ -1018,16 +1024,16 @@ export default function Page() {
 /* ---------------- Helper Components ---------------- */
 function Row({ label, value, bold, big }: any) {
   return (
-    <div className="flex justify-between text-[#717171] font-xs">
+    <div className="flex justify-between text-[#717171] font-[14px}">
       <span className="font-light">{label}</span>
-      <span className={`${bold ? "font-bold" : ""} ${big ? "text-base" : ""}`}>{value}</span>
+      <span className={`${bold ? "font-bold" : ""} ${big ? "text-base" : ""} ${big ? "font-[25px]" : ""}`}>{value}</span>
     </div>
   );
 }
 
 function InfoRow({ icon, title, text }: InfoRowProps) {
   return (
-    <div className="flex items-center gap-3 border-b border-[#f0f0f0] pb-2">
+    <div className="flex items-center gap-3 border-b border-[#d1d1d1] pb-2">
       <Image className="shrink-0" src={icon} alt="Icon" width={24} height={24} />
       <div>
         <p className="font-medium">{title}</p>
