@@ -711,7 +711,7 @@ const ReferralPage = () => {
             </div>
           )}
 
-          <section className="premium-data relative bg-[#181818]">
+          {/* <section className="premium-data relative bg-[#181818]">
             {premiumData.map((item, index) => (
               <div key={index} className={index === 1 ? "data" : "data1"}>
                 <div>
@@ -725,7 +725,7 @@ const ReferralPage = () => {
                 </div>
               </div>
             ))}
-          </section>
+          </section> */}
 
           {loading && (
             <p style={{ textAlign: "center", marginTop: "20px" }} className="my-12 text-xl pt-6 font-semibold">

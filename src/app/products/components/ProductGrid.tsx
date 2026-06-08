@@ -75,12 +75,12 @@
 // }
 
 // type GridItem = {
-//   id: string;
+//   id: string;       // slug — stable key used everywhere
 //   name: string;
 //   slug: string;
 //   image?: string;
 //   brand: string;
-//   priceRaw?: number; // in cents
+//   priceRaw?: number;
 //   currencyCode: string;
 // };
 
@@ -108,7 +108,13 @@
 //     updateQuantity: updateLocalQuantity,
 //   } = useLocalCart();
 
+//   // variantIdMap: slug → variantId (populated lazily on first add-to-cart,
+//   // AND eagerly from cart data on mount so refresh restores quantities)
 //   const variantIdMap = useRef<Record<string, string>>({});
+
+//   // reverse map: variantId → slug (built from cart on every render)
+//   const variantToSlug = useRef<Record<string, string>>({});
+
 //   const [openBrands, setOpenBrands] = useState<Record<string, boolean>>({});
 
 //   const [loadDetails] = useLazyQuery<GetProductDetailsResponse>(
@@ -131,20 +137,42 @@
 
 //   const { data: facetsData } = useQuery<GetAllFacetsResponse>(GET_ALL_FACETS);
 
+//   // ─── Build reverse map from live cart data ────────────────────────────────
+//   // This runs on every render so variantToSlug is always up-to-date.
+//   // For server cart: line.productVariant.id → line.productVariant.product.slug
+//   // For local cart: item.id is variantId, item.slug is the product slug
+//   useEffect(() => {
+//     if (customer) {
+//       (cart?.activeOrder?.lines ?? []).forEach((line: any) => {
+//         const variantId = line?.productVariant?.id;
+//         const slug =
+//           line?.productVariant?.product?.slug ??
+//           line?.productVariant?.name; // fallback
+//         if (variantId && slug) {
+//           variantToSlug.current[variantId] = slug;
+//           variantIdMap.current[slug] = variantId; // also populate forward map
+//         }
+//       });
+//     } else {
+//       localItems.forEach((item) => {
+//         if (item.id && item.slug) {
+//           variantToSlug.current[item.id] = item.slug;
+//           variantIdMap.current[item.slug] = item.id;
+//         }
+//       });
+//     }
+//   }, [customer, cart, localItems]);
+
 //   // ─── Brand buckets with price filtering ───────────────────────────────────
 //   const brandBuckets = useMemo(() => {
 //     const items = data?.search?.items ?? [];
 //     const facetItems = facetsData?.facets?.items ?? [];
 //     if (!items.length) return [];
 
-//     // priceRange is in display units (e.g. ₦1,500)
-//     // priceRaw from the API is in cents (e.g. 150000 = ₦1,500)
-//     // Multiply display range by 100 to compare correctly
 //     const [minDisplay, maxDisplay] = priceRange;
 //     const minCents = minDisplay * 100;
 //     const maxCents = maxDisplay * 100;
 
-//     // Build facetValueId → { name, facetName } map
 //     const facetValueMap: Record<string, { name: string; facetName: string }> = {};
 //     facetItems.forEach((facet) => {
 //       facet.values.forEach((val) => {
@@ -161,7 +189,6 @@
 //     > = {};
 
 //     items.forEach((it) => {
-//       // Resolve brand name from facets
 //       let brandName = "Others";
 //       if (it.facetValueIds?.length) {
 //         for (const id of it.facetValueIds) {
@@ -173,13 +200,11 @@
 //         }
 //       }
 
-//       // Resolve raw price in cents
 //       const priceRaw =
 //         it.priceWithTax.__typename === "SinglePrice"
 //           ? it.priceWithTax.value
 //           : it.priceWithTax.min;
 
-//       // ── Price filter: skip items outside the selected range ──
 //       if (priceRaw !== undefined) {
 //         if (priceRaw < minCents || priceRaw > maxCents) return;
 //       }
@@ -189,7 +214,7 @@
 //       }
 
 //       buckets[brandName].items.push({
-//         id: it.slug,
+//         id: it.slug,       // slug as stable ID
 //         name: it.productName,
 //         slug: it.slug,
 //         image: it.productAsset?.preview,
@@ -201,7 +226,6 @@
 
 //     const result = Object.values(buckets);
 
-//     // Sort items within each bucket
 //     result.forEach((bucket) => {
 //       bucket.items.sort((a, b) => {
 //         switch (sort) {
@@ -214,9 +238,8 @@
 //       });
 //     });
 
-//     // Remove buckets that are empty after price filtering
 //     return result.filter((bucket) => bucket.items.length > 0);
-//   }, [data, facetsData, sort, priceRange]); // ← priceRange is a dependency
+//   }, [data, facetsData, sort, priceRange]);
 
 //   // Open all brand sections by default on first load
 //   useEffect(() => {
@@ -231,27 +254,33 @@
 //     }
 //   }, [brandBuckets]);
 
-//   // ─── quantityMap derived from live cart contexts ──────────────────────────
+//   // ─── quantityMap keyed by SLUG (not variantId) ────────────────────────────
+//   // This is the core fix: we key by slug so quantities survive refresh.
+//   // On refresh, variantToSlug is rebuilt from cart data in the useEffect above,
+//   // so the slug lookup always works even before any click.
 //   const quantityMap = useMemo<Record<string, number>>(() => {
 //     const map: Record<string, number> = {};
-//     const slugToVariant = variantIdMap.current;
 
 //     if (customer) {
-//       const serverQty: Record<string, number> = {};
+//       // Server cart: look up slug from variantToSlug reverse map
 //       (cart?.activeOrder?.lines ?? []).forEach((line: any) => {
-//         const vid = line?.productVariant?.id;
-//         if (vid) serverQty[vid] = line.quantity ?? 0;
-//       });
-//       Object.entries(slugToVariant).forEach(([slug, variantId]) => {
-//         const qty = serverQty[variantId];
-//         if (qty && qty > 0) map[slug] = qty;
+//         const variantId = line?.productVariant?.id;
+//         const qty = line?.quantity ?? 0;
+//         if (!variantId || qty <= 0) return;
+
+//         // Try reverse map first, then fall back to product slug on the line
+//         const slug =
+//           variantToSlug.current[variantId] ??
+//           line?.productVariant?.product?.slug;
+
+//         if (slug) map[slug] = qty;
 //       });
 //     } else {
-//       const localQty: Record<string, number> = {};
-//       localItems.forEach((it) => { localQty[it.id] = it.quantity; });
-//       Object.entries(slugToVariant).forEach(([slug, variantId]) => {
-//         const qty = localQty[variantId];
-//         if (qty && qty > 0) map[slug] = qty;
+//       // Local cart: item.slug is the product slug, item.id is variantId
+//       localItems.forEach((item) => {
+//         if (item.slug && item.quantity > 0) {
+//           map[item.slug] = item.quantity;
+//         }
 //       });
 //     }
 
@@ -261,11 +290,15 @@
 //   // ─── Resolve & cache variantId ─────────────────────────────────────────────
 //   const resolveVariant = useCallback(
 //     async (item: GridItem): Promise<string | null> => {
+//       // Already cached from a previous click or from cart data on mount
 //       if (variantIdMap.current[item.id]) return variantIdMap.current[item.id];
+
 //       const { data: pd } = await loadDetails({ variables: { slug: item.slug } });
 //       const variant = pd?.product?.variants?.[0];
 //       if (!variant) return null;
+
 //       variantIdMap.current[item.id] = variant.id;
+//       variantToSlug.current[variant.id] = item.slug;
 //       return variant.id;
 //     },
 //     [loadDetails]
@@ -275,14 +308,12 @@
 //   const handleAddToCart = useCallback(
 //     async (item: GridItem) => {
 //       try {
-//         // resolveVariant internally calls loadDetails and caches the variantId
 //         const variantId = await resolveVariant(item);
 //         if (!variantId) {
 //           toast.error("Could not load product details");
 //           return;
 //         }
 
-//         // Use the cached result from resolveVariant — no second network call needed
 //         const cached = await loadDetails({ variables: { slug: item.slug } });
 //         const pd = cached?.data;
 
@@ -292,15 +323,12 @@
 //           pd?.product?.assets?.[0]?.preview ??
 //           undefined;
 
-//         // item.priceRaw comes from GET_COLLECTION_PRODUCTS (search results) and
-//         // is always correct in cents. Use it directly instead of relying on
-//         // GET_PRODUCT_DETAILS variant.priceWithTax which can return undefined.
 //         const priceInCents = item.priceRaw ?? 0;
 
 //         addLocalItem({
 //           id: variantId,
 //           name: item.name,
-//           slug: item.slug,
+//           slug: item.slug,   // ← always persist slug so quantityMap works on refresh
 //           priceWithTax: priceInCents,
 //           currencyCode: item.currencyCode,
 //           brand: item.brand,
@@ -326,7 +354,10 @@
 //     async (item: GridItem, change: number) => {
 //       const current = quantityMap[item.id] ?? 0;
 //       const newQty = current + change;
-//       const variantId = variantIdMap.current[item.id];
+
+//       // Ensure variantId is resolved before adjusting
+//       const variantId =
+//         variantIdMap.current[item.id] ?? (await resolveVariant(item));
 //       if (!variantId) return;
 
 //       if (newQty <= 0) {
@@ -350,6 +381,7 @@
 //     },
 //     [
 //       quantityMap,
+//       resolveVariant,
 //       customer,
 //       removeLocalItem,
 //       updateLocalQuantity,
@@ -377,7 +409,7 @@
 //         const isOpen = openBrands[brandGroup.brandId] ?? true;
 
 //         return (
-//           <div key={brandGroup.brandId} className="w-full ">
+//           <div key={brandGroup.brandId} className="w-full">
 //             {/* Accordion Header */}
 //             <button
 //               onClick={() =>
@@ -386,14 +418,11 @@
 //                   [brandGroup.brandId]: !prev[brandGroup.brandId],
 //                 }))
 //               }
-//               className="w-full flex items-center justify-between  py-2 text-left border-b border-[#D4D4D4] mb-5"
+//               className="w-full flex items-center justify-between py-2 text-left border-b border-[#D4D4D4] mb-5"
+//               aria-label={`Toggle ${brandGroup.brandName} products`}
 //             >
 //               <h2 className="text-sm font-semibold">{brandGroup.brandName}</h2>
-//               <span
-//                 className={`text-xl transition-transform duration-200 ${
-//                   isOpen ? "rotate-180" : "rotate-0"
-//                 }`}
-//               >
+//               <span className={`text-xl transition-transform duration-200 ${isOpen ? "rotate-180" : "rotate-0"}`}>
 //                 <ChevronDown />
 //               </span>
 //             </button>
@@ -428,6 +457,7 @@
 //                               <button
 //                                 className="text-lg font-bold bg-black rounded-md text-white px-2"
 //                                 onClick={() => adjustQuantity(item, -1)}
+//                                 aria-label="Decrease quantity"
 //                               >
 //                                 –
 //                               </button>
@@ -435,6 +465,7 @@
 //                               <button
 //                                 className="text-lg font-bold bg-black rounded-md text-white px-2"
 //                                 onClick={() => adjustQuantity(item, +1)}
+//                                 aria-label="Increase quantity"
 //                               >
 //                                 +
 //                               </button>
@@ -466,6 +497,7 @@
 // }
 
 
+
 "use client";
 
 import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
@@ -481,6 +513,7 @@ import {
   GET_PRODUCT_DETAILS,
   GET_ALL_FACETS,
 } from "@/graphql/queries";
+import { useCartClearOnSuccess } from "@/hooks/useCartClearOnSuccess";
 
 type Props = {
   categorySlug: string;
@@ -543,7 +576,7 @@ interface GetAllFacetsResponse {
 }
 
 type GridItem = {
-  id: string;       // slug — stable key used everywhere
+  id: string;
   name: string;
   slug: string;
   image?: string;
@@ -576,13 +609,11 @@ export default function ProductGrid({
     updateQuantity: updateLocalQuantity,
   } = useLocalCart();
 
-  // variantIdMap: slug → variantId (populated lazily on first add-to-cart,
-  // AND eagerly from cart data on mount so refresh restores quantities)
+  // Clear cart if coming back from a successful payment
+  useCartClearOnSuccess();
+
   const variantIdMap = useRef<Record<string, string>>({});
-
-  // reverse map: variantId → slug (built from cart on every render)
   const variantToSlug = useRef<Record<string, string>>({});
-
   const [openBrands, setOpenBrands] = useState<Record<string, boolean>>({});
 
   const [loadDetails] = useLazyQuery<GetProductDetailsResponse>(
@@ -605,20 +636,14 @@ export default function ProductGrid({
 
   const { data: facetsData } = useQuery<GetAllFacetsResponse>(GET_ALL_FACETS);
 
-  // ─── Build reverse map from live cart data ────────────────────────────────
-  // This runs on every render so variantToSlug is always up-to-date.
-  // For server cart: line.productVariant.id → line.productVariant.product.slug
-  // For local cart: item.id is variantId, item.slug is the product slug
   useEffect(() => {
     if (customer) {
       (cart?.activeOrder?.lines ?? []).forEach((line: any) => {
         const variantId = line?.productVariant?.id;
-        const slug =
-          line?.productVariant?.product?.slug ??
-          line?.productVariant?.name; // fallback
+        const slug = line?.productVariant?.product?.slug ?? line?.productVariant?.name;
         if (variantId && slug) {
           variantToSlug.current[variantId] = slug;
-          variantIdMap.current[slug] = variantId; // also populate forward map
+          variantIdMap.current[slug] = variantId;
         }
       });
     } else {
@@ -631,7 +656,6 @@ export default function ProductGrid({
     }
   }, [customer, cart, localItems]);
 
-  // ─── Brand buckets with price filtering ───────────────────────────────────
   const brandBuckets = useMemo(() => {
     const items = data?.search?.items ?? [];
     const facetItems = facetsData?.facets?.items ?? [];
@@ -644,17 +668,11 @@ export default function ProductGrid({
     const facetValueMap: Record<string, { name: string; facetName: string }> = {};
     facetItems.forEach((facet) => {
       facet.values.forEach((val) => {
-        facetValueMap[val.id] = {
-          name: val.name,
-          facetName: val.facet?.name ?? facet.name,
-        };
+        facetValueMap[val.id] = { name: val.name, facetName: val.facet?.name ?? facet.name };
       });
     });
 
-    const buckets: Record<
-      string,
-      { brandId: string; brandName: string; items: GridItem[] }
-    > = {};
+    const buckets: Record<string, { brandId: string; brandName: string; items: GridItem[] }> = {};
 
     items.forEach((it) => {
       let brandName = "Others";
@@ -682,7 +700,7 @@ export default function ProductGrid({
       }
 
       buckets[brandName].items.push({
-        id: it.slug,       // slug as stable ID
+        id: it.slug,
         name: it.productName,
         slug: it.slug,
         image: it.productAsset?.preview,
@@ -709,7 +727,6 @@ export default function ProductGrid({
     return result.filter((bucket) => bucket.items.length > 0);
   }, [data, facetsData, sort, priceRange]);
 
-  // Open all brand sections by default on first load
   useEffect(() => {
     if (brandBuckets.length > 0) {
       setOpenBrands((prev) => {
@@ -722,49 +739,30 @@ export default function ProductGrid({
     }
   }, [brandBuckets]);
 
-  // ─── quantityMap keyed by SLUG (not variantId) ────────────────────────────
-  // This is the core fix: we key by slug so quantities survive refresh.
-  // On refresh, variantToSlug is rebuilt from cart data in the useEffect above,
-  // so the slug lookup always works even before any click.
   const quantityMap = useMemo<Record<string, number>>(() => {
     const map: Record<string, number> = {};
-
     if (customer) {
-      // Server cart: look up slug from variantToSlug reverse map
       (cart?.activeOrder?.lines ?? []).forEach((line: any) => {
         const variantId = line?.productVariant?.id;
         const qty = line?.quantity ?? 0;
         if (!variantId || qty <= 0) return;
-
-        // Try reverse map first, then fall back to product slug on the line
-        const slug =
-          variantToSlug.current[variantId] ??
-          line?.productVariant?.product?.slug;
-
+        const slug = variantToSlug.current[variantId] ?? line?.productVariant?.product?.slug;
         if (slug) map[slug] = qty;
       });
     } else {
-      // Local cart: item.slug is the product slug, item.id is variantId
       localItems.forEach((item) => {
-        if (item.slug && item.quantity > 0) {
-          map[item.slug] = item.quantity;
-        }
+        if (item.slug && item.quantity > 0) map[item.slug] = item.quantity;
       });
     }
-
     return map;
   }, [customer, cart, localItems]);
 
-  // ─── Resolve & cache variantId ─────────────────────────────────────────────
   const resolveVariant = useCallback(
     async (item: GridItem): Promise<string | null> => {
-      // Already cached from a previous click or from cart data on mount
       if (variantIdMap.current[item.id]) return variantIdMap.current[item.id];
-
       const { data: pd } = await loadDetails({ variables: { slug: item.slug } });
       const variant = pd?.product?.variants?.[0];
       if (!variant) return null;
-
       variantIdMap.current[item.id] = variant.id;
       variantToSlug.current[variant.id] = item.slug;
       return variant.id;
@@ -772,15 +770,11 @@ export default function ProductGrid({
     [loadDetails]
   );
 
-  // ─── Add to cart ──────────────────────────────────────────────────────────
   const handleAddToCart = useCallback(
     async (item: GridItem) => {
       try {
         const variantId = await resolveVariant(item);
-        if (!variantId) {
-          toast.error("Could not load product details");
-          return;
-        }
+        if (!variantId) { toast.error("Could not load product details"); return; }
 
         const cached = await loadDetails({ variables: { slug: item.slug } });
         const pd = cached?.data;
@@ -791,13 +785,11 @@ export default function ProductGrid({
           pd?.product?.assets?.[0]?.preview ??
           undefined;
 
-        const priceInCents = item.priceRaw ?? 0;
-
         addLocalItem({
           id: variantId,
           name: item.name,
-          slug: item.slug,   // ← always persist slug so quantityMap works on refresh
-          priceWithTax: priceInCents,
+          slug: item.slug,
+          priceWithTax: item.priceRaw ?? 0,
           currencyCode: item.currencyCode,
           brand: item.brand,
           image,
@@ -817,15 +809,11 @@ export default function ProductGrid({
     [resolveVariant, loadDetails, addLocalItem, addToCartMutation, customer]
   );
 
-  // ─── Adjust / remove quantity ─────────────────────────────────────────────
   const adjustQuantity = useCallback(
     async (item: GridItem, change: number) => {
       const current = quantityMap[item.id] ?? 0;
       const newQty = current + change;
-
-      // Ensure variantId is resolved before adjusting
-      const variantId =
-        variantIdMap.current[item.id] ?? (await resolveVariant(item));
+      const variantId = variantIdMap.current[item.id] ?? (await resolveVariant(item));
       if (!variantId) return;
 
       if (newQty <= 0) {
@@ -848,14 +836,9 @@ export default function ProductGrid({
       }
     },
     [
-      quantityMap,
-      resolveVariant,
-      customer,
-      removeLocalItem,
-      updateLocalQuantity,
-      getOrderLineIdByVariantId,
-      removeFromCartMutation,
-      handleAdjustQuantity,
+      quantityMap, resolveVariant, customer,
+      removeLocalItem, updateLocalQuantity,
+      getOrderLineIdByVariantId, removeFromCartMutation, handleAdjustQuantity,
     ]
   );
 
@@ -878,7 +861,6 @@ export default function ProductGrid({
 
         return (
           <div key={brandGroup.brandId} className="w-full">
-            {/* Accordion Header */}
             <button
               onClick={() =>
                 setOpenBrands((prev) => ({
@@ -895,13 +877,11 @@ export default function ProductGrid({
               </span>
             </button>
 
-            {/* Accordion Content */}
             {isOpen && (
               <div className="px-2 pb-4">
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
                   {brandGroup.items.map((item) => {
                     const qty = quantityMap[item.id];
-
                     return (
                       <div key={item.id} className="rounded-[5px] p-1 shadow-sm bg-[#FFFFFF]">
                         <div className="bg-[#F3F5F7] p-3 pb-1 rounded-t-md">
@@ -926,17 +906,13 @@ export default function ProductGrid({
                                 className="text-lg font-bold bg-black rounded-md text-white px-2"
                                 onClick={() => adjustQuantity(item, -1)}
                                 aria-label="Decrease quantity"
-                              >
-                                –
-                              </button>
+                              >–</button>
                               <span className="font-semibold">{qty}</span>
                               <button
                                 className="text-lg font-bold bg-black rounded-md text-white px-2"
                                 onClick={() => adjustQuantity(item, +1)}
                                 aria-label="Increase quantity"
-                              >
-                                +
-                              </button>
+                              >+</button>
                             </div>
                           )}
                         </div>
@@ -946,9 +922,7 @@ export default function ProductGrid({
                           <p className="font-semibold text-sm">{item.name}</p>
                           <p className="text-md font-bold mt-4">
                             {item.currencyCode}{" "}
-                            {item.priceRaw
-                              ? (item.priceRaw / 100).toLocaleString()
-                              : "0.00"}
+                            {item.priceRaw ? (item.priceRaw / 100).toLocaleString() : "0.00"}
                           </p>
                         </div>
                       </div>
