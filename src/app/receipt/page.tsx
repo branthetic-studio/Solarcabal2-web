@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery } from "@apollo/client/react";
 import { gql } from "@apollo/client";
@@ -9,6 +9,7 @@ import Footer from "@/Components/Footer/Footer";
 import { useUser } from "@/context/UserContext";
 import { Package, ArrowLeft, Download, Share2, AlertCircle } from "lucide-react";
 import Suscribe from "@/Components/Suscribe/Suscribe";
+
 
 const GET_ORDER_FOR_RECEIPT = gql`
   query GetOrderForReceipt($code: String!) {
@@ -145,20 +146,99 @@ export default function ReceiptPage() {
   const placedAt = order?.orderPlacedAt ?? order?.createdAt;
   const { label: stateLabel, classes: stateClasses } = getStateBadge(order?.state ?? "");
 
-  /* ── Handle share ── */
+  /* ── Generate receipt as PNG image (images stripped to avoid CORS) ── */
+  const [shareCopied, setShareCopied] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const generateReceiptImage = async (): Promise<Blob | null> => {
+    if (!receiptRef.current) return null;
+
+    const { toPng } = await import("html-to-image");
+
+ 
+    const dataUrl = await toPng(receiptRef.current, {
+      backgroundColor: "#ffffff",
+      pixelRatio: 2,
+      cacheBust: true,
+      filter: (node) => {
+        if (node instanceof HTMLImageElement) return false;
+        if (node instanceof HTMLElement && node.dataset?.receiptExclude === "true") return false;
+        return true;
+      },
+    });
+
+    const res = await fetch(dataUrl);
+    return await res.blob();
+  };
+
+ 
   const handleShare = async () => {
-    const url = window.location.href;
-    if (navigator.share) {
-      await navigator.share({ title: `Receipt #${order?.code}`, url });
-    } else {
-      await navigator.clipboard.writeText(url);
-      alert("Receipt link copied to clipboard!");
+    setIsGeneratingImage(true);
+    try {
+      const blob = await generateReceiptImage();
+      if (!blob) {
+        console.error("[receipt] no blob generated");
+        return;
+      }
+
+      const file = new File([blob], `receipt-${order?.code ?? "order"}.png`, {
+        type: "image/png",
+      });
+
+      // Try native share with file (mobile / AirDrop / supported browsers)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            title: `Receipt #${order?.code}`,
+            files: [file],
+          });
+          return;
+        } catch (err) {
+          if ((err as Error)?.name === "AbortError") return;
+          console.warn("[receipt] navigator.share failed, falling back to download:", err);
+        }
+      }
+
+  
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `receipt-${order?.code ?? "order"}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch (err) {
+      console.error("[receipt] share image failed:", err);
+    } finally {
+      setIsGeneratingImage(false);
     }
   };
 
-  /* ── Handle print/download ── */
-  const handleDownload = () => {
-    window.print();
+  /* ── Handle download (saves receipt as PNG image) ── */
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const blob = await generateReceiptImage();
+      if (!blob) return;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `receipt-${order?.code ?? "order"}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[receipt] download image failed:", err);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   /* ── Not logged in ── */
@@ -371,7 +451,7 @@ export default function ReceiptPage() {
           </div>
 
           {/* Action buttons */}
-          <div className="px-6 pb-6 pt-2 flex flex-col sm:flex-row gap-3 print:hidden">
+          <div data-receipt-exclude="true" className="px-6 pb-6 pt-2 flex flex-col sm:flex-row gap-3 print:hidden">
             <button
               onClick={() => router.push("/enquiries")}
               className="flex-1 rounded-full bg-red-600 text-white py-3 text-sm font-semibold hover:bg-red-700 transition-colors"
@@ -380,17 +460,19 @@ export default function ReceiptPage() {
             </button>
             <button
               onClick={handleDownload}
-              className="flex-1 rounded-full bg-neutral-900 text-white py-3 text-sm font-semibold hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2"
+              disabled={isDownloading}
+              className="flex-1 rounded-full bg-neutral-900 text-white py-3 text-sm font-semibold hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
             >
               <Download className="h-4 w-4" />
-              Download Receipt
+              {isDownloading ? "Generating..." : "Download Receipt"}
             </button>
             <button
               onClick={handleShare}
-              className="flex-1 rounded-full border border-neutral-300 text-neutral-700 py-3 text-sm font-semibold hover:bg-neutral-50 transition-colors flex items-center justify-center gap-2"
+              disabled={isGeneratingImage}
+              className="flex-1 rounded-full border border-neutral-300 text-neutral-700 py-3 text-sm font-semibold hover:bg-neutral-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
             >
               <Share2 className="h-4 w-4" />
-              Share Receipt
+              {isGeneratingImage ? "Preparing..." : shareCopied ? "Saved!" : "Share Receipt"}
             </button>
           </div>
         </div>

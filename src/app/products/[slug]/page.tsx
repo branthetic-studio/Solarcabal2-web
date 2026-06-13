@@ -16,6 +16,7 @@
 // import { useRouter } from "next/navigation";
 // import { toast, ToastContainer } from "react-toastify";
 // import "react-toastify/dist/ReactToastify.css";
+// import { stripHtml } from "@/utils/stripHtml";
 
 // /* ===================== Types ===================== */
 
@@ -67,8 +68,6 @@
 // };
 
 // type GetProductDetailsData = { product: ProductDetails | null };
-
-// // ── Each button has its own identity ──────────────────────────────────────────
 // type ActionKey = "cart" | "buy" | "later";
 
 // /* ===================== Static data ===================== */
@@ -121,18 +120,14 @@
 //   const slug = params?.slug as string;
 //   const router = useRouter();
 
-//   const { addToCartMutation } = useCart();
+//   const { cart, addToCartMutation, handleAdjustQuantity, removeFromCartMutation, getOrderLineIdByVariantId } = useCart();
 //   const { customer } = useUser();
-//   const { addItem: addLocalItem } = useLocalCart();
+//   const { items: localItems, addItem: addLocalItem, updateQuantity: updateLocalQuantity, removeItem: removeLocalItem } = useLocalCart();
 
-//   // ── One state tracks WHICH button is loading, not just whether any is ──────
 //   const [loadingAction, setLoadingAction] = useState<ActionKey | null>(null);
-
 //   const [selectedImage, setSelectedImage] = useState(0);
 //   const [quantity, setQuantity] = useState(1);
-//   const [activeTab, setActiveTab] = useState<
-//     "Product Detail" | "Reviews" | "Related Product"
-//   >("Product Detail");
+//   const [activeTab, setActiveTab] = useState<"Product Detail" | "Reviews" | "Related Product">("Product Detail");
 //   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
 //   const { data, loading, error } = useQuery<GetProductDetailsData>(
@@ -193,6 +188,39 @@
 //   const currencySymbol = currency === "NGN" ? "₦" : currency === "USD" ? "$" : currency;
 //   const formattedPrice = (currentPrice / 100).toLocaleString();
 
+//   /* ---------- Plain-text description (strips HTML tags) ---------- */
+//   const plainDescription = useMemo(
+//     () => stripHtml(product?.description),
+//     [product?.description]
+//   );
+
+//   // ─── Quantity from cart — reads directly from cart/localItems by variantId ──
+//   const cartQuantity = useMemo(() => {
+//     if (!selectedVariant) return 0;
+
+//     if (customer) {
+//       const line = (cart?.activeOrder?.lines ?? []).find(
+//         (l: any) =>
+//           l?.productVariant?.id === selectedVariant.id ||
+//           l?.productVariant?.product?.slug === slug
+//       );
+//       return line?.quantity ?? 0;
+//     } else {
+//       const item = localItems.find(
+//         (it) => it.id === selectedVariant.id || it.slug === slug
+//       );
+//       return item?.quantity ?? 0;
+//     }
+//   }, [selectedVariant, customer, cart, localItems, slug]);
+
+//   useEffect(() => {
+//     if (cartQuantity > 0) {
+//       setQuantity(cartQuantity);
+//     } else {
+//       setQuantity(1);
+//     }
+//   }, [cartQuantity, selectedVariant?.id]);
+
 //   /* ---------- Core cart action ---------- */
 //   const addVariantToCart = useCallback(
 //     async (action: ActionKey): Promise<boolean> => {
@@ -201,7 +229,6 @@
 //         return false;
 //       }
 
-//       // Only THIS button shows a loading state
 //       setLoadingAction(action);
 //       try {
 //         addLocalItem({
@@ -210,8 +237,7 @@
 //           slug: slug ?? "",
 //           priceWithTax: selectedVariant.priceWithTax,
 //           currencyCode: selectedVariant.currencyCode ?? "NGN",
-//           image:
-//             mainImageSrc !== "/api/placeholder/400/400" ? mainImageSrc : undefined,
+//           image: mainImageSrc !== "/api/placeholder/400/400" ? mainImageSrc : undefined,
 //           quantity,
 //         });
 
@@ -249,16 +275,37 @@
 //         setLoadingAction(null);
 //       }
 //     },
-//     [
-//       selectedVariant,
-//       quantity,
-//       product,
-//       slug,
-//       mainImageSrc,
-//       customer,
-//       addLocalItem,
-//       addToCartMutation,
-//     ]
+//     [selectedVariant, quantity, product, slug, mainImageSrc, customer, addLocalItem, addToCartMutation]
+//   );
+
+//   // ─── Adjust quantity directly from product detail page ────────────────────
+//   const adjustCartQuantity = useCallback(
+//     async (newQty: number) => {
+//       if (!selectedVariant) return;
+//       setQuantity(Math.max(1, newQty));
+
+//       if (cartQuantity === 0) return;
+
+//       if (newQty <= 0) {
+//         removeLocalItem(selectedVariant.id);
+//         if (customer) {
+//           const orderLineId = getOrderLineIdByVariantId(selectedVariant.id);
+//           if (orderLineId) {
+//             try { await removeFromCartMutation(orderLineId); } catch (e) { console.error(e); }
+//           }
+//         }
+//         return;
+//       }
+
+//       updateLocalQuantity(selectedVariant.id, newQty);
+//       if (customer) {
+//         const orderLineId = getOrderLineIdByVariantId(selectedVariant.id);
+//         if (orderLineId) {
+//           try { await handleAdjustQuantity(orderLineId, newQty); } catch (e) { console.error(e); }
+//         }
+//       }
+//     },
+//     [selectedVariant, cartQuantity, customer, removeLocalItem, updateLocalQuantity, getOrderLineIdByVariantId, removeFromCartMutation, handleAdjustQuantity]
 //   );
 
 //   const handleAddToCart = () => addVariantToCart("cart");
@@ -271,7 +318,6 @@
 //     if (ok) router.push("/checkout?method=installment");
 //   };
 
-//   // Any action in progress? Disable all buttons but only label the active one
 //   const anyLoading = loadingAction !== null;
 
 //   /* ---------- Loading skeleton ---------- */
@@ -346,6 +392,7 @@
 //                   <button
 //                     key={index}
 //                     onClick={() => setSelectedImage(index)}
+//                     aria-label={`View image ${index + 1}`}
 //                     className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 p-2 ${
 //                       selectedImage === index ? "border-[#00AAFF]" : "border-gray-200"
 //                     }`}
@@ -408,13 +455,17 @@
 //                 </div>
 //               )}
 
-//               <p className="text-gray-700">{product.description}</p>
+//               {/* Description — HTML tags stripped */}
+//               {plainDescription && (
+//                 <p className="text-gray-700">{plainDescription}</p>
+//               )}
 
-//               {/* Quantity */}
+//               {/* ── Quantity — shows cart quantity if already in cart ── */}
 //               <div className="flex items-center gap-3">
 //                 <span className="text-gray-700 font-medium">Qty:</span>
 //                 <button
-//                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+//                   aria-label="Decrease quantity"
+//                   onClick={() => adjustCartQuantity(quantity - 1)}
 //                   disabled={anyLoading}
 //                   className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 text-lg disabled:opacity-50"
 //                 >
@@ -422,18 +473,22 @@
 //                 </button>
 //                 <span className="w-8 text-center font-medium">{quantity}</span>
 //                 <button
-//                   onClick={() => setQuantity((q) => q + 1)}
+//                   aria-label="Increase quantity"
+//                   onClick={() => adjustCartQuantity(quantity + 1)}
 //                   disabled={anyLoading}
 //                   className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 text-lg disabled:opacity-50"
 //                 >
 //                   +
 //                 </button>
+//                 {cartQuantity > 0 && (
+//                   <span className="text-xs text-green-600 font-medium ml-1">
+//                     ({cartQuantity} in cart)
+//                   </span>
+//                 )}
 //               </div>
 
-//               {/* ── Action buttons — each shows its OWN loading state ── */}
+//               {/* ── Action buttons ── */}
 //               <div className="flex flex-col md:flex-row gap-2 md:gap-4">
-
-//                 {/* Add to Cart */}
 //                 <button
 //                   onClick={handleAddToCart}
 //                   disabled={anyLoading || !selectedVariant}
@@ -444,12 +499,9 @@
 //                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#242425] border-t-transparent" />
 //                       Adding...
 //                     </>
-//                   ) : (
-//                     "Add to Cart"
-//                   )}
+//                   ) : cartQuantity > 0 ? "Update Cart" : "Add to Cart"}
 //                 </button>
 
-//                 {/* Buy Now */}
 //                 <button
 //                   onClick={handleBuyNow}
 //                   disabled={anyLoading || !selectedVariant}
@@ -460,12 +512,9 @@
 //                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
 //                       Processing...
 //                     </>
-//                   ) : (
-//                     "Buy Now"
-//                   )}
+//                   ) : "Buy Now"}
 //                 </button>
 
-//                 {/* Pay Later */}
 //                 <button
 //                   onClick={handlePayLater}
 //                   disabled={anyLoading || !selectedVariant}
@@ -476,11 +525,8 @@
 //                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
 //                       Processing...
 //                     </>
-//                   ) : (
-//                     "Pay Later"
-//                   )}
+//                   ) : "Pay Later"}
 //                 </button>
-
 //               </div>
 //             </div>
 //           </div>
@@ -519,11 +565,7 @@
 //                         onClick={() => router.push(`/products/${rp.slug}`)}
 //                       >
 //                         <div className="bg-gray-100 p-4 aspect-square flex items-center justify-center">
-//                           <img
-//                             src={rp.image}
-//                             alt={rp.name}
-//                             className="max-w-full max-h-full object-contain"
-//                           />
+//                           <img src={rp.image} alt={rp.name} className="max-w-full max-h-full object-contain" />
 //                         </div>
 //                         <div className="p-4">
 //                           <h4 className="font-medium text-gray-900 mb-2">{rp.name}</h4>
@@ -656,20 +698,13 @@
 //             {isOpen && <ReviewModal onClose={() => setIsOpen(false)} />}
 
 //             {reviews.map((review) => (
-//               <div
-//                 key={review.id}
-//                 className="border-b border-[#E4E9EE] flex justify-between pb-6 space-y-3"
-//               >
+//               <div key={review.id} className="border-b border-[#E4E9EE] flex justify-between pb-6 space-y-3">
 //                 <div className="flex flex-col gap-3">
 //                   <div className="flex gap-1">
 //                     {[1, 2, 3, 4, 5].map((i) => (
 //                       <Star
 //                         key={i}
-//                         className={`w-4 h-4 ${
-//                           i <= review.rating
-//                             ? "fill-[#FFA133] text-[#FFA133]"
-//                             : "text-gray-300"
-//                         }`}
+//                         className={`w-4 h-4 ${i <= review.rating ? "fill-[#FFA133] text-[#FFA133]" : "text-gray-300"}`}
 //                       />
 //                     ))}
 //                   </div>
@@ -678,11 +713,7 @@
 //                     <p className="text-xs text-gray-500">{review.date}</p>
 //                   </div>
 //                   <div className="flex items-center gap-2">
-//                     <img
-//                       src={review.image}
-//                       alt={review.name}
-//                       className="w-8 h-8 object-cover rounded-full"
-//                     />
+//                     <img src={review.image} alt={review.name} className="w-8 h-8 object-cover rounded-full" />
 //                     <p className="font-semibold">{review.name}</p>
 //                   </div>
 //                 </div>
@@ -719,12 +750,15 @@
 //     { label: "Surface Material", value: cf.surfaceMaterial },
 //   ].filter((s) => Boolean(s.value));
 
+//   // Strip HTML tags from product description in this tab too
+//   const plainDescription = stripHtml(product.description);
+
 //   return (
 //     <div className="space-y-6">
-//       {product.description && (
+//       {plainDescription && (
 //         <div>
 //           <h3 className="text-lg font-semibold text-gray-900 mb-2">{product.name}</h3>
-//           <p className="text-[#818B9C] leading-relaxed">{product.description}</p>
+//           <p className="text-[#818B9C] leading-relaxed">{plainDescription}</p>
 //         </div>
 //       )}
 //       {specs.length > 0 && (
@@ -763,16 +797,13 @@
 
 //   return (
 //     <div className="fixed inset-0 z-50 flex items-center justify-center">
-//       <div
-//         className="absolute inset-0 bg-black/50"
-//         onClick={!submitted ? onClose : undefined}
-//       />
+//       <div className="absolute inset-0 bg-black/50" onClick={!submitted ? onClose : undefined} />
 //       <div className="relative bg-white rounded-xl p-4 w-full max-w-md z-10">
 //         {!submitted ? (
 //           <>
 //             <div className="flex justify-between mb-6">
 //               <h3 className="text-lg font-semibold">Review</h3>
-//               <button onClick={onClose}>
+//               <button onClick={onClose} aria-label="Close review modal">
 //                 <Image src="/close-circle.png" alt="Close" width={22} height={22} />
 //               </button>
 //             </div>
@@ -812,6 +843,7 @@
 // }
 
 
+
 "use client";
 
 import { useParams } from "next/navigation";
@@ -830,6 +862,7 @@ import StarRating from "../components/StarRating";
 import { useRouter } from "next/navigation";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { stripHtml } from "@/utils/stripHtml";
 
 /* ===================== Types ===================== */
 
@@ -882,6 +915,31 @@ type ProductDetails = {
 
 type GetProductDetailsData = { product: ProductDetails | null };
 type ActionKey = "cart" | "buy" | "later";
+
+/**
+ * Parses Vendure\'s stockLevel string into a numeric max quantity.
+ * - "OUT_OF_STOCK"      -> 0
+ * - "5_UNITS_LEFT"      -> 5  (any "X_UNITS_LEFT" pattern, 1-10)
+ * - "IN_STOCK"          -> Infinity (no display limit, >10 available)
+ * - anything else/empty -> Infinity (fail open, don\'t block legit purchases)
+ */
+function parseStockLevel(stockLevel?: string | null): number {
+  let limit: number;
+
+  if (!stockLevel) {
+    limit = Infinity;
+  } else if (stockLevel === "OUT_OF_STOCK") {
+    limit = 0;
+  } else if (stockLevel === "IN_STOCK") {
+    limit = Infinity;
+  } else {
+    const match = stockLevel.match(/^(\d+)_UNITS_LEFT$/);
+    limit = match ? parseInt(match[1], 10) : Infinity;
+  }
+
+  console.log("[stock] parseStockLevel:", { stockLevel, limit });
+  return limit;
+}
 
 /* ===================== Static data ===================== */
 
@@ -1001,14 +1059,25 @@ const ProductDetailsPage = () => {
   const currencySymbol = currency === "NGN" ? "₦" : currency === "USD" ? "$" : currency;
   const formattedPrice = (currentPrice / 100).toLocaleString();
 
+  /* ---------- Plain-text description (strips HTML tags) ---------- */
+  const plainDescription = useMemo(
+    () => stripHtml(product?.description),
+    [product?.description]
+  );
+
+  /* ---------- Stock limit for the selected variant ---------- */
+  const stockLimit = useMemo(
+    () => parseStockLevel(selectedVariant?.stockLevel),
+    [selectedVariant?.stockLevel]
+  );
+
+  const isOutOfStock = stockLimit <= 0;
+
   // ─── Quantity from cart — reads directly from cart/localItems by variantId ──
-  // This is the fix: we don't rely on any cached ref — we look up the live
-  // cart state every render using the selected variant's id and the slug.
   const cartQuantity = useMemo(() => {
     if (!selectedVariant) return 0;
 
     if (customer) {
-      // Server cart: find a line whose variantId matches
       const line = (cart?.activeOrder?.lines ?? []).find(
         (l: any) =>
           l?.productVariant?.id === selectedVariant.id ||
@@ -1016,7 +1085,6 @@ const ProductDetailsPage = () => {
       );
       return line?.quantity ?? 0;
     } else {
-      // Local cart: item.id is variantId OR item.slug is the product slug
       const item = localItems.find(
         (it) => it.id === selectedVariant.id || it.slug === slug
       );
@@ -1024,7 +1092,6 @@ const ProductDetailsPage = () => {
     }
   }, [selectedVariant, customer, cart, localItems, slug]);
 
-  // Keep the quantity input in sync with cart quantity on mount / variant change
   useEffect(() => {
     if (cartQuantity > 0) {
       setQuantity(cartQuantity);
@@ -1038,6 +1105,24 @@ const ProductDetailsPage = () => {
     async (action: ActionKey): Promise<boolean> => {
       if (!selectedVariant) {
         toast.error("Please select a variant");
+        return false;
+      }
+
+      // ── Stock check before adding ──
+      const limit = parseStockLevel(selectedVariant.stockLevel);
+      console.log("[stock] addVariantToCart check:", {
+        variant: selectedVariant.name,
+        stockLevel: selectedVariant.stockLevel,
+        limit,
+        requestedQty: quantity,
+      });
+
+      if (limit <= 0) {
+        toast.error("This item is out of stock");
+        return false;
+      }
+      if (quantity > limit) {
+        toast.error(`Only ${limit} unit(s) available in stock`);
         return false;
       }
 
@@ -1094,9 +1179,30 @@ const ProductDetailsPage = () => {
   const adjustCartQuantity = useCallback(
     async (newQty: number) => {
       if (!selectedVariant) return;
+
+      // ── Stock check: don\'t allow increasing beyond available stock ──
+      if (newQty > quantity) {
+        const limit = parseStockLevel(selectedVariant.stockLevel);
+        console.log("[stock] adjustCartQuantity check:", {
+          variant: selectedVariant.name,
+          stockLevel: selectedVariant.stockLevel,
+          currentQty: quantity,
+          newQty,
+          limit,
+        });
+        if (newQty > limit) {
+          toast.error(
+            limit <= 0
+              ? "This item is out of stock"
+              : `Only ${limit} unit(s) available in stock`
+          );
+          return;
+        }
+      }
+
       setQuantity(Math.max(1, newQty));
 
-      if (cartQuantity === 0) return; // not in cart yet — just update local counter
+      if (cartQuantity === 0) return;
 
       if (newQty <= 0) {
         removeLocalItem(selectedVariant.id);
@@ -1262,12 +1368,19 @@ const ProductDetailsPage = () => {
 
               {/* Stock */}
               {selectedVariant && (
-                <div className="text-sm text-gray-600">
-                  Stock: {selectedVariant.stockLevel}
+                <div className={`text-sm font-medium ${isOutOfStock ? "text-red-600" : "text-gray-600"}`}>
+                  {isOutOfStock
+                    ? "Out of stock"
+                    : Number.isFinite(stockLimit)
+                    ? `Only ${stockLimit} unit(s) left in stock`
+                    : "In stock"}
                 </div>
               )}
 
-              <p className="text-gray-700">{product.description}</p>
+              {/* Description — HTML tags stripped */}
+              {plainDescription && (
+                <p className="text-gray-700">{plainDescription}</p>
+              )}
 
               {/* ── Quantity — shows cart quantity if already in cart ── */}
               <div className="flex items-center gap-3">
@@ -1284,12 +1397,11 @@ const ProductDetailsPage = () => {
                 <button
                   aria-label="Increase quantity"
                   onClick={() => adjustCartQuantity(quantity + 1)}
-                  disabled={anyLoading}
+                  disabled={anyLoading || quantity >= stockLimit}
                   className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 text-lg disabled:opacity-50"
                 >
                   +
                 </button>
-                {/* Show live cart badge if already in cart */}
                 {cartQuantity > 0 && (
                   <span className="text-xs text-green-600 font-medium ml-1">
                     ({cartQuantity} in cart)
@@ -1301,7 +1413,7 @@ const ProductDetailsPage = () => {
               <div className="flex flex-col md:flex-row gap-2 md:gap-4">
                 <button
                   onClick={handleAddToCart}
-                  disabled={anyLoading || !selectedVariant}
+                  disabled={anyLoading || !selectedVariant || isOutOfStock}
                   className="flex-1 border-2 border-[#242425] text-[#242425] py-3 px-6 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 flex items-center justify-center gap-2"
                 >
                   {loadingAction === "cart" ? (
@@ -1309,12 +1421,12 @@ const ProductDetailsPage = () => {
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#242425] border-t-transparent" />
                       Adding...
                     </>
-                  ) : cartQuantity > 0 ? "Update Cart" : "Add to Cart"}
+                  ) : isOutOfStock ? "Out of Stock" : cartQuantity > 0 ? "Update Cart" : "Add to Cart"}
                 </button>
 
                 <button
                   onClick={handleBuyNow}
-                  disabled={anyLoading || !selectedVariant}
+                  disabled={anyLoading || !selectedVariant || isOutOfStock}
                   className="flex-1 px-6 py-3 bg-[#242425] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800 flex items-center justify-center gap-2"
                 >
                   {loadingAction === "buy" ? (
@@ -1327,7 +1439,7 @@ const ProductDetailsPage = () => {
 
                 <button
                   onClick={handlePayLater}
-                  disabled={anyLoading || !selectedVariant}
+                  disabled={anyLoading || !selectedVariant || isOutOfStock}
                   className="flex-1 bg-[#ff0000] text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#751c1c] flex items-center justify-center gap-2"
                 >
                   {loadingAction === "later" ? (
@@ -1560,12 +1672,15 @@ function LocalProductCard({
     { label: "Surface Material", value: cf.surfaceMaterial },
   ].filter((s) => Boolean(s.value));
 
+  // Strip HTML tags from product description in this tab too
+  const plainDescription = stripHtml(product.description);
+
   return (
     <div className="space-y-6">
-      {product.description && (
+      {plainDescription && (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">{product.name}</h3>
-          <p className="text-[#818B9C] leading-relaxed">{product.description}</p>
+          <p className="text-[#818B9C] leading-relaxed">{plainDescription}</p>
         </div>
       )}
       {specs.length > 0 && (
