@@ -1177,6 +1177,19 @@ const Navbar = () => {
             </Link>
           ))}
 
+ {/* Orders — only shown when logged in */}
+          {customer && !loading && (
+            <Link
+              href="/orders"
+              className={`text-sm font-medium py-1 transition-colors hover:text-[#FF0000] ${
+                pathname === "/orders" ? "text-[#FF0000]" : "text-gray-700"
+              }`}
+              onClick={() => setOpen(false)}
+            >
+              My Orders
+            </Link>
+          )}
+          
           <div className="border-t pt-4 mt-2">
             {!customer && !loading && (
               /* ✅ Mobile: navigate to /register page instead of modal */
