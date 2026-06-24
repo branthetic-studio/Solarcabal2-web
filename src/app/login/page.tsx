@@ -171,7 +171,7 @@ export default function LoginPage() {
   // ── Forgot Password Screen ─────────────────────────────────────────────
   if (forgotStep) {
     return (
-      <div className="lg:hidden min-h-screen bg-white flex flex-col px-6 pt-12 pb-10">
+      <div className="lg:hidden min-h-screen bg-white flex flex-col px-6 pt-12 pb-10 -mt-16">
         <button
           aria-label="Go back to login"
           onClick={() => {
@@ -242,7 +242,7 @@ export default function LoginPage() {
 
   // ── Main Login Screen ──────────────────────────────────────────────────
   return (
-    <div className="lg:hidden min-h-screen bg-white flex flex-col px-6 pt-12 pb-10">
+    <div className="lg:hidden min-h-screen bg-white flex flex-col px-6 pt-12 pb-10 -mt-16">
       {/* Top bar */}
       <div className="flex items-center justify-between mb-10">
         <button
@@ -252,9 +252,9 @@ export default function LoginPage() {
         >
           <ArrowLeft className="w-6 h-6 text-gray-800" />
         </button>
-        <button aria-label="Open menu" className="p-2">
+        {/* <button aria-label="Open menu" className="p-2">
           <Menu className="w-6 h-6 text-gray-800" />
-        </button>
+        </button> */}
       </div>
 
       {/* Heading */}

@@ -7,7 +7,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  margin-bottom: 80px;
+  margin-bottom: 50px;
 }
 
 .faq-banner h2 {
@@ -30,7 +30,7 @@
 .faqAccordion h3 {
   color: #ff0000;
   font-family: Inter;
-  font-size: 32px;
+  font-size: 25px;
   font-weight: 600;
 }
 
@@ -45,8 +45,8 @@
 }
 
 .accordion-header {
-  color: Grayscale/800;
-  font-size: 24px;
+  color: #262626;
+  font-size: 18px;
   font-weight: 500;
   background: none;
   border: none;
@@ -99,6 +99,7 @@
 @media (max-width: 1024px) {
   .faq-banner {
     height: 300px;
+    margin-bottom: 0px;
   }
   .faq-banner h2 {
     font-size: 32px;
@@ -142,7 +143,7 @@
   }
 
   .faqAccordion h3 {
-    font-size: 22px;
+    font-size: 18px;
   }
 
   .accordion-header {
@@ -194,11 +195,11 @@
   }
 
   .faqAccordion h3 {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .accordion-header {
-    font-size: 15.5px;
+    font-size: 13.5px;
   }
   .accordion-content {
     font-size: 14px;

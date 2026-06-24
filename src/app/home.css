@@ -619,8 +619,11 @@
     gap: 10px;
   }
 
+ 
   .products-header h3 {
-    font-size: 22px; /* down from 30px */
+    font-size: 15px;
+    color:#191A26;
+    font-size: 500 !important;
   }
 
   .products-header button {
@@ -675,7 +678,9 @@
   }
 
   .products-header h3 {
-    font-size: 20px;
+    font-size: 15px;
+    color:#191A26;
+    font-size: 500 !important;
   }
 }
 

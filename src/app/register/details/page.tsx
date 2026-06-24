@@ -258,7 +258,7 @@ export default function RegisterDetailsPage() {
   // ── OTP Step ──────────────────────────────────────────────────────────────
   if (verifyStep) {
     return (
-      <div className="lg:hidden min-h-screen bg-white flex flex-col px-6 pt-12 pb-10">
+      <div className="lg:hidden min-h-screen bg-white flex flex-col px-6 pt-12 pb-10 -mt-16 lg:-mt-24">
         <button onClick={() => setVerifyStep(false)} className="mb-8">
           <ArrowLeft className="w-6 h-6 text-gray-800" />
         </button>
@@ -304,11 +304,11 @@ export default function RegisterDetailsPage() {
 
   // ── Main Register Form ────────────────────────────────────────────────────
   return (
-    <div className="lg:hidden min-h-screen bg-white flex flex-col">
+    <div className="lg:hidden min-h-screen bg-white flex flex-col -mt-16 lg:-mt-24">
       {/* Hero Header */}
       <div className="relative h-48 w-full">
         <Image
-          src="/solar-hero.jpg"
+       src="/mobilebanner.png"
           alt="Solar panels"
           fill
           className="object-cover"
@@ -323,9 +323,7 @@ export default function RegisterDetailsPage() {
             >
               <ArrowLeft className="w-5 h-5 text-white" />
             </button>
-            <button className="w-9 h-9 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-              <Menu className="w-5 h-5 text-white" />
-            </button>
+          
           </div>
           <div>
             <h1 className="text-white text-3xl font-bold">Sign Up</h1>

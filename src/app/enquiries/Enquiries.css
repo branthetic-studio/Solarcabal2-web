@@ -7,7 +7,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  margin-bottom: 80px;
+  margin-bottom: 50px;
   padding: 240 0px;
 }
 
@@ -26,31 +26,34 @@
 .enquiries-container {
   display: flex;
   margin: 20px auto;
-  padding: 20px 10%;
+  padding: 20px 8%;
    margin-bottom: 80px;
+   gap: 8;
+   
 }
 
 .enquiries-header {
-  flex: 0.2;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-right: 40px;
+
 }
 .enquiries-header h3 {
   font-weight: 700;
-  font-size: 32px;
-  margin: 0;
-  color: #0f0f0f;
+  font-size: 25px;
+  
+  color: #0B0F0E;
 }
 
 .enquiries-header p {
-  color: #a3a3a3;
-  font-size: 18px;
+  color: #A3A3A3;
+  font-size: 14px;
+  font-weight: 400;
 }
 
 .enquiries-content {
-  flex: 0.8;
+  flex: 1.5;
+margin-right: 80px;
 }
 
 .contact-info {
@@ -60,17 +63,17 @@
 .contact-info h3 {
   color: #ff0000;
   font-weight: 600;
-  font-size: 22px;
+  font-size: 18px;
 }
 
 .contact-info h6 {
   color: #262626;
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 .contact-info p {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 400;
   color: #525252;
   /* margin-top: 100px 0; */
@@ -85,7 +88,8 @@
 }
 
 .enquiries-form {
-  flex: 1.2;
+flex: 2;
+
 }
 
 .contact-form {
@@ -106,6 +110,7 @@
   flex-direction: column;
   margin-bottom: 16px;
   flex: 1;
+  row-gap: 8px;
 }
 
 .input-group label {
@@ -117,7 +122,7 @@
 .input-group input,
 .input-group textarea {
   padding: 15px;
-  border-radius: 30px;
+  border-radius: 24px;
   border: 1px solid #e0e0e0;
   background-color: #fafafa;
   font-size: 14px;
@@ -158,6 +163,7 @@
     height: 420px;
     background-position: center;
     background-size: cover;
+
   }
   .enquiries-banner h2 {
     font-size: 44px;
@@ -220,6 +226,7 @@
   /* Tighten typographic scale a bit */
   .enquiries-banner {
     height: 360px;
+    margin-bottom: 0px;
   }
   .enquiries-banner h2 {
     font-size: 34px;
@@ -246,7 +253,7 @@
   .input-group input,
   .input-group textarea {
     padding: 14px;
-    border-radius: 22px;
+    border-radius: 20px;
     font-size: 14px;
   }
 
