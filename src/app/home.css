@@ -170,7 +170,7 @@
 
 .products-container h3 {
   font-weight: 600;
-  font-size: 30px;
+  font-size: 23px;
 }
 
 .products-header {
@@ -664,8 +664,8 @@
 /* Phones */
 @media (max-width: 480px) {
   .products-header {
-    flex-direction: column; /* stack title & button */
-    align-items: flex-start;
+
+    
   }
 
   .product-grid {

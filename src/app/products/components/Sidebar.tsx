@@ -877,12 +877,20 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Mobile filter trigger → opens price modal */}
-        <button
+        {/* <button
           onClick={() => setPriceModalOpen(true)}
-          className="mx-auto mb-4 block text-sm font-medium text-neutral-700 hover:text-red-600 transition-colors"
+          className="mx-auto mb-4 block text-sm font-medium text-neutral-700 hover:text-red-600 transition-colors mt-7 "
         >
           Price Filter
-        </button>
+        </button> */}
+
+        <button
+  onClick={() => setPriceModalOpen(true)}
+  className="mx-auto mb-4 block text-sm font-bold text-neutral-700 hover:text-red-600 transition-colors mt-5 border-t border-neutral-300 pt-4"
+>
+  Price Filter
+</button>
+
       </div>
 
       {/* ════════ DESKTOP: full sidebar ════════ */}

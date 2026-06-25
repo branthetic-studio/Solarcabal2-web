@@ -149,12 +149,12 @@ const Products = () => {
       <div className="products-header">
         <h3 >Popular Products</h3>
         <Link
-          className="text-lg flex gap-2 items-center cursor-pointer mt-5"
+
           href="/products"
           passHref
         >
-          <span className="text-[#FF0000] font-[12px] ">See More</span>
-          <FaArrowRight className="text-[#ff0000] font-medium" />
+          <h3 style={{color:'red'}}>See More</h3>
+          
         </Link>
       </div>
 
