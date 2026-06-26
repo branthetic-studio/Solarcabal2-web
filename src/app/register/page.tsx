@@ -310,8 +310,8 @@ export default function RegisterLandingPage() {
       {/* SECTION 1 — Top bar + Logo + Title */}
       <div>
         <div className="flex justify-end">
-          <button className="p-2">
-            <Menu className="w-6 h-6 text-gray-800" />
+          <button className="p-2 mt-9">
+            {/* <Menu className="w-6 h-6 text-gray-800" /> */}
           </button>
         </div>
 
@@ -327,7 +327,7 @@ export default function RegisterLandingPage() {
           </div>
 
           <h1 className="text-3xl font-bold text-gray-900 leading-tight">
-            Welcome To
+            Welcome To 
             <br />
             SolarCabal
           </h1>

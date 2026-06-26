@@ -89,6 +89,7 @@
 
 .installation-info {
   padding: 40px 35px;
+  margin-top: -60px;
 }
 
 .installation-info h3 {
@@ -113,6 +114,11 @@
   border-radius: 12px;
 }
 
+.item h4{
+  font-size: 17px;
+  margin-top: 15px;
+  color: #281D1B;
+}
 .ready {
   background-color: #1c1c1c;
   display: flex;
@@ -184,13 +190,17 @@
 }
 
 .step-indicator {
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   background-color: red;
   border-radius: 50%;
   position: absolute;
   left: -8px;
-  top: 20px;
+ margin-top: -8px;
+  /* down:-30px */
+  /*  */
+  /* left: -8px;
+  top: 20px; */
 }
 
 .step-content {
@@ -198,7 +208,7 @@
 }
 
 .step-content h3 {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 500;
   margin-bottom: 8px;
 }
@@ -495,6 +505,12 @@
     padding: 28px 15px;
   }
 
+   
+  .installation-info h3 {
+  font-size: 20px;
+}
+
+
   .installation-steps {
     padding-left: 22px;
   }
@@ -509,12 +525,14 @@
     font-size: 28px;
     text-align: center;
   }
-  .consult-btn,
-  .request-btn {
+  .consult-btn {
     font-size: 16px;
     padding: 12px 22px;
   }
 
+  .request-btn{
+       font-size: 16px;
+  }
   /* Package header spacing */
   .package-header {
     flex-wrap: wrap;
@@ -586,7 +604,7 @@
 /* ---------- Small phones (≤ 480px) ---------- */
 @media (max-width: 480px) {
   .installation-title {
-    font-size: 24px;
+    font-size: 20px;
   }
   .installation-subtitle {
     font-size: 16px;
