@@ -21,7 +21,7 @@ export default function Home() {
       {/* <Category /> */}
       <Products />
       <ChooseUs />
-      <Reward />
+      {/* <Reward /> */}
       <Testimonial />
       <Suscribe />
       <Footer />

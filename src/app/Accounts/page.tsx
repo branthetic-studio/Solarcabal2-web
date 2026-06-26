@@ -17,6 +17,7 @@ import Footer from "@/Components/Footer/Footer";
 import Suscribe from "@/Components/Suscribe/Suscribe";
 import Navbar from "@/Components/Navbar/Navbar";
 import { ChevronDown, Loader2, Check, Trash2, Plus } from "lucide-react";
+import { PhoneNumber } from "@clerk/nextjs/server";
 
 // ─── Payout GQL ──────────────────────────────────────────────────────────────
 
@@ -259,11 +260,10 @@ const PayoutAccountsSection = () => {
       )}
 
       {/* Add account form */}
-      {showForm && (
+      {/* {showForm && (
         <div className="border rounded-xl p-4 space-y-3 bg-neutral-50">
           <p className="text-sm font-medium">New payout account</p>
 
-          {/* Bank dropdown */}
           <div>
             <label className="text-xs text-neutral-500 mb-1 block">Bank</label>
             <div className="relative">
@@ -320,7 +320,7 @@ const PayoutAccountsSection = () => {
             </div>
           </div>
 
-          {/* Account number */}
+     
           <div>
             <label className="text-xs text-neutral-500 mb-1 block">Account Number</label>
             <input
@@ -337,7 +337,7 @@ const PayoutAccountsSection = () => {
             />
           </div>
 
-          {/* Verification status */}
+
           <div className="min-h-[28px]">
             {verifying && (
               <p className="text-sm text-neutral-400 flex items-center gap-2 animate-pulse">
@@ -352,7 +352,7 @@ const PayoutAccountsSection = () => {
             )}
           </div>
 
-          {/* Actions */}
+ 
           <div className="flex justify-end gap-3 pt-1">
             <button
               className="px-4 py-2 rounded-lg border text-sm"
@@ -371,6 +371,7 @@ const PayoutAccountsSection = () => {
           </div>
         </div>
       )}
+       */}
     </section>
   );
 };
@@ -512,14 +513,17 @@ export default function AccountPage() {
     title: "",
     firstName: "",
     lastName: "",
+      phoneNumber: '',
   });
 
+  console.log(activeCustomer?.addresses[0]?.phoneNumber, 'plol active customer')
   React.useEffect(() => {
     if (!activeCustomer) return;
     setProfile({
       title: activeCustomer.title ?? "",
       firstName: activeCustomer.firstName ?? "",
       lastName: activeCustomer.lastName ?? "",
+      phoneNumber: activeCustomer?.addresses[0]?.phoneNumber ?? ""
     });
   }, [activeCustomer?.id]);
 
@@ -767,6 +771,11 @@ export default function AccountPage() {
             <input
               className="border rounded-lg p-2 bg-neutral-100"
               value={activeCustomer.emailAddress}
+              disabled
+            />
+             <input
+              className="border rounded-lg p-2 bg-neutral-100"
+              value={profile?.phoneNumber}
               disabled
             />
           </div>

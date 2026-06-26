@@ -202,7 +202,7 @@ const Banner = () => {
           </Link>
 
           {/* Refer & Earn */}
-          <Link href="/referral" className="flex flex-col items-center gap-2 group">
+          <Link href="/" className="flex flex-col items-center gap-2 group">
             <div className="w-16 h-16 rounded-full bg-[#F54E4D1A] flex items-center justify-center transition-transform group-hover:scale-105">
               <svg width="25" height="25" viewBox="0 0 25 25" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M20.8332 12.5V18.75C20.8332 21.0521 18.9686 22.9167 16.6665 22.9167H8.33317C6.03109 22.9167 4.1665 21.0521 4.1665 18.75V12.5C4.1665 11.9271 4.63525 11.4584 5.20817 11.4584H7.26025C7.83317 11.4584 8.30192 11.9271 8.30192 12.5V15.7709C8.30192 16.5417 8.729 17.25 9.40609 17.6146C9.70817 17.7813 10.0415 17.8646 10.3853 17.8646C10.7811 17.8646 11.1769 17.75 11.5207 17.5209L12.5103 16.875L13.4269 17.4896C14.0623 17.9167 14.8748 17.9688 15.5519 17.6042C16.2394 17.2396 16.6665 16.5417 16.6665 15.7605V12.5C16.6665 11.9271 17.1353 11.4584 17.7082 11.4584H19.7915C20.3644 11.4584 20.8332 11.9271 20.8332 12.5Z" fill="#FF0000"/>
