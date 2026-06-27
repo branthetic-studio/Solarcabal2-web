@@ -210,8 +210,8 @@ const PayoutAccountsSection = () => {
   };
 
   return (
-    <section className="rounded-2xl border bg-white p-5 space-y-4">
-      <div className="flex items-center justify-between">
+    <section className=" bg-white p-5 space-y-4">
+      {/* <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">Payout accounts</h2>
         {!showForm && (
           <button
@@ -222,10 +222,10 @@ const PayoutAccountsSection = () => {
             Add account
           </button>
         )}
-      </div>
+      </div> */}
 
       {/* Saved accounts list */}
-      {accountsLoading ? (
+      {/* {accountsLoading ? (
         <p className="text-sm text-neutral-400 animate-pulse">Loading accounts…</p>
       ) : savedAccounts.length === 0 && !showForm ? (
         <p className="text-sm text-neutral-500">No payout accounts saved yet.</p>
@@ -257,7 +257,7 @@ const PayoutAccountsSection = () => {
             </div>
           ))}
         </div>
-      )}
+      )} */}
 
       {/* Add account form */}
       {/* {showForm && (

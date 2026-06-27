@@ -159,12 +159,12 @@ const Banner = () => {
               >
                 Installation
               </Link>
-              <Link
+              {/* <Link
                 href="/referral"
                 className="inline-flex items-center justify-center bg-white hover:bg-red-700 hover:text-white text-red-600 px-8 py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit text-xs font-medium"
               >
                 Referral
-              </Link>
+              </Link> */}
             </div>
           </div>
         </div>

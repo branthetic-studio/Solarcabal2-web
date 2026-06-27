@@ -62,7 +62,7 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold text-lg mb-4">Earn Money with Solarcabal</h3>
             <ul className="space-y-2 text-sm text-gray-300 mb-4">
-              <li><a href="/referral" className="hover:text-red-500">Referral</a></li>
+              {/* <li><a href="/referral" className="hover:text-red-500">Referral</a></li> */}
               <li><a href="/enquiries" className="hover:text-red-500">Sell on Solarcabal</a></li>
             </ul>
 
