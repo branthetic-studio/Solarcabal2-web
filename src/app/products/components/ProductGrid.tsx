@@ -1,3 +1,4 @@
+
 // "use client";
 
 // import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
@@ -410,31 +411,21 @@
 
 //         return (
 //           <div key={brandGroup.brandId} className="w-full">
-//             <div className="w-full flex items-center justify-between py-2 border-b border-[#D4D4D4] mb-5">
-//               <button
-//                 onClick={() =>
-//                   setOpenBrands((prev) => ({
-//                     ...prev,
-//                     [brandGroup.brandId]: !prev[brandGroup.brandId],
-//                   }))
-//                 }
-//                 className="flex items-center gap-2 text-left"
-//                 aria-label={`Toggle ${brandGroup.brandName} products`}
-//               >
-//                 <h2 className="text-sm font-semibold">{brandGroup.brandName}</h2>
-//                 <span className={`text-xl transition-transform duration-200 ${isOpen ? "rotate-180" : "rotate-0"}`}>
-//                   <ChevronDown />
-//                 </span>
-//               </button>
-
-//               {/* See all → category page filtered to this brand */}
-//               <Link
-//                 href={`/products?category=${encodeURIComponent(categorySlug)}&brand=${encodeURIComponent(brandGroup.brandName)}`}
-//                 className="text-sm font-semibold text-red-600 hover:text-red-700"
-//               >
-//                 See all
-//               </Link>
-//             </div>
+//             <button
+//               onClick={() =>
+//                 setOpenBrands((prev) => ({
+//                   ...prev,
+//                   [brandGroup.brandId]: !prev[brandGroup.brandId],
+//                 }))
+//               }
+//               className="w-full flex items-center justify-between py-2 text-left border-b border-[#D4D4D4] mb-5"
+//               aria-label={`Toggle ${brandGroup.brandName} products`}
+//             >
+//               <h2 className="text-sm font-semibold">{brandGroup.brandName}</h2>
+//               <span className={`text-xl transition-transform duration-200 ${isOpen ? "rotate-180" : "rotate-0"}`}>
+//                 <ChevronDown />
+//               </span>
+//             </button>
 
 //             {isOpen && (
 //               <div className="px-2 pb-4">
@@ -458,40 +449,43 @@
 //                             />
 //                           </Link>
 
-//                           {!qty ? (
-//                             itemIsOutOfStock ? (
-//                               <button
-//                                 disabled
-//                                 className="w-full bg-gray-300 text-gray-500 py-2 rounded-md mt-3 cursor-not-allowed text-sm"
-//                               >
-//                                 Out of Stock
-//                               </button>
+//                           {/* Cart action — hidden on mobile, shown from md up */}
+//                           <div className="hidden md:block">
+//                             {!qty ? (
+//                               itemIsOutOfStock ? (
+//                                 <button
+//                                   disabled
+//                                   className="w-full bg-gray-300 text-gray-500 py-2 rounded-md mt-3 cursor-not-allowed text-sm"
+//                                 >
+//                                   Out of Stock
+//                                 </button>
+//                               ) : (
+//                                 <button
+//                                   className="w-full bg-[#141718] text-white py-2 rounded-md mt-3"
+//                                   onClick={() => handleAddToCart(item)}
+//                                 >
+//                                   Add to Cart
+//                                 </button>
+//                               )
 //                             ) : (
-//                               <button
-//                                 className="w-full bg-[#141718] text-white py-2 rounded-md mt-3"
-//                                 onClick={() => handleAddToCart(item)}
-//                               >
-//                                 Add to Cart
-//                               </button>
-//                             )
-//                           ) : (
-//                             <div className="flex items-center justify-between mt-3 bg-gray-100 rounded-md px-3 py-2">
-//                               <button
-//                                 className="text-lg font-bold bg-black rounded-md text-white px-2"
-//                                 onClick={() => adjustQuantity(item, -1)}
-//                                 aria-label="Decrease quantity"
-//                               >–</button>
-//                               <span className="font-semibold">{qty}</span>
-//                               <button
-//                                 className={`text-lg font-bold rounded-md text-white px-2 ${
-//                                   isPlusDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-black"
-//                                 }`}
-//                                 onClick={() => !isPlusDisabled && adjustQuantity(item, +1)}
-//                                 disabled={isPlusDisabled}
-//                                 aria-label="Increase quantity"
-//                               >+</button>
-//                             </div>
-//                           )}
+//                               <div className="flex items-center justify-between mt-3 bg-gray-100 rounded-md px-3 py-2">
+//                                 <button
+//                                   className="text-lg font-bold bg-black rounded-md text-white px-2"
+//                                   onClick={() => adjustQuantity(item, -1)}
+//                                   aria-label="Decrease quantity"
+//                                 >–</button>
+//                                 <span className="font-semibold">{qty}</span>
+//                                 <button
+//                                   className={`text-lg font-bold rounded-md text-white px-2 ${
+//                                     isPlusDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-black"
+//                                   }`}
+//                                   onClick={() => !isPlusDisabled && adjustQuantity(item, +1)}
+//                                   disabled={isPlusDisabled}
+//                                   aria-label="Increase quantity"
+//                                 >+</button>
+//                               </div>
+//                             )}
+//                           </div>
 //                         </div>
 
 //                         <div className="p-2">
@@ -514,7 +508,6 @@
 //     </div>
 //   );
 // }
-
 
 
 "use client";
@@ -947,7 +940,7 @@ export default function ProductGrid({
 
             {isOpen && (
               <div className="px-2 pb-4">
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
+                <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
                   {brandGroup.items.map((item) => {
                     const qty = quantityMap[item.id];
                     const itemStockLevel = stockLevelState[item.id];
@@ -957,56 +950,61 @@ export default function ProductGrid({
                     const isPlusDisabled = itemIsOutOfStock || (itemUnitsLeft !== null && (qty ?? 0) >= itemUnitsLeft);
 
                     return (
-                      <div key={item.id} className="rounded-[5px] p-1 shadow-sm bg-[#FFFFFF]">
+                      <div key={item.id} className="flex flex-col h-full rounded-[5px] p-1 shadow-sm bg-[#FFFFFF]">
                         <div className="bg-[#F3F5F7] p-3 pb-1 rounded-t-md">
-                          <Link href={`/products/${item.slug}`}>
-                            <img
-                              src={item.image || "/placeholder.png"}
-                              className="w-full h-full object-contain rounded-md"
-                              alt={item.name}
-                            />
+                          <Link href={`/products/${item.slug}`} className="block">
+                            <div className="w-full aspect-square flex items-center justify-center">
+                              <img
+                                src={item.image || "/placeholder.png"}
+                                className="max-w-full max-h-full object-contain rounded-md"
+                                alt={item.name}
+                              />
+                            </div>
                           </Link>
 
-                          {!qty ? (
-                            itemIsOutOfStock ? (
-                              <button
-                                disabled
-                                className="w-full bg-gray-300 text-gray-500 py-2 rounded-md mt-3 cursor-not-allowed text-sm"
-                              >
-                                Out of Stock
-                              </button>
+                          {/* Cart action — hidden on mobile, shown from md up */}
+                          <div className="hidden md:block">
+                            {!qty ? (
+                              itemIsOutOfStock ? (
+                                <button
+                                  disabled
+                                  className="w-full bg-gray-300 text-gray-500 py-2 rounded-md mt-3 cursor-not-allowed text-sm"
+                                >
+                                  Out of Stock
+                                </button>
+                              ) : (
+                                <button
+                                  className="w-full bg-[#141718] text-white py-2 rounded-md mt-3"
+                                  onClick={() => handleAddToCart(item)}
+                                >
+                                  Add to Cart
+                                </button>
+                              )
                             ) : (
-                              <button
-                                className="w-full bg-[#141718] text-white py-2 rounded-md mt-3"
-                                onClick={() => handleAddToCart(item)}
-                              >
-                                Add to Cart
-                              </button>
-                            )
-                          ) : (
-                            <div className="flex items-center justify-between mt-3 bg-gray-100 rounded-md px-3 py-2">
-                              <button
-                                className="text-lg font-bold bg-black rounded-md text-white px-2"
-                                onClick={() => adjustQuantity(item, -1)}
-                                aria-label="Decrease quantity"
-                              >–</button>
-                              <span className="font-semibold">{qty}</span>
-                              <button
-                                className={`text-lg font-bold rounded-md text-white px-2 ${
-                                  isPlusDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-black"
-                                }`}
-                                onClick={() => !isPlusDisabled && adjustQuantity(item, +1)}
-                                disabled={isPlusDisabled}
-                                aria-label="Increase quantity"
-                              >+</button>
-                            </div>
-                          )}
+                              <div className="flex items-center justify-between mt-3 bg-gray-100 rounded-md px-3 py-2">
+                                <button
+                                  className="text-lg font-bold bg-black rounded-md text-white px-2"
+                                  onClick={() => adjustQuantity(item, -1)}
+                                  aria-label="Decrease quantity"
+                                >–</button>
+                                <span className="font-semibold">{qty}</span>
+                                <button
+                                  className={`text-lg font-bold rounded-md text-white px-2 ${
+                                    isPlusDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-black"
+                                  }`}
+                                  onClick={() => !isPlusDisabled && adjustQuantity(item, +1)}
+                                  disabled={isPlusDisabled}
+                                  aria-label="Increase quantity"
+                                >+</button>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="p-2">
+                        <div className="flex flex-col flex-1 p-2">
                           <p className="text-sm text-gray-500 mt-2">{item.brand}</p>
-                          <p className="font-semibold text-sm">{item.name}</p>
-                          <p className="text-md font-bold mt-4">
+                          <p className="text-[12px] md:text-md font-bold line-clamp-2">{item.name}</p>
+                          <p className="text-[12px] md:text-md font-bold mt-auto pt-4">
                             {item.currencyCode}{" "}
                             {item.priceRaw ? (item.priceRaw / 100).toLocaleString() : "0.00"}
                           </p>

@@ -726,9 +726,10 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="mx-auto">
+    <div className="w-full bg-[#f5f5f5]">
       <Navbar />
-      <div className="max-w-5xl mx-auto py-20 pb-40 space-y-8 px-4">
+  <div className=" w-[94%] mx-auto py-2 lg:py-20 pb-40 space-y-8 px-4">
+
         <div className="mb-4 max-w-5xl">
           <button
             onClick={() => router.push("/")}
@@ -748,7 +749,7 @@ export default function AccountPage() {
 
         {/* Profile */}
         <section className="rounded-2xl border bg-white p-5 space-y-3">
-          <h2 className="text-sm font-semibold">Customer details</h2>
+          <h2 className="text-sm font-semibold">Customer details 898</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
               className="border rounded-lg p-2"
@@ -788,7 +789,7 @@ export default function AccountPage() {
         </section>
 
         {/* Payout accounts */}
-        <PayoutAccountsSection />
+        {/* <PayoutAccountsSection /> */}
 
         {/* Addresses */}
         <section className="rounded-2xl border bg-white p-5 space-y-4">

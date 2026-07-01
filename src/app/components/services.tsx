@@ -44,7 +44,7 @@ const services = () => {
             />
             <div className="mt-3 md:mt-4 text-center md:text-left w-full">
               <h4 className="text-base md:text-lg font-semibold text-[#281D1B]">
-                Installation
+                Solar Packages
               </h4>
               <p className="text-[#281d1b] text-md md:text-md mt-2 md:mt-2.5 leading-relaxed pb-6">
                 Enjoy exceptional solar installations that illuminate your

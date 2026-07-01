@@ -157,7 +157,7 @@ const Banner = () => {
                 href="/installation"
                 className="inline-flex items-center justify-center border border-white hover:bg-red-700 text-white px-8 py-4 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl w-fit text-xs font-medium"
               >
-                Installation
+                    Solar Packages
               </Link>
               {/* <Link
                 href="/referral"
